@@ -1,4 +1,4 @@
-# AI Agent Project 🤖
+# ai-workflow-task-agent PROJECT 🤖
 
 A flexible and extensible AI agent implementation using LangChain and LangGraph frameworks, designed to connect custom tools with AI models for intelligent task execution.
 
