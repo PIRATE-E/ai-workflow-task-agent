@@ -1,6 +1,8 @@
-from typing import Annotated, Literal, List
 import json
+from typing import Annotated, Literal, List
 
+import httpcore
+import requests
 import rich
 from langchain_community.tools import DuckDuckGoSearchRun
 # <-- CHANGE: Import message objects
@@ -12,7 +14,7 @@ from langgraph.graph.message import add_messages
 from pydantic import Field, BaseModel
 from typing_extensions import TypedDict
 
-llm = ChatOllama(#
+llm = ChatOllama(  #
     model="llava-llama3:latest",
     format="json",
     temperature=0.1,
@@ -23,8 +25,48 @@ llm = ChatOllama(#
 console = rich.get_console()
 
 
-# Define a function to search DuckDuckGo
+def translate_message(message: str, target_language: str) -> str:
+    """
+    Translates the given message to the target language.
+    This is a placeholder function; actual translation logic should be implemented.
+    """
 
+    url = "http://localhost:5500/translate"  # Replace with actual translation service URL
+    data = {
+        "q": message,
+        "source": "auto",  # Assuming the source language is English
+        "target": target_language,
+        "format": "text"
+    }
+
+    # api_headers = {
+    #     "Content-Type": "application/json"
+    # }
+
+    response = requests.post(url, json=data)
+
+    # For now, just return the original message with a note
+    return f"[Translated to {target_language}]: {response.json().get('translatedText', message)}"
+
+
+class TranslationMessage(BaseModel):
+    message: str = Field(
+        description="The message to translate. Provide the text you want to translate into the targeted language."
+    )
+    target_language: str = Field(
+        description="The language to translate the message into. Use ISO 639-1 codes (e.g., 'en' for English, 'hi' for Hindi)."
+    )
+
+
+translate_tool = StructuredTool.from_function(
+    func=translate_message,
+    name="Translatetool",
+    description="For translating messages into different languages.",
+    args_schema=TranslationMessage,
+)
+
+
+# Define a function to search DuckDuckGo
 def search_duckduckgo(query: str) -> any:
     search_tool = DuckDuckGoSearchRun()
     result = search_tool.run(query)
@@ -44,7 +86,7 @@ search_tool = StructuredTool.from_function(
 )
 
 # Register all tools here
-tools = [search_tool]
+tools = [search_tool, translate_tool]
 
 
 class ToolSelection(BaseModel):
@@ -93,7 +135,6 @@ def classify_message(state: State):
         **Classification Rules:**
     
         1.  **Classify as 'llm'** if the "Latest Message" is a follow-up question or a command related to the **Conversation History**. This includes requests to:
-            - Translate the previous response.
             - Summarize the previous response.
             - Explain the previous response.
             - Reformat the previous response.
@@ -103,6 +144,7 @@ def classify_message(state: State):
         2.  **Classify as 'tool'** ONLY IF the "Latest Message" is a request for **new information** that requires a fresh web search.
             - Example: "How many teams won the IPL?"
             - Example: "What is the weather today in London?"
+            - Example: "Translate 'Hello' to Hindi" is a tool request, but if the user says "Translate the last message to Hindi", it is a follow-up and should be classified as 'llm'.
     
         Analyze the intent. Is the user asking for a new search, or are they asking to process existing information?
         """
@@ -127,7 +169,7 @@ def router(state: State):
     # else:
     #     raise ValueError("Unknown message type")
 
-#   <-- now we use a dictionary to map message types to node names
+    #   <-- now we use a dictionary to map message types to node names
 
     return {'message_type': message_type}
 
@@ -263,4 +305,9 @@ def runn_chat():
 
 
 if __name__ == '__main__':
-    runn_chat()
+    try:
+        runn_chat()
+    except KeyboardInterrupt:
+        print("\nExiting the chatbot. Goodbye!")
+    except httpcore.ConnectError:
+        print("\nConnection error. Please turn on the Ollama server and try again.")
