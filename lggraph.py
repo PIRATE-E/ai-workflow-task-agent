@@ -186,7 +186,11 @@ def router(state: State):
 def chatBot(state: State) -> dict:
     console.print("\t\t----[bold][green]Node is chatBot[/bold][/green]")
     # print(f"[LOG] chatBot state: {state}")
-    system_prompt = "You are a next-generation AI assistant that references the full conversation history and relevant context to provide more natural, context-rich, and accurate answers to user questions. Leverage any results from available tools in your reasoning."
+    system_prompt = ("You are a next-generation AI assistant that references the full conversation history"
+                     " and relevant context to provide more natural, context-rich, and accurate answers to user questions."
+                     " Leverage any results from available tools in your reasoning."
+                     "make sure always answer user prompt using fixed json object key 'response' value 'your answer'"
+                     "for example {\"response\": \"Your answer here.\"}")
     messages = state["messages"]
     # <-- CHANGE: Prepend system prompt as a HumanMessage for consistency, though a simple dict also works here
     messages_with_system_prompt = [HumanMessage(content=system_prompt)] + messages
