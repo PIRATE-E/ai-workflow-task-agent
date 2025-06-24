@@ -133,21 +133,18 @@ def classify_message(state: State):
         **Latest Message:**
         {content}
     
-        **Classification Rules:**
+    **Classification Rules**:
     
-        1.  **Classify as 'llm'** if the "Latest Message" is a follow-up question or a command related to the **Conversation History**. This includes requests to:
-            - Summarize the previous response.
-            - Explain the previous response.
-            - Reformat the previous response.
-            - Any general chat or question about the history.
-            - Example: If history has a search result, and the user says "Translate that to Hindi", you MUST classify it as 'llm'.
+    1. **Classify as 'tool'** if the user explicitly requests new information from the web. For instance, if the user references \"search\", \"web\", or \"internet\" or asks for fresh online data.
+    2. **Classify as 'tool'** if the user insists on translating the current or previous message. Use the translation tool.
+    3. Otherwise, classify as 'llm'.
     
-        2.  **Classify as 'tool'** ONLY IF the "Latest Message" is a request for **new information** that requires a fresh web search.
-            - Example: "How many teams won the IPL?"
-            - Example: "What is the weather today in London?"
-            - Example: "Translate 'Hello' to Hindi" is a tool request, but if the user says "Translate the last message to Hindi", it is a follow-up and should be classified as 'llm'.
-    
-        Analyze the intent. Is the user asking for a new search, or are they asking to process existing information?
+    **Examples of 'llm' messages**:
+   - Greetings (like "hi", "hello")
+   - General questions or statements
+   - Follow-up questions
+   - ANY message that doesn't explicitly require external tools 
+BE CONSERVATIVE with tool usage - when in doubt, classify as 'llm'.
         """
 
     # <-- CHANGE: Pass messages as a list of objects
@@ -177,9 +174,8 @@ def router(state: State):
 
 def chatBot(state: State) -> dict:
     console.print("\t\t----[bold][green]Node is chatBot[/bold][/green]")
+    system_prompt = "You are a next-generation AI assistant that references the full conversation history and relevant context to provide more natural, context-rich, and accurate answers to user questions. Leverage any results from available tools in your reasoning."
     messages = state["messages"]
-    system_prompt = "You are a helpful chat assistant. Respond to the user's last message using the full conversation history provided for context. The history may contain results from tools, which you should use to answer the user's questions about them."
-
     # <-- CHANGE: Prepend system prompt as a HumanMessage for consistency, though a simple dict also works here
     messages_with_system_prompt = [HumanMessage(content=system_prompt)] + messages
 
