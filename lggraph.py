@@ -1,4 +1,5 @@
 import json
+import os
 from typing import Annotated, Literal, List
 
 import httpcore
@@ -13,6 +14,8 @@ from langgraph.graph import StateGraph, START, END
 from langgraph.graph.message import add_messages
 from pydantic import Field, BaseModel
 from typing_extensions import TypedDict
+
+# from IPython.display import Image, display
 
 llm = ChatOllama(  #
     model="llava-llama3:latest",
@@ -297,6 +300,8 @@ def tool_agent(state: State) -> dict:
         return {"messages": [AIMessage(content=f"Tool '{selection.tool_name}' not found.")]}
     # print("[LOG] No tool was used.")
     return {"messages": [AIMessage(content='No tool was used.')]}
+
+
 # ...existing code...
 
 
@@ -340,6 +345,24 @@ def onExit(state: State):
     return {"messages": [AIMessage(content="Thank you for using the LangGraph Chatbot!")]}
 
 
+def savePng(path: str):
+    """
+Saves the conversation history as a PNG image.
+    :param path:
+    :return:
+    """
+
+    with open(path, "wb") as f:
+        f.write(graph.get_graph().draw_mermaid_png())
+
+    # os.system('start ' + path)  # Opens the PNG file in the default viewer
+    if os.name == 'posix':
+        os.system(f'xdg-open {path}')
+    else:
+        os.system(f'start {path}')
+    pass
+
+
 def runn_chat():
     state = {'messages': [], 'message_type': None}
     print("Welcome to the LangGraph Chatbot!")
@@ -352,6 +375,8 @@ def runn_chat():
             print("Exiting the chatbot. Goodbye!")
             onExit(state)
             rich.inspect(state)
+            # display(Image(graph.get_graph().draw_mermaid_png()))
+            savePng("conversation_history.png")
             break
         # <-- CHANGE: Append a HumanMessage object instead of a dictionary
         state['messages'].append(HumanMessage(content=user_input))
