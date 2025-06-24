@@ -124,7 +124,8 @@ def classify_message(state: State):
     classified_llm = llm.with_structured_output(message_classifier)
 
     # Improved system prompt to better handle follow-up questions
-    system_prompt = F"""You are a highly intelligent message classifier. Your task is to analyze the user's "Latest Message" in the context of the "Conversation History" and classify it as either 'llm' or 'tool'.
+    system_prompt = F"""You are a highly intelligent message classifier.
+    Your task is to analyze the user's \"Latest Message\" in the context of the \"Conversation History\" and classify it as 'llm' or 'tool'.
     
         **Conversation History:**
         {history}
@@ -287,6 +288,25 @@ graph_builder.add_edge("tool_agent", END)
 graph = graph_builder.compile()
 
 
+def onExit(state: State):
+    console.print("\t\t----[bold][red]Node is onExit[/bold][/red]")
+
+    history = []
+    for msg in state["messages"]:
+        history.append(
+            {
+                "type": msg.type,
+                "content": msg.content
+            }
+        )
+
+    # save the conversation history to a file
+    json.dump(history, open("conversation_history.json", "w"), indent=2)
+
+    # <-- CHANGE: Return an AIMessage object
+    return {"messages": [AIMessage(content="Thank you for using the LangGraph Chatbot!")]}
+
+
 def runn_chat():
     state = {'messages': [], 'message_type': None}
     print("Welcome to the LangGraph Chatbot!")
@@ -296,6 +316,7 @@ def runn_chat():
         user_input = input('message: ')
         if user_input.lower() == 'exit':
             print("Exiting the chatbot. Goodbye!")
+            onExit(state)
             rich.inspect(state)
             break
         # <-- CHANGE: Append a HumanMessage object instead of a dictionary
