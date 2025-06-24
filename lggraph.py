@@ -1,9 +1,10 @@
-
-from typing import Annotated, Literal
+from typing import Annotated, Literal, List
 import json
 
 import rich
 from langchain_community.tools import DuckDuckGoSearchRun
+# <-- CHANGE: Import message objects
+from langchain_core.messages import HumanMessage, AIMessage
 from langchain_core.tools import StructuredTool
 from langchain_ollama import ChatOllama
 from langgraph.graph import StateGraph, START, END
@@ -11,7 +12,7 @@ from langgraph.graph.message import add_messages
 from pydantic import Field, BaseModel
 from typing_extensions import TypedDict
 
-llm = ChatOllama(
+llm = ChatOllama(#
     model="llava-llama3:latest",
     format="json",
     temperature=0.1,
@@ -21,32 +22,13 @@ llm = ChatOllama(
 # rich console for better output formatting
 console = rich.get_console()
 
+
 # Define a function to search DuckDuckGo
 
 def search_duckduckgo(query: str) -> any:
     search_tool = DuckDuckGoSearchRun()
     result = search_tool.run(query)
     return result
-
-
-"""
-The AI agent uses both descriptions, but for different purposes:
-
-
-description in StructuredTool (lines 36-37): 
-This is the main description for the tool itself. 
-The agent uses this high-level description ("For general web searches (recent info, facts, news).") to decide if it should select the DuckDuckGoSearch
- tool from the available tools.
-
-
-description in duckduckgo_search class (lines 29-30):
- This describes a specific parameter (query) for the tool.
-  Once the agent has decided to use DuckDuckGoSearch, it uses this description ("Search query for DuckDuckGo...") 
-  to understand what kind of value it should provide for the query argument.
-
-
-In summary, one description is for choosing the tool, and the other is for using it correctly.
-"""
 
 
 class duckduckgo_search(BaseModel):
@@ -72,7 +54,8 @@ class ToolSelection(BaseModel):
 
 
 class State(TypedDict):
-    messages: Annotated[list, add_messages]
+    # <-- CHANGE: Define the list to contain message objects
+    messages: Annotated[List[HumanMessage | AIMessage], add_messages]
     message_type: str | None
 
 
@@ -87,53 +70,47 @@ class message_classifier(BaseModel):
 def classify_message(state: State):
     print("\t\t----Node is classify_message")
     last_message = state["messages"][-1]
-    if isinstance(last_message, dict):
-        content = last_message.get("content", "")
-    else:
-        content = getattr(last_message, "content", str(last_message))
+    # <-- CHANGE: Access content directly using the .content attribute
+    content = last_message.content
 
     history_parts = []
+    # <-- CHANGE: Access message type and content directly
     for msg in state["messages"][:-1]:
-        if isinstance(msg, dict):
-            role = msg.get("role", "unknown")
-            msg_content = msg.get("content", "")
-        else:
-            role = getattr(msg, "type", "unknown")
-            msg_content = getattr(msg, "content", "")
-        history_parts.append(f"{role}: {msg_content}")
+        history_parts.append(f"{msg.type}: {msg.content}")
     history = "\n".join(history_parts)
 
     classified_llm = llm.with_structured_output(message_classifier)
 
     # Improved system prompt to better handle follow-up questions
     system_prompt = F"""You are a highly intelligent message classifier. Your task is to analyze the user's "Latest Message" in the context of the "Conversation History" and classify it as either 'llm' or 'tool'.
+    
+        **Conversation History:**
+        {history}
+    
+        **Latest Message:**
+        {content}
+    
+        **Classification Rules:**
+    
+        1.  **Classify as 'llm'** if the "Latest Message" is a follow-up question or a command related to the **Conversation History**. This includes requests to:
+            - Translate the previous response.
+            - Summarize the previous response.
+            - Explain the previous response.
+            - Reformat the previous response.
+            - Any general chat or question about the history.
+            - Example: If history has a search result, and the user says "Translate that to Hindi", you MUST classify it as 'llm'.
+    
+        2.  **Classify as 'tool'** ONLY IF the "Latest Message" is a request for **new information** that requires a fresh web search.
+            - Example: "How many teams won the IPL?"
+            - Example: "What is the weather today in London?"
+    
+        Analyze the intent. Is the user asking for a new search, or are they asking to process existing information?
+        """
 
-    **Conversation History:**
-    {history}
-
-    **Latest Message:**
-    {content}
-
-    **Classification Rules:**
-
-    1.  **Classify as 'llm'** if the "Latest Message" is a follow-up question or a command related to the **Conversation History**. This includes requests to:
-        - Translate the previous response.
-        - Summarize the previous response.
-        - Explain the previous response.
-        - Reformat the previous response.
-        - Any general chat or question about the history.
-        - Example: If history has a search result, and the user says "Translate that to Hindi", you MUST classify it as 'llm'.
-
-    2.  **Classify as 'tool'** ONLY IF the "Latest Message" is a request for **new information** that requires a fresh web search.
-        - Example: "How many teams won the IPL?"
-        - Example: "What is the weather today in London?"
-
-    Analyze the intent. Is the user asking for a new search, or are they asking to process existing information?
-    """
-
+    # <-- CHANGE: Pass messages as a list of objects
     result = classified_llm.invoke([
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": content}
+        HumanMessage(content=system_prompt),
+        HumanMessage(content=content)
     ])
 
     console.print(f"[u][red]Message classified as[/u][/red]: {result.message_type}")
@@ -143,30 +120,25 @@ def classify_message(state: State):
 def router(state: State):
     console.print("\t\t[bold][green]----Node is router[/bold][/green]")
     message_type = state.get("message_type", "llm")  # Default to 'llm' if not set
-    if message_type == "llm":
-        return {"next": "chatBot"}
-    elif message_type == "tool":
-        return {"next": "tool_agent"}
-    else:
-        raise ValueError("Unknown message type")
+    # if message_type == "llm":
+    #     return "chatBot"  # <-- CHANGE: Conditional edges now use string keys
+    # elif message_type == "tool":
+    #     return "tool_agent"  # <-- CHANGE: Conditional edges now use string keys
+    # else:
+    #     raise ValueError("Unknown message type")
+
+#   <-- now we use a dictionary to map message types to node names
+
+    return {'message_type': message_type}
 
 
 def chatBot(state: State) -> dict:
-    # the llm response contain title and response because we are using a structured output/make json=true while assigning the llm
     console.print("\t\t----[bold][green]Node is chatBot[/bold][/green]")
-
-    # This is the full list of messages, which provides context.
     messages = state["messages"]
+    system_prompt = "You are a helpful chat assistant. Respond to the user's last message using the full conversation history provided for context. The history may contain results from tools, which you should use to answer the user's questions about them."
 
-    # Your custom system prompt.
-    system_prompt = {
-        "role": "system",
-        "content": "You are a helpful chat assistant. Respond to the user's last message using the full conversation history provided for context. The history may contain results from tools, which you should use to answer the user's questions about them."
-    }
-
-    # Prepend the system prompt to the message history.
-    # This is the correct way to structure the input for the LLM.
-    messages_with_system_prompt = [system_prompt] + messages
+    # <-- CHANGE: Prepend system prompt as a HumanMessage for consistency, though a simple dict also works here
+    messages_with_system_prompt = [HumanMessage(content=system_prompt)] + messages
 
     stream = llm.stream(messages_with_system_prompt)
     content = ""
@@ -175,16 +147,15 @@ def chatBot(state: State) -> dict:
         content += chunk
         print(chunk, end="", flush=True)
     print()
-    return {"messages": [{"role": "assistant", "content": content}]}
+    # <-- CHANGE: Return an AIMessage object
+    return {"messages": [AIMessage(content=content)]}
 
 
 def tool_agent(state: State) -> dict:
     console.print("\t\t----[bold][green]Node is tool_agent[/bold][/green]")
     last_message = state["messages"][-1]
-    if isinstance(last_message, dict):
-        content = last_message.get("content", "")
-    else:
-        content = getattr(last_message, "content", str(last_message))
+    # <-- CHANGE: Access content directly
+    content = last_message.content
 
     tools_context = "\n\n".join([
         f"Tool: {tool.name}\nDescription: {tool.description}\nParameters: {json.dumps(tool.args_schema.model_json_schema())}"
@@ -198,7 +169,6 @@ def tool_agent(state: State) -> dict:
         f"Based on the user's message, select the most appropriate tool.\n"
         f"The tool name must be one of: {', '.join([tool.name for tool in tools])} or 'none'.\n"
         f"If no tool is suitable, select 'none'.\n"
-        # f"IMPORTANT: For DuckDuckGoSearch tool, your reasoning MUST BE the exact search query you want to use.\n"
         f"Your response MUST be in this exact JSON format:\n"
         f"{{\n"
         f'  "tool_name": "TOOL_NAME_HERE",\n'
@@ -207,9 +177,7 @@ def tool_agent(state: State) -> dict:
         f"}}\n"
     )
 
-    # Use non-streaming approach only
     try:
-        # Create a non-streaming LLM instance specifically for this task
         structured_llm = ChatOllama(
             model="llava-llama3:latest",
             format="json",
@@ -217,9 +185,10 @@ def tool_agent(state: State) -> dict:
             stream=False
         ).with_structured_output(ToolSelection)
 
+        # <-- CHANGE: Pass messages as objects
         selection = structured_llm.invoke([
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": content}
+            HumanMessage(content=system_prompt),
+            HumanMessage(content=content)
         ])
 
         print("Tool selected:", selection.tool_name)
@@ -227,9 +196,9 @@ def tool_agent(state: State) -> dict:
         print("Parameters:", selection.parameters)
 
     except Exception as e:
-        return {"messages": [{"role": "assistant", "content": f"Error processing tool selection: {str(e)}"}]}
+        # <-- CHANGE: Return an AIMessage object
+        return {"messages": [AIMessage(content=f"Error processing tool selection: {str(e)}")]}
 
-    # If parameters are returned as a string, parse them
     parameters = selection.parameters
     if isinstance(parameters, str):
         try:
@@ -242,14 +211,16 @@ def tool_agent(state: State) -> dict:
             if tool.name.lower() == selection.tool_name.lower():
                 try:
                     result = tool.invoke(parameters)
-                    # The line below was removed as it caused the error.
-                    # The return statement correctly handles adding the message to the state.
-                    return {"messages": [{"role": "assistant", "content": f"Result from {tool.name}: {result}"}]}
+                    # <-- CHANGE: Return an AIMessage object
+                    return {"messages": [AIMessage(content=f"Result from {tool.name}: {result}")]}
                 except Exception as e:
-                    return {"messages": [{"role": "assistant", "content": f"Error using {tool.name}: {str(e)}"}]}
-        return {"messages": [{"role": "assistant", "content": f"Tool '{selection.tool_name}' not found."}]}
+                    # <-- CHANGE: Return an AIMessage object
+                    return {"messages": [AIMessage(content=f"Error using {tool.name}: {str(e)}")]}
+        # <-- CHANGE: Return an AIMessage object
+        return {"messages": [AIMessage(content=f"Tool '{selection.tool_name}' not found.")]}
 
-    return {"messages": [{"role": "assistant", "content": "No tool was used."}]}
+    # <-- CHANGE: Return an AIMessage object
+    return {"messages": [AIMessage(content="No tool was used.")]}
 
 
 # Graph setup
@@ -260,8 +231,15 @@ graph_builder.add_node("tool_agent", tool_agent)
 
 graph_builder.add_edge(START, "classifier")
 graph_builder.add_edge('classifier', 'router')
-graph_builder.add_conditional_edges('router', lambda state: state.get("message_type"),
-                                    {"llm": "chatBot", "tool": "tool_agent"})
+
+# <-- CHANGE: Conditional edges now map string return values to node names
+graph_builder.add_conditional_edges(
+    'router',
+    # This function extracts the routing value from state updates
+    lambda state_updates: state_updates["message_type"],
+    {"llm": "chatBot", "tool": "tool_agent"}
+)
+
 graph_builder.add_edge("chatBot", END)
 graph_builder.add_edge("tool_agent", END)
 graph = graph_builder.compile()
@@ -278,9 +256,10 @@ def runn_chat():
             print("Exiting the chatbot. Goodbye!")
             rich.inspect(state)
             break
-        state['messages'].append({"role": "user", "content": user_input})
+        # <-- CHANGE: Append a HumanMessage object instead of a dictionary
+        state['messages'].append(HumanMessage(content=user_input))
         state = graph.invoke(state)
-        print(state["messages"][-1])
+        console.print(state["messages"][-1].content)  # <-- CHANGE: Access .content
 
 
 if __name__ == '__main__':
