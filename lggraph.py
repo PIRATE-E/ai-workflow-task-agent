@@ -27,7 +27,7 @@ llm = ChatOllama(  #
 # rich console for better output formatting
 console = rich.get_console()
 
-
+# Define a function to translate messages
 def translate_message(message: str, target_language: str) -> str:
     """
     Translates the given message to the target language.
@@ -88,8 +88,28 @@ search_tool = StructuredTool.from_function(
     args_schema=duckduckgo_search,
 )
 
+def rag_search(query: str) -> str:
+    """
+    here we will implement the RAG search logic. that will search the knowledge base and return relevant information.
+    this is not actual RAG it is RAG classifier that which RAG search to use. [image RAG,text RAG,PDF RAG etc.]
+    --Placeholder function for RAG search.
+    This should be replaced with actual RAG search logic.
+    """
+    return f"[RAG Search Result for '{query}']"
+
+class rag_search_message(BaseModel):
+    query: str = Field(
+        description="Search query for RAG search. Use this to find information in the knowledge base. provide a clear and concise query.", )
+
+rag_search_tool = StructuredTool.from_function(
+    func=rag_search,
+    name="RAGSearch",
+    description="For searching the knowledge base (RAG search).",
+    args_schema=rag_search_message,
+)
+
 # Register all tools here
-tools = [search_tool, translate_tool]
+tools = [search_tool, translate_tool, rag_search_tool]
 
 
 class ToolSelection(BaseModel):
