@@ -15,6 +15,8 @@ from langgraph.graph.message import add_messages
 from pydantic import Field, BaseModel
 from typing_extensions import TypedDict
 
+import RAG_FILES.rag
+
 # from IPython.display import Image, display
 
 llm = ChatOllama(  #
@@ -95,6 +97,11 @@ def rag_search(query: str) -> str:
     --Placeholder function for RAG search.
     This should be replaced with actual RAG search logic.
     """
+    # Assuming RAG_FILES.rag.embedding_store() is a function that returns the embedding store for RAG search
+    retriever_vector = RAG_FILES.rag.embedding_store()
+    # Perform the RAG search using the retriever_vector
+    retriever_vector.as_retriever(search_kwargs={"k": 5})
+    retrieved_docs = retriever_vector.get()
     return f"[RAG Search Result for '{query}']"
 
 class rag_search_message(BaseModel):
@@ -178,6 +185,7 @@ Your task is to analyze the user's \"Latest Message\" in the context of the \"Co
 1. **If the user explicitly requests or instructs to use 'AI', 'assistant', or 'LLM', always classify as 'llm', even if tool keywords are present.**
 2. **Classify as 'tool'** if the user explicitly mentions these keywords: "search", "web", or "internet" or asks for fresh online data.
 3. **Classify as 'tool'** if the user explicitly mentions these keywords: "translate" regarding translating the current or previous message. Use the translation tool.
+5  **RAG Search**: If the user asks for RAG search, classify as 'tool' and use the RAG search tool.
 4. Otherwise, classify as 'llm'.
 
 **Examples of 'llm' messages**:
