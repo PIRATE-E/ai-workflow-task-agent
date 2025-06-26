@@ -5,8 +5,8 @@ from typing import Annotated, Literal, List
 import httpcore
 import requests
 import rich
+from rich.prompt import Prompt
 from langchain_community.tools import DuckDuckGoSearchRun
-# <-- CHANGE: Import message objects
 from langchain_core.messages import HumanMessage, AIMessage
 from langchain_core.tools import StructuredTool
 from langchain_ollama import ChatOllama
@@ -92,21 +92,63 @@ search_tool = StructuredTool.from_function(
 
 def rag_search(query: str) -> str:
     """
-    here we will implement the RAG search logic. that will search the knowledge base and return relevant information.
-    this is not actual RAG it is RAG classifier that which RAG search to use. [image RAG,text RAG,PDF RAG etc.]
-    --Placeholder function for RAG search.
-    This should be replaced with actual RAG search logic.
+    :arg query: str - The user's query for RAG search.
+    :return: str - The result of the RAG search.
+    :description -
+        here we will implement the RAG search logic. that will search the knowledge base and return relevant information.
+        this is not actual RAG it is RAG classifier that which RAG search to use. [image RAG,text RAG,PDF RAG etc.]
+        --Placeholder function for RAG search.
+        This should be replaced with actual RAG search logic.
     """
-    # Assuming RAG_FILES.rag.embedding_store() is a function that returns the embedding store for RAG search
-    retriever_vector = RAG_FILES.rag.embedding_store()
-    # Perform the RAG search using the retriever_vector
-    retriever_vector.as_retriever(search_kwargs={"k": 5})
-    retrieved_docs = retriever_vector.get()
-    return f"[RAG Search Result for '{query}']"
+    file_path = Prompt.ask("Enter FILE PATH TO RAG SEARCH", default=r"C:\Users\pirat\PycharmProjects\AI_llm\RAG_FILES\patent_2.pdf")
+    system_prompt = (
+       "You are an expert RAG (Retrieval-Augmented Generation) search classifier. "
+        "Given a user's query and a file name, your task is to decide which type of RAG search to perform based primarily on the file extension and the context of the query. "
+        "Supported RAG search types are: image RAG search, text RAG search, PDF RAG search, and audio RAG search. "
+        "Determine the RAG type as follows: "
+        "- If the file extension is an image format (e.g., .jpg, .jpeg, .png, .gif), select image RAG search. "
+        "- If the file extension is a text format (e.g., .txt, .md), select text RAG search. "
+        "- If the file extension is .pdf, select PDF RAG search. "
+        "- If the file extension is an audio format (e.g., .mp3, .wav), select audio RAG search. "
+        "Also consider the user's query: if it clearly asks for a specific type of content (image, text, PDF, or audio), use that to inform your decision. "
+        "Return your answer as a JSON object in this format: {\"rag_type\": \"TYPE\", \"reasoning\": \"Your reasoning here.\"} "
+        "Be concise and accurate in your reasoning."
+    )
+    llm_rag = ChatOllama(
+        model="llava-llama3:latest",
+        format="json",
+        temperature=0.1,
+        stream=False
+    )#.with_structured_output(rag_search_message)
+    result = llm_rag.invoke([
+        HumanMessage(content=system_prompt),
+        HumanMessage(content=f"Query: {query}\nFile Name: {file_path}")
+    ])
+    print(f"rag classification using llm :- {result.content}\n\n\n")
+
+    # Parse the JSON string from result.content
+    try:
+        rag_result = json.loads(result.content)
+    except Exception as e:
+        return f"Error: Could not parse LLM output: {e}"
+
+    if not isinstance(rag_result, dict) or "rag_type" not in rag_result:
+        return "Error: Unable to classify RAG search type. Please check your query and try again."
+    elif rag_result["rag_type"].lower() == "image":
+        return "Image RAG search is not implemented yet."
+    elif rag_result["rag_type"].lower() == "text":
+        return "Text RAG search is not implemented yet."
+    elif rag_result["rag_type"].lower() == "pdf":
+        retriever_vector = RAG_FILES.rag.embedding_store()
+        retrieved_docs = retriever_vector.similarity_search_with_score(query)
+        return f"Our RAG search found the following relevant documents:\n{retrieved_docs}"
+    else:
+        return "Error: Unsupported RAG search type. Please check your query and file type."
 
 class rag_search_message(BaseModel):
     query: str = Field(
-        description="Search query for RAG search. Use this to find information in the knowledge base. provide a clear and concise query.", )
+        description="the query is for searching RAG",
+    )
 
 rag_search_tool = StructuredTool.from_function(
     func=rag_search,
