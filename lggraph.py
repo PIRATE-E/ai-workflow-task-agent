@@ -66,10 +66,9 @@ llm = ChatOllama(
 
 console = rich.get_console()
 
-def translate_message(message: str, target_language: str) -> str:
+def translate_text(message: str, target_language: str) -> str:
     """
-    Translates the given message to the target language.
-    This is a placeholder function; actual translation logic should be implemented.
+    Translates the given message to the target language using an external translation service.
     """
     url = "http://localhost:5500/translate"  # Replace with actual translation service URL
     data = {
@@ -81,14 +80,18 @@ def translate_message(message: str, target_language: str) -> str:
     response = requests.post(url, json=data)
     return f"[Translated to {target_language}]: {response.json().get('translatedText', message)}"
 
-def search_duckduckgo(query: str) -> any:
+def duckduckgo_web_search(query: str) -> any:
+    """
+    Performs a web search using DuckDuckGo and returns the result.
+    """
     search_tool = DuckDuckGoSearchRun()
     result = search_tool.run(query)
     return result
 
-def classify_rag_search(query: str) -> str:
+def rag_search_classifier(query: str) -> str:
     """
-    Classifies and performs the appropriate RAG search based on the query and file type.
+    Determines the appropriate RAG (Retrieval-Augmented Generation) search type based on the query and file type,
+    and performs the search if supported.
     """
     file_path = Prompt.ask("Enter FILE PATH TO RAG SEARCH",
                            default=r"C:\Users\pirat\PycharmProjects\AI_llm\RAG_FILES\patent_2.pdf")
@@ -142,6 +145,9 @@ def classify_rag_search(query: str) -> str:
         return "Error: Unsupported RAG search type. Please check your query and file type."
 
 def classify_message_type(state: State):
+    """
+    Classifies the latest message in the conversation as either requiring an LLM response or a tool response.
+    """
     print("\t\t----Node is classify_message")
     last_message = state["messages"][-1]
     content = last_message.content
@@ -202,11 +208,17 @@ If the user says to use the AI or LLM, do NOT use a tool, even if tool keywords 
     return {"message_type": result.message_type}
 
 def route_message(state: State):
+    """
+    Determines the next node in the workflow based on the classified message type.
+    """
     console.print("\t\t[bold][green]----Node is router[/bold][/green]")
     message_type = state.get("message_type", "llm")
     return {'message_type': message_type}
 
-def chat_Bot(state: State) -> dict:
+def generate_llm_response(state: State) -> dict:
+    """
+    Generates a response using the LLM based on the conversation history and the latest user message.
+    """
     console.print("\t\t----[bold][green]Node is chatBot[/bold][/green]")
     history = "\n".join(
         f"{msg.type}: {msg.content}" for msg in state["messages"][:-1]
@@ -235,6 +247,9 @@ def chat_Bot(state: State) -> dict:
     return {"messages": [AIMessage(content=content)]}
 
 def tool_selection_agent(state: State) -> dict:
+    """
+    Selects and invokes the most appropriate tool for the user's request, or returns a message if no tool is needed.
+    """
     console.print("\t\t----[bold][green]Node is tool_agent[/bold][/green]")
     last_message = state["messages"][-1]
     content = last_message.content
@@ -320,6 +335,9 @@ def tool_selection_agent(state: State) -> dict:
     return {"messages": [AIMessage(content='No tool was used.')]}
 
 def on_exit(state: State):
+    """
+    Handles cleanup and saving of conversation history when the chatbot session ends.
+    """
     console.print("\t\t----[bold][red]Node is onExit[/bold][/red]")
     history = []
     for msg in state["messages"]:
@@ -334,7 +352,7 @@ def on_exit(state: State):
 
 def save_png(path: str):
     """
-    Saves the conversation history as a PNG image.
+    Saves the conversation history graph as a PNG image.
     """
     with open(path, "wb") as f:
         f.write(graph.get_graph().draw_mermaid_png())
@@ -345,6 +363,9 @@ def save_png(path: str):
     pass
 
 def run_chat():
+    """
+    Main loop for running the chatbot, handling user input and conversation flow.
+    """
     state = {'messages': [], 'message_type': None}
     print("Welcome to the LangGraph Chatbot!")
     print("Type 'exit' to end the conversation.")
@@ -364,21 +385,21 @@ def run_chat():
 # -------------------- TOOL ASSIGNMENTS --------------------
 
 translate_tool = StructuredTool.from_function(
-    func=translate_message,
+    func=translate_text,
     name="Translatetool",
     description="For translating messages into different languages.",
     args_schema=TranslationMessage,
 )
 
 search_tool = StructuredTool.from_function(
-    func=search_duckduckgo,
+    func=duckduckgo_web_search,
     name="DuckDuckGoSearch",
     description="For general web searches (recent info, facts, news).",
     args_schema=duckduckgo_search,
 )
 
 rag_search_tool = StructuredTool.from_function(
-    func=classify_rag_search,
+    func=rag_search_classifier,
     name="RAGSearch",
     description="For searching the knowledge base (RAG search).",
     args_schema=rag_search_message,
@@ -391,7 +412,7 @@ tools = [search_tool, translate_tool, rag_search_tool]
 graph_builder = StateGraph(State)
 graph_builder.add_node("classifier", classify_message_type)
 graph_builder.add_node("router", route_message)
-graph_builder.add_node("chatBot", chat_Bot)
+graph_builder.add_node("chatBot", generate_llm_response)
 graph_builder.add_node("tool_agent", tool_selection_agent)
 
 graph_builder.add_edge(START, "classifier")
