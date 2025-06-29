@@ -12,12 +12,15 @@ from langchain_ollama import ChatOllama
 from langgraph.graph import StateGraph, START, END
 from langgraph.graph.message import add_messages
 from pydantic import Field, BaseModel
+from rich.align import Align
+from rich.console import Console
+from rich.panel import Panel
 from rich.prompt import Prompt
+from rich.text import Text
 from typing_extensions import TypedDict
 
 import RAG_FILES.rag
 
-# from IPython.display import Image, display
 
 # -------------------- STRUCTURED CLASSES --------------------
 
@@ -47,13 +50,16 @@ class ToolSelection(BaseModel):
     reasoning: str = Field(description="Reasoning for selecting this tool.")
     parameters: dict = Field(description="The parameters to pass to the tool.")
 
+
 class State(TypedDict):
     messages: Annotated[List[HumanMessage | AIMessage], add_messages]
     message_type: str | None
 
+
 class message_classifier(BaseModel):
     message_type: Literal['llm', 'tool'] = Field(
         description="classify the message as Type of message: 'llm' for LLM response, 'tool' for tool response.")
+
 
 # -------------------- FUNCTION DEFINITIONS --------------------
 
@@ -64,13 +70,72 @@ llm = ChatOllama(
     stream=True
 )
 
-console = rich.get_console()
+console = Console()
+
+
+def print_banner():
+    banner = """
+ .S_SSSs     .S_SSSs     .S_SSSs     .S_sSSs           .S    S.    .S_SSSs           .S_SSSs     .S         .S_SSSs      sSSs_sSSs    sdSS_SSSSSSbs  
+.SS~SSSSS   .SS~SSSSS   .SS~SSSSS   .SS~YS%%b         .SS    SS.  .SS~SSSSS         .SS~SSSSS   .SS        .SS~SSSSS    d%%SP~YS%%b   YSSS~S%SSSSSP  
+S%S   SSSS  S%S   SSSS  S%S   SSSS  S%S   `S%b        S%S    S&S  S%S   SSSS        S%S   SSSS  S%S        S%S   SSSS  d%S'     `S%b       S%S       
+S%S    S%S  S%S    S%S  S%S    S%S  S%S    S%S        S%S    d*S  S%S    S%S        S%S    S%S  S%S        S%S    S%S  S%S       S%S       S%S       
+S%S SSSS%P  S%S SSSS%S  S%S SSSS%S  S%S    d*S        S&S   .S*S  S%S SSSS%S        S%S SSSS%S  S&S        S%S SSSS%P  S&S       S&S       S&S       
+S&S  SSSY   S&S  SSS%S  S&S  SSS%S  S&S   .S*S        S&S_sdSSS   S&S  SSS%S        S&S  SSS%S  S&S        S&S  SSSY   S&S       S&S       S&S       
+S&S    S&S  S&S    S&S  S&S    S&S  S&S_sdSSS         S&S~YSSY%b  S&S    S&S        S&S    S&S  S&S        S&S    S&S  S&S       S&S       S&S       
+S&S    S&S  S&S    S&S  S&S    S&S  S&S~YSSY          S&S    `S%  S&S    S&S        S&S    S&S  S&S        S&S    S&S  S&S       S&S       S&S       
+S*S    S&S  S*S    S&S  S*S    S&S  S*S               S*S     S%  S*S    S&S        S*S    S&S  S*S        S*S    S&S  S*b       d*S       S*S       
+S*S    S*S  S*S    S*S  S*S    S*S  S*S               S*S     S&  S*S    S*S        S*S    S*S  S*S        S*S    S*S  S*S.     .S*S       S*S       
+S*S SSSSP   S*S    S*S  S*S    S*S  S*S               S*S     S&  S*S    S*S        S*S    S*S  S*S        S*S SSSSP    SSSbs_sdSSS        S*S       
+S*S  SSY    SSS    S*S  SSS    S*S  S*S               S*S     SS  SSS    S*S        SSS    S*S  S*S        S*S  SSY      YSSP~YSSY         S*S       
+SP                 SP          SP   SP                SP                 SP                SP   SP         SP                              SP        
+Y                  Y           Y    Y                 Y                  Y                 Y    Y          Y                               Y         
+                                                                                                                                                     
+    """
+    console.print(Align.center(
+        Panel.fit(Text(banner, style="bold magenta"), title="LangGraph Chatbot", subtitle="made by pirate",
+                  style="bold blue")))
+
+
+def print_message(msg, sender="user"):
+    if sender == "user":
+        icon = "👤"
+        style = "bold cyan"
+        label = "[USER]"
+    elif sender == "ai":
+        icon = "🤖"
+        style = "bold green"
+        label = "[AI]"
+    elif sender == "tool":
+        icon = "🛠️"
+        style = "bold yellow"
+        label = "[TOOL]"
+    else:
+        icon = ""
+        style = ""
+        label = ""
+    panel = Panel(
+        Align.left(Text(f"{icon} {label} {msg}", style=style)),
+        border_style=style,
+        padding=(1, 2),
+    )
+    console.print(panel)
+
+
+def print_history(messages):
+    for msg in messages:
+        if isinstance(msg, HumanMessage):
+            print_message(msg.content, sender="user")
+        elif isinstance(msg, AIMessage):
+            print_message(msg.content, sender="ai")
+        else:
+            print_message(str(msg), sender="tool")
+
 
 def translate_text(message: str, target_language: str) -> str:
     """
     Translates the given message to the target language using an external translation service.
     """
-    url = "http://localhost:5500/translate"  # Replace with actual translation service URL
+    url = "http://localhost:5560/translate"  # Replace with actual translation service URL
     data = {
         "q": message,
         "source": "auto",
@@ -80,6 +145,7 @@ def translate_text(message: str, target_language: str) -> str:
     response = requests.post(url, json=data)
     return f"[Translated to {target_language}]: {response.json().get('translatedText', message)}"
 
+
 def duckduckgo_web_search(query: str) -> any:
     """
     Performs a web search using DuckDuckGo and returns the result.
@@ -87,6 +153,7 @@ def duckduckgo_web_search(query: str) -> any:
     search_tool = DuckDuckGoSearchRun()
     result = search_tool.run(query)
     return result
+
 
 def rag_search_classifier(query: str) -> str:
     """
@@ -131,18 +198,19 @@ def rag_search_classifier(query: str) -> str:
     elif rag_result["rag_type"].lower() == "text":
         return "Text RAG search is not implemented yet."
     elif rag_result["rag_type"].lower() == "pdf":
-        similar_search_output = RAG_FILES.rag.most_similar_doc(query, file_path)
+        similar_search_output = RAG_FILES.rag.find_similar_documents(query, file_path)
         similar_search_output_str = "\n".join(
             [f"Document {i + 1}: {doc.page_content}" for i, doc in enumerate(similar_search_output)]
         )
-        gen_ai_search_output = RAG_FILES.rag.similarity_search_genai(query, [doc.page_content for doc in
-                                                                             similar_search_output])
+        gen_ai_search_output = RAG_FILES.rag.search_similar_chunks_genai(query, [doc.page_content for doc in
+                                                                                 similar_search_output])
         gen_ai_search_output_str = "\n".join(
             [f"Document {i + 1}: {doc.page_content}" for i, doc in enumerate(gen_ai_search_output)]
         )
         return f"\n\nSimilarity Search Results:\n{similar_search_output_str}\n\nGenAI Search Results:\n{gen_ai_search_output_str}"
     else:
         return "Error: Unsupported RAG search type. Please check your query and file type."
+
 
 def classify_message_type(state: State):
     """
@@ -207,6 +275,7 @@ If the user says to use the AI or LLM, do NOT use a tool, even if tool keywords 
     console.print(f"[u][red]Message classified as[/u][/red]: {result.message_type}")
     return {"message_type": result.message_type}
 
+
 def route_message(state: State):
     """
     Determines the next node in the workflow based on the classified message type.
@@ -215,9 +284,11 @@ def route_message(state: State):
     message_type = state.get("message_type", "llm")
     return {'message_type': message_type}
 
+
 def generate_llm_response(state: State) -> dict:
     """
     Generates a response using the LLM based on the conversation history and the latest user message.
+    Shows a spinner while generating the response.
     """
     console.print("\t\t----[bold][green]Node is chatBot[/bold][/green]")
     history = "\n".join(
@@ -237,14 +308,16 @@ def generate_llm_response(state: State) -> dict:
     )
     messages_with_system_prompt = [HumanMessage(content=system_prompt)]
 
-    stream = llm.stream(messages_with_system_prompt)
-    content = ""
-    for part in stream:
-        chunk = part.content if part.content is not None else ""
-        content += chunk
-        print(chunk, end="", flush=True)
-    print()
+    with console.status("[bold green]Thinking...[/bold green]", spinner="dots"):
+        stream = llm.stream(messages_with_system_prompt)
+        content = ""
+        for part in stream:
+            chunk = part.content if part.content is not None else ""
+            content += chunk
+    # Print AI message in modern style
+    print_message(content, sender="ai")
     return {"messages": [AIMessage(content=content)]}
+
 
 def tool_selection_agent(state: State) -> dict:
     """
@@ -326,6 +399,8 @@ def tool_selection_agent(state: State) -> dict:
             if tool.name.lower() == selection.tool_name.lower():
                 try:
                     result = tool.invoke(parameters)
+                    # Print tool result in modern style
+                    print_message(result, sender="tool")
                     return {"messages": [AIMessage(content=f"Result from {tool.name}: {result}")]}
                 except Exception as e:
                     print(f"[ERROR] Error using tool {tool.name}: {e}")
@@ -334,11 +409,12 @@ def tool_selection_agent(state: State) -> dict:
         return {"messages": [AIMessage(content=f"Tool '{selection.tool_name}' not found.")]}
     return {"messages": [AIMessage(content='No tool was used.')]}
 
+
 def on_exit(state: State):
     """
     Handles cleanup and saving of conversation history when the chatbot session ends.
     """
-    console.print("\t\t----[bold][red]Node is onExit[/bold][/red]")
+    console.print("\t\t----[bold][red]Node is onExit[/bold][red]")
     history = []
     for msg in state["messages"]:
         history.append(
@@ -349,6 +425,7 @@ def on_exit(state: State):
         )
     json.dump(history, open("conversation_history.json", "w"), indent=2)
     return {"messages": [AIMessage(content="Thank you for using the LangGraph Chatbot!")]}
+
 
 def save_png(path: str):
     """
@@ -362,25 +439,33 @@ def save_png(path: str):
         os.system(f'start {path}')
     pass
 
+
 def run_chat():
     """
     Main loop for running the chatbot, handling user input and conversation flow.
+    Modernized with banner, styled prompts, and message history.
     """
     state = {'messages': [], 'message_type': None}
-    print("Welcome to the LangGraph Chatbot!")
-    print("Type 'exit' to end the conversation.")
+    print_banner()
+    console.print(Align.center("[bold blue]Welcome to the LangGraph Chatbot![/bold blue]"))
+    console.print(Align.center("Type '[bold red]exit[/bold red]' to end the conversation.\n"))
 
     while True:
-        user_input = input('message: ')
+        user_input = Prompt.ask("[bold cyan]You[/bold cyan]", default="", show_default=False)
         if user_input.lower() == 'exit':
-            print("Exiting the chatbot. Goodbye!")
+            print_message("Exiting the chatbot. Goodbye!", sender="ai")
+            if state["messages"]:
+                print_history(state["messages"])
             on_exit(state)
             rich.inspect(state)
             save_png("conversation_history.png")
             break
         state['messages'].append(HumanMessage(content=user_input))
+        # Print user message in modern style
+        print_message(user_input, sender="user")
         state = graph.invoke(state)
-        console.print(state["messages"][-1].content)
+        # The AI/tool message is printed inside generate_llm_response/tool_selection_agent
+
 
 # -------------------- TOOL ASSIGNMENTS --------------------
 
