@@ -1,3 +1,4 @@
+import asyncio
 import json
 import os
 from typing import Annotated, Literal, List
@@ -155,13 +156,43 @@ def duckduckgo_web_search(query: str) -> any:
     return result
 
 
+def retrieve_knowledge_graph(query: str) -> str:
+    """
+    Retrieves information from the knowledge graph based on a query.
+    Convert the user's query to the Cypher query format and return the results from the knowledge graph.
+    """
+    # Here you would typically query your knowledge graph database
+    # For demonstration purposes, we return a static response
+
+    llm = ChatOllama(
+        model="llava-llama3:latest",
+        temperature=0.1,
+    )
+    system_prompt = (
+        "You are an expert knowledge graph query generator. "
+        "Given a user's query, your task is to convert it into a Cypher query format for a Neo4j database. "
+        "Return the Cypher query as a string."
+    )
+
+    result = llm.invoke([
+        HumanMessage(content=system_prompt),
+        HumanMessage(content=f"Query: {query}")
+    ])
+
+    cypher_query = result.content.strip()
+    # now run the cypher query against your Neo4j database
+    results = RAG_FILES.rag.get_retrieve_triples(cypher_query)
+
+    return f"Results for '{query}' from the knowledge graph {results}."
+
+
 def rag_search_classifier(query: str) -> str:
     """
     Determines the appropriate RAG (Retrieval-Augmented Generation) search type based on the query and file type,
     and performs the search if supported.
     """
     file_path = Prompt.ask("Enter FILE PATH TO RAG SEARCH",
-                           default=r"C:\Users\pirat\PycharmProjects\AI_llm\RAG_FILES\patent_2.pdf")
+                           default=r"C:\Users\pirat\PycharmProjects\AI_llm\RAG_FILES\kafka.pdf")
     system_prompt = (
         "You are an expert RAG (Retrieval-Augmented Generation) search classifier. "
         "Given a user's query and a file name, your task is to decide which type of RAG search to perform based primarily on the file extension and the context of the query. "
@@ -198,16 +229,8 @@ def rag_search_classifier(query: str) -> str:
     elif rag_result["rag_type"].lower() == "text":
         return "Text RAG search is not implemented yet."
     elif rag_result["rag_type"].lower() == "pdf":
-        similar_search_output = RAG_FILES.rag.find_similar_documents(query, file_path)
-        similar_search_output_str = "\n".join(
-            [f"Document {i + 1}: {doc.page_content}" for i, doc in enumerate(similar_search_output)]
-        )
-        gen_ai_search_output = RAG_FILES.rag.search_similar_chunks_genai(query, [doc.page_content for doc in
-                                                                                 similar_search_output])
-        gen_ai_search_output_str = "\n".join(
-            [f"Document {i + 1}: {doc.page_content}" for i, doc in enumerate(gen_ai_search_output)]
-        )
-        return f"\n\nSimilarity Search Results:\n{similar_search_output_str}\n\nGenAI Search Results:\n{gen_ai_search_output_str}"
+        RAG_FILES.rag.save_knowledge_graph_gemini_api(file_path)
+        return f"{"retrieve_knowledge_graph(query)"}"
     else:
         return "Error: Unsupported RAG search type. Please check your query and file type."
 
@@ -359,6 +382,21 @@ def tool_selection_agent(state: State) -> dict:
         "- If the tool requires parameters, extract them from the user's message or conversation context.\n"
         "- If the user refers to previous messages, use them to inform your reasoning and parameter selection.\n"
         "- Always provide clear, step-by-step reasoning for your choice.\n"
+        "**Parameter Extraction Examples:**\n"
+        "- If the user says: \"rag search :- Technology\"\n"
+        "  - Tool: RAGSearch\n"
+        "  - Parameters: { \"query\": \"Technology\" }\n"
+        "- If the user says: \"rag search: AI in healthcare\"\n"
+        "  - Tool: RAGSearch\n"
+        "  - Parameters: { \"query\": \"AI in healthcare\" }\n"
+        "- If the user says: \"search for patents about batteries\"\n"
+        "  - Tool: DuckDuckGoSearch\n"
+        "  - Parameters: { \"query\": \"patents about batteries\" }\n"
+        "- If the user says: \"translate hello to French\"\n"
+        "  - Tool: Translatetool\n"
+        "  - Parameters: { \"message\": \"hello\", \"target_language\": \"fr\" }\n"
+        "\n"
+
     )
 
     try:
@@ -445,6 +483,7 @@ def run_chat():
     Main loop for running the chatbot, handling user input and conversation flow.
     Modernized with banner, styled prompts, and message history.
     """
+    os.system("cls" if os.name == 'nt' else "clear")
     state = {'messages': [], 'message_type': None}
     print_banner()
     console.print(Align.center("[bold blue]Welcome to the LangGraph Chatbot![/bold blue]"))
@@ -458,7 +497,7 @@ def run_chat():
                 print_history(state["messages"])
             on_exit(state)
             rich.inspect(state)
-            save_png("conversation_history.png")
+            # save_png("conversation_history.png")
             break
         state['messages'].append(HumanMessage(content=user_input))
         # Print user message in modern style
