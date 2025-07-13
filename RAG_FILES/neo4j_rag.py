@@ -5,7 +5,7 @@ import subprocess
 import tempfile
 import uuid
 from pathlib import Path
-from typing import Any
+from typing import Any, Coroutine
 
 import google.genai as genai
 from anyio import Semaphore
@@ -73,7 +73,8 @@ SUBPROCESS_TIMEOUT = 120  # 2 minutes timeout per request
 task_count = 0  # Global counter for tracking the number of tasks
 
 
-async def prompt_gemini_for_triples(chunk: Document) -> list:
+async def prompt_gemini_for_triples_cli(chunk: Document) -> dict[str, Document | str | list[Any]] | dict[
+    str, Document | list[Any]]:
     """
     FIXED VERSION: Enhanced error handling, resource management, and process isolation.
     Uses temporary files to avoid CLI interference and implements proper cleanup.
@@ -81,112 +82,53 @@ async def prompt_gemini_for_triples(chunk: Document) -> list:
     Args:
         chunk (Document): A Document object containing the text to analyze.
     """
-    prompt = f"""
-    You are an expert in extracting subject-predicate-object triples from text.
-    Your task is to analyze the following text and extract all subject-predicate-object triples for making knowledge graph.
-    Extract all subject-predicate-object triples (entities and their relationships) from the following text.
-    Respond in a JSON list of triples with keys "subject", "relation", and "object".
-    Only return the JSON list without any additional text or explanation.
-    Text:
-    {chunk.page_content}
-    """
+    prompt = SYSTEM_PROMPT_GENERATE_TRIPLE + f"""text :- \n\t{chunk.page_content.strip()}"""
 
     if not os.path.exists(GEMINI_CLI_PATH):
         raise FileNotFoundError(
             f"Gemini command not found at {GEMINI_CLI_PATH}. Please ensure it is installed and the path is correct."
         )
+    process = await asyncio.create_subprocess_exec(
+        GEMINI_CLI_PATH,
+        stderr=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stdin=subprocess.PIPE,
+        creationflags=subprocess.CREATE_NO_WINDOW,  # Prevents a new console window from opening
+    )
 
-    # 🚀 FIXED: Proper semaphore management with context manager pattern
-    async with semaphore:
-        global task_count
-        task_count += 1
-        print(f"Task count before processing: {task_count}")
-        # 🚀 FIXED: Add small delay to prevent overwhelming
-        await asyncio.sleep(0.2)
-
-        # 🚀 FIXED: Use temporary files to avoid CLI interference
-        temp_dir = Path(tempfile.gettempdir()) / "gemini_parallel"
-        temp_dir.mkdir(exist_ok=True)
-
-        input_file = temp_dir / f"input_{uuid.uuid4().hex}.txt"
-        output_file = temp_dir / f"output_{uuid.uuid4().hex}.json"
-
-        try:
-            # Write prompt to temporary file
-            with open(input_file, 'w', encoding='utf-8') as f:
-                f.write(prompt)
-
-            # 🚀 FIXED: Enhanced subprocess call with proper timeout and isolation
-            process = await asyncio.create_subprocess_exec(
-                GEMINI_CLI_PATH,
-                stdin=subprocess.PIPE,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                creationflags=subprocess.CREATE_NO_WINDOW,
-                cwd=temp_dir  # Isolate working directory
+    try:
+        stdout, stderr = await asyncio.wait_for(process.communicate(input=prompt.encode("utf-8")), timeout=SUBPROCESS_TIMEOUT)
+        stdout = stdout.decode('utf-8').strip()
+        stderr = stderr.decode('utf-8').strip()
+        if process.returncode != 0:
+            raise RuntimeError(
+                f"Gemini command failed with return code {process.returncode}: {stderr}"
             )
+    except asyncio.TimeoutError:
+        process.kill()
+        stdout , stderr = await process.communicate()
+        raise FileNotFoundError(f"Gemini CLI call timed out after {SUBPROCESS_TIMEOUT} seconds, error:-{stderr.decode('utf-8')}")
 
-            result = ""
+    triples = None
+    try:
+        triples = json.loads(stdout)
+    except json.JSONDecodeError as e:
+        json_start_pointer = stdout.find("[")
+        json_end_pointer = stdout.rfind("]") + 1
 
+        # pointer would -1 if it does not find the character "["
+        if json_start_pointer != -1 and json_end_pointer > json_start_pointer:
+            json_part = stdout[json_start_pointer:json_end_pointer]
             try:
-                stdout, stderr = await asyncio.wait_for(
-                    process.communicate(input=prompt.encode("utf-8")),
-                    timeout=SUBPROCESS_TIMEOUT
-                )
-                result = stdout.decode("utf-8").strip() if stdout else ""
-                error_output = stderr.decode("utf-8").strip() if stderr else ""
-                if process.returncode != 0:
-                    raise RuntimeError(
-                        f"Gemini command failed with return code {process.returncode}: {error_output}\nOutput: {result}"
-                    )
-            except asyncio.TimeoutError:
-                # ... [timeout handling] ...
-                raise RuntimeError(f"Gemini CLI call timed out after {SUBPROCESS_TIMEOUT} seconds")
-        except Exception as e:
-            raise RuntimeError(f"Gemini command failed with error: {e}")
-        finally:
-            task_count -= 1  # Decrement task count
-            print(f"Task count after processing: {task_count}")
-            # Cleanup temporary files
-            try:
-                if input_file.exists():
-                    input_file.unlink()
-                if output_file.exists():
-                    output_file.unlink()
-            except Exception:
-                print(f"Failed to clean up temporary files: {input_file}, {output_file}")
+                triples = json.loads(json_part)
+            except json.JSONDecodeError as extraction_error:
+                print(f"Failed to extract JSON from response: {extraction_error}")
+                print(f"Original output: {stdout}")
+    if triples is None or not isinstance(triples, list):
+        print("No triples extracted or empty response.")
+        return {"chunk": chunk, "triples": []}
+    return {"chunk": chunk, "triples": triples}
 
-        # Now, after all try/except/finally, do the JSON parsing and return
-        try:
-            if not result or result == "[]" or len(result.strip()) == 0:
-                print("No triples extracted or empty response.")
-                return []
-            triples = json.loads(result)
-            if not isinstance(triples, list):
-                print(f"Warning: Expected list, got {type(triples)}. Attempting to extract...")
-                raise json.JSONDecodeError("Not a list", result, 0)
-            return triples
-        except json.JSONDecodeError as e:
-            print(f"JSON decode error: {e}")
-            print(f"Raw result: {result}")
-            try:
-                json_start = result.find("[")
-                json_end = result.rfind("]") + 1
-                if json_start != -1 and json_end > json_start:
-                    json_part = result[json_start:json_end]
-                    triples = json.loads(json_part)
-                    if isinstance(triples, list):
-                        return triples
-                    else:
-                        print(f"Extracted JSON is not a list: {type(triples)}")
-                        return []
-                else:
-                    print("No JSON array found in response")
-                    return []
-            except Exception as extraction_error:
-                print(f"Failed to extract JSON: {extraction_error}")
-                print(f"Original result: {result}")
-                return []
 
 
 # 🚀 FIXED: Enhanced batch processing function keep this method to for if more batching related issue arises
@@ -207,7 +149,7 @@ async def prompt_gemini_for_triples_batch(chunks: list[Document], batch_size: in
         batch = chunks[i:i + batch_size]
         print(f"Processing batch {i // batch_size + 1}/{(len(chunks) + batch_size - 1) // batch_size}")
 
-        batch_tasks = [prompt_gemini_for_triples(chunk) for chunk in batch]
+        batch_tasks = [prompt_gemini_for_triples_cli(chunk) for chunk in batch]
         batch_results = await asyncio.gather(*batch_tasks, return_exceptions=True)
 
         # Handle exceptions in batch results
@@ -266,7 +208,7 @@ async def prompt_gemini_for_triples_api(chunk: Document) -> None | dict[str, Doc
         return {"chunk": chunk, "triples": triples}
     except json.JSONDecodeError as e:
         print(f"JSON decode error: {e}")
-        print(f"Raw result: {output}")
+        # print(f"Raw result: {output}")
         try:
             json_start = output.find("[")
             json_end = output.rfind("]") + 1
