@@ -1,6 +1,5 @@
-import functools
-import sys
 import os
+import sys
 
 # Add the parent directory to the Python path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -31,6 +30,7 @@ except Exception as e:
     print(f"Error connecting to socket: {e}")
     socket_con = None
 
+
 def load_pdf_document(
         doc_path: str = r"C:\Users\pirat\PycharmProjects\AI_llm\RAG_FILES\kafka.pdf",
 ) -> list:
@@ -46,7 +46,8 @@ def load_pdf_document(
     loader = PyPDFLoader(doc_path)
     return loader.load()
 
-@functools.lru_cache(maxsize=1)
+
+# @functools.lru_cache(maxsize=1)
 def split_into_unique_chunks(documents: list, chunking_size: int) -> list[Document]:
     """
     Splits a list of Document objects into unique text chunks using a recursive character splitter.
@@ -204,129 +205,38 @@ async def save_knowledge_graph_local_llm(file_path: str):
 
 
 def save_knowledge_graph_gemini_cli(file_path: str):
-    async def saving_knowledge_graph_immediate():
-        """
-        Save the knowledge graph to the Neo4j database using Gemini CLI with IMMEDIATE saving.
-        This processes and saves triples as soon as each chunk completes.
-        """
-        # Load PDF document
-        document_pdf = load_pdf_document(file_path)
-        processed_chunks = get_processed_chunks()
+    documents = load_pdf_document(file_path)
+    processed_chunks = get_processed_chunks()
 
-        print(f"Total words: {sum(len(doc.page_content.split()) for doc in document_pdf)}")
-        print(f"Total characters: {sum(len(doc.page_content.strip()) for doc in document_pdf)}")
+    print(f"Total words: {sum(len(doc.page_content.split()) for doc in documents)}")
+    print(f"Total characters: {sum(len(doc.page_content.strip()) for doc in documents)}")
 
-        # Chunking logic (same as before)
-        if rich.prompt.Prompt.ask("Do you want chunking? (y/n)", default="y") == "y":
-            no_of_chunks = int(rich.prompt.Prompt.ask("Enter how many chunks you want", default=10))
-            chunking_size = sum(len(doc.page_content.strip()) for doc in document_pdf) // no_of_chunks
-            all_text_doc = "".join(doc.page_content.strip() for doc in document_pdf)
-        else:
-            all_text_doc = "".join(doc.page_content for doc in document_pdf)
-            chunking_size = len(all_text_doc)
+    all_text_doc = "".join(doc.page_content.strip() for doc in documents)
+    if rich.prompt.Prompt.ask("Do you want chunking? (y/n)", default="y") == "y":
+        no_of_chunks = int(rich.prompt.Prompt.ask("Enter how many chunks you want", default=10))
+        chunking_size = len(all_text_doc) // no_of_chunks
 
-        chunks = split_into_unique_chunks([Document(page_content=all_text_doc.strip())], chunking_size)
-        print(f"Total chunks created: {len(chunks)}")
-        print(f"Total processed chunks: {len(processed_chunks)}")
+    else:
+        chunking_size = len(all_text_doc)  # no chunking, use the whole document as one chunk
 
-        if rich.prompt.Prompt.ask("Do you want to overwrite the processed chunks? (y/n)") == "y":
-            with open("processed_hash_chunks.txt", "w") as file:
-                file.write("")
-            with open("processed_triple.json", "w") as file:
-                file.write("[]")
+    if rich.prompt.Prompt.ask("Do you want to overwrite the processed chunks? (y/n)") == "y":
+        with open("processed_hash_chunks.txt", "w") as file:
+            file.write("")
+        with open("processed_triple.json", "w") as file:
+            file.write("[]")
 
-        async def process_chunk_with_data(chunk):
-            """Wrapper function that includes chunk data with the result"""
-            chunk_hash = hashlib.sha256(chunk.page_content.encode()).hexdigest()
-            try:
-                triples = await neo4j_rag.prompt_gemini_for_triples(chunk)
-                return {
-                    "success": True,
-                    "triples": triples,
-                    "chunk": chunk,
-                    "chunk_hash": chunk_hash,
-                    "error": None
-                }
-            except Exception as e:
-                return {
-                    "success": False,
-                    "triples": None,
-                    "chunk": chunk,
-                    "chunk_hash": chunk_hash,
-                    "error": str(e)
-                }
+    chunks = split_into_unique_chunks([Document(page_content=all_text_doc.strip())], chunking_size)
+    print(f"Total chunks created: {len(chunks)}")
 
-        # Create tasks for unprocessed chunks only
-        tasks = []
-        for chunk in chunks:
-            chunk_hash = hashlib.sha256(chunk.page_content.encode()).hexdigest()
-            if chunk_hash not in processed_chunks:
-                task = asyncio.create_task(process_chunk_with_data(chunk))
-                tasks.append(task)
-            else:
-                print(f"Skipping already processed chunk: {chunk.page_content[:50]}...")
+    print(f"Total processed chunks: {len(processed_chunks)}")
+    # remove the processed chunks from the chunks list (this is unique chunk that has to be processed)
+    chunks_to_process = [chunk for chunk in chunks if
+                         hashlib.sha256(chunk.page_content.encode()).hexdigest() not in processed_chunks]
 
-        if not tasks:
-            print("All chunks already processed!")
-            return
-
-        print(f"Processing {len(tasks)} chunks with IMMEDIATE saving...")
-
-        successful_count = 0
-        total_tasks = len(tasks)
-
-        try:
-            for completed_task in asyncio.as_completed(tasks):
-                try:
-                    result = await completed_task
-
-                    if result["success"] and result["triples"] and isinstance(result["triples"], list):
-                        mark_triple_chunk(result["triples"], result["chunk_hash"])
-                        successful_count += 1
-                        print(
-                            f"✅ IMMEDIATELY SAVED chunk {successful_count}/{total_tasks}: "
-                            f"{result['chunk'].page_content[:30]}... with hash {result['chunk_hash']}"
-                        )
-                    else:
-                        error_msg = result["error"] if result["error"] else "No valid triples extracted"
-                        print(
-                            f"❌ Failed chunk: {result['chunk'].page_content[:30]}... "
-                            f"with hash {result['chunk_hash']} - {error_msg}"
-                        )
-                except Exception as e:
-                    SocketCon.send_error(f"❌ Error processing individual chunk: {e}")
-                    continue
-
-        except Exception as e:
-            print(f"Error during async processing: {e}")
-            return
-
-        print(f"Successfully processed and saved {successful_count}/{total_tasks} chunks IMMEDIATELY")
-
-        # Step 3: Insert all saved triples into Neo4j
-        print("Inserting all triples into Neo4j...")
-        print("clearing database if any other data is present")
-        try:
-            neo4j_rag.clear_database()
-            for triple in get_all_triples():
-                subject = triple.get("subject") or triple.get("Subject")
-                predicate = (
-                        triple.get("predicate") or triple.get("relation") or
-                        triple.get("Predicate") or triple.get("Relation")
-                )
-                object_val = triple.get("object") or triple.get("Object")
-                if subject and predicate and object_val is not None:
-                    neo4j_rag.insert_triples([(subject, predicate, object_val)])
-        except Exception as e:
-            print(f"Error inserting triples to Neo4j: {e}")
-
-        processed_chunks = get_processed_chunks()
-        print(f"Final processed chunks: {len(processed_chunks)}")
-
-    asyncio.run(saving_knowledge_graph_immediate())
+    asyncio.run(process_chunks_with_immediate_saving(chunks_to_process, neo4j_rag.prompt_gemini_for_triples_cli))
 
 
-async def process_chunks_with_immediate_saving(chunks_to_process: list[Document]):
+async def process_chunks_with_immediate_saving(chunks_to_process: list[Document], function=neo4j_rag.prompt_gemini_for_triples_api):
     """
     Process chunks with true parallelism (up to semaphore limit) and save results immediately.
     """
@@ -348,7 +258,7 @@ async def process_chunks_with_immediate_saving(chunks_to_process: list[Document]
 
             try:
                 # Call Gemini API (properly awaiting the async function)
-                result = await neo4j_rag.prompt_gemini_for_triples_api(chunk)
+                result = await function(chunk)
 
                 # Log completion with timing information
                 duration = asyncio.get_event_loop().time() - start_time
@@ -356,7 +266,7 @@ async def process_chunks_with_immediate_saving(chunks_to_process: list[Document]
 
                 return result
             except Exception as e:
-                SocketCon.send_error(f"❌ Error processing chunk, active taskc count {active_task}: {e}")
+                socket_con.send_error(f"❌ Error processing chunk, active taskc count {active_task}: {e}")
                 return {"chunk": chunk, "triples": []}
 
             finally:
@@ -380,23 +290,38 @@ async def process_chunks_with_immediate_saving(chunks_to_process: list[Document]
         saved_results.append(result.get('chunk'))
         print(f"✅ Processed chunk #{completed_tasks_count}/{len(tasks)}: {result['chunk'].page_content[:20]}...")
 
-        if len(saved_results) == get_processed_chunks():
-            print("All chunks processed, exiting early.")
-            if result.get("triples") and isinstance(result["triples"], list):
-                triples = result["triples"]
-                chunk = result["chunk"]
-                if triples or len(triples) > 0:
-                    print("💾 Saving triples immediately...")
-                    try:
-                        mark_triple_chunk(triples, hashlib.sha256(chunk.page_content.encode()).hexdigest())
-                    except Exception as e:
-                        SocketCon.send_error(f"❌ Error saving triples: {e} chunk : {chunk.page_content[:20]}")
-                else:
-                    print("⚠️ No triples found in this chunk, skipping save. for chunk: ", result['chunk'].page_content[:20])
-        else:
-            print(f"❌ No result for chunk #{completed_tasks_count}/{len(tasks)}")
+        # if len(saved_results) == get_processed_chunks():
+        #     print("All chunks processed, exiting early.")
+        #     if result.get("triples") and isinstance(result["triples"], list):
+        #         triples = result["triples"]
+        #         chunk = result["chunk"]
+        #         if triples or len(triples) > 0:
+        #             print("💾 Saving triples immediately...")
+        #             try:
+        #                 mark_triple_chunk(triples, hashlib.sha256(chunk.page_content.encode()).hexdigest())
+        #             except Exception as e:
+        #                 SocketCon.send_error(f"❌ Error saving triples: {e} chunk : {chunk.page_content[:20]}")
+        #         else:
+        #             print("⚠️ No triples found in this chunk, skipping save. for chunk: ", result['chunk'].page_content[:20])
+        # else:
+        #     print(f"❌ No result for chunk #{completed_tasks_count}/{len(tasks)}")
 
-        # save triples to Neo4j immediately
+        if result.get("triples") and isinstance(result["triples"], list):
+            triples = result["triples"]
+            chunk = result["chunk"]
+            if triples or len(triples) > 0:
+                print("💾 Saving triples immediately...")
+                try:
+                    mark_triple_chunk(triples, hashlib.sha256(chunk.page_content.encode()).hexdigest())
+                except Exception as e:
+                    socket_con.send_error(f"❌ Error saving triples: {e} chunk : {chunk.page_content[:20]}")
+            else:
+                print("⚠️ No triples found in this chunk, skipping save. for chunk: ",
+                      result['chunk'].page_content[:20])
+
+    # save triples to Neo4j immediately
+    if len(saved_results) == len(chunks_to_process):
+        print("All chunks processed, saving triples to Neo4j database...")
         for triples in get_all_triples():
             subject = triples.get("subject") or triples.get("Subject")
             predicate = (
@@ -408,15 +333,15 @@ async def process_chunks_with_immediate_saving(chunks_to_process: list[Document]
                 try:
                     neo4j_rag.insert_triples([(subject, predicate, object_val)])
                 except Exception as e:
-                    SocketCon.send_error(f"❌ Error inserting triples to Neo4j:"
-                          f" {e} \n subject: {subject}, predicate: {predicate}, object: {object_val}")
+                    socket_con.send_error(f"❌ Error inserting triples to Neo4j:"
+                                          f" {e} \n subject: {subject}, predicate: {predicate}, object: {object_val}")
 
-            #   # Show progress
-        elapsed = asyncio.get_event_loop().time() - start_time
-        print(f"⏱️ Progress: {completed_tasks_count}/{len(tasks)} chunks processed in {elapsed:.2f}s")
+        #   # Show progress
+    elapsed = asyncio.get_event_loop().time() - start_time
+    print(f"⏱️ Progress: {completed_tasks_count}/{len(tasks)} chunks processed in {elapsed:.2f}s")
 
+    # Save result immediately (no waiting for other tasks)
 
-        # Save result immediately (no waiting for other tasks)
     #     if result and result.get("triples"):
     #         triples = result["triples"]
     #         # Save to Neo4j or JSON file
@@ -469,7 +394,6 @@ def save_knowledge_graph_gemini_api(filepath: str):
     chunks = split_into_unique_chunks([Document(page_content=all_text_doc.strip())], chunking_size)
     print(f"Total chunks created: {len(chunks)}")
 
-    processed_chunks = get_processed_chunks()
     print(f"Total processed chunks: {len(processed_chunks)}")
     # remove the processed chunks from the chunks list (this is unique chunk that has to be processed)
     chunks_to_process = [chunk for chunk in chunks if
@@ -535,5 +459,4 @@ def get_processed_chunks() -> set:
 
 
 if __name__ == "__main__":
-    save_knowledge_graph_gemini_api("C:\\Users\\pirat\\PycharmProjects\\AI_llm\\RAG_FILES\\kafka.pdf")
     pass
