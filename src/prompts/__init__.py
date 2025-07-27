@@ -1,0 +1,1 @@
+# Prompts module for centralized prompt management

@@ -11,7 +11,7 @@ from langchain_core.messages import HumanMessage
 from langchain_ollama import ChatOllama
 from neo4j import GraphDatabase
 
-import lggraph
+from src.utils.model_manager import socket_con
 from src.utils.structured_triple_prompt import create_structured_prompt
 
 SYSTEM_PROMPT_GENERATE_TRIPLE_ENHANCED = """
@@ -232,7 +232,7 @@ async def prompt_gemini_for_triples_api(chunk: Document) -> None | dict[str, Doc
         try:
             return model.generate_content(prompt_g)
         except Exception as e_G:
-            lggraph.socket_con.send_error(f"Error calling Gemini API: {e_G}")
+            socket_con.send_error(f"Error calling Gemini API: {e_G}")
             return None
 
     loop = asyncio.get_event_loop()
@@ -401,7 +401,7 @@ def get_triples(cypher_query: str):
                 })
             return triples
     except Exception as e:
-        print(f"Error executing cypher query: {e}")
+        socket_con.send_error(f"Error executing cypher query: {e}")
         return []
 
 
@@ -440,7 +440,7 @@ def get_retrieve_triples(cypher_query: str):
                 records.append(dict(record))
             return records
     except Exception as e:
-        print(f"Error executing cypher query: {e}")
+        socket_con.send_error(f"Error executing cypher query: {e}")
         return []
 
 
@@ -462,8 +462,8 @@ def get_all_relationship_types() -> list[str]:
     """
     with driver.session() as session:
         relationship_types = [
-            record["type"] for record in 
-            session.run("MATCH ()-[r:RELATION]-() RETURN DISTINCT r.type AS type") 
+            record["type"] for record in
+            session.run("MATCH ()-[r:RELATION]-() RETURN DISTINCT r.type AS type")
             if record["type"]
         ]
     return relationship_types

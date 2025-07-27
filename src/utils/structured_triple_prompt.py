@@ -61,16 +61,16 @@ def create_structured_prompt(schema_headers, record_data):
     Create a schema-aware prompt for structured data
     """
     prompt = STRUCTURED_DATA_TRIPLE_PROMPT
-    
+
     # Add schema context
     prompt += f"\n**SCHEMA:** {', '.join(schema_headers)}\n"
-    
+
     # Add record data
     prompt += f"**RECORD DATA:**\n"
     for header, value in record_data.items():
         if value:
             prompt += f"- {header}: {value}\n"
-    
+
     prompt += "\n**Extract meaningful triples that represent the relationships in this structured record:**"
-    
+
     return prompt

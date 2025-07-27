@@ -6,12 +6,12 @@ from typing import ClassVar, Optional, Any
 from langchain_core.language_models import LanguageModelInput
 from langchain_core.messages import BaseMessage, HumanMessage
 from langchain_core.runnables import RunnableConfig
-
-from src.config import settings
 from langchain_ollama import ChatOllama
 
+from src.config import settings
 # Import socket manager for logging
 from .socket_manager import SocketManager
+
 socket_con = SocketManager().get_socket_connection() if settings.ENABLE_SOCKET_LOGGING else None
 
 class ModelManager(ChatOllama):

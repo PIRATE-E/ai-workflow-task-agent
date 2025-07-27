@@ -5,13 +5,11 @@ Demonstrates real-time command suggestions like Gemini CLI
 """
 
 import sys
-import os
+
 from rich.console import Console
-from rich.text import Text
-from rich.panel import Panel
-from rich.live import Live
 from rich.layout import Layout
-from rich.align import Align
+from rich.panel import Panel
+from rich.text import Text
 
 # For cross-platform keyboard input
 try:
@@ -45,63 +43,63 @@ class AutoCompleteInput:
         self.cursor_pos = 0
         self.suggestions = []
         self.selected_suggestion = 0
-        
+
     def get_suggestions(self, text):
         """Get matching commands based on current input"""
         if not text.startswith('/'):
             return []
-        
+
         matches = []
         for cmd in COMMANDS.keys():
             if cmd.startswith(text.lower()):
                 matches.append(cmd)
-        
+
         return sorted(matches)
-    
+
     def get_best_suggestion(self):
         """Get the best matching suggestion"""
         if not self.suggestions:
             return ""
         return self.suggestions[0] if self.suggestions else ""
-    
+
     def create_display(self):
         """Create the visual display with typed text + grayed suggestion"""
         display_text = Text()
-        
+
         # Add the prompt
         display_text.append("You: ", style="bold cyan")
-        
+
         # Add typed text
         display_text.append(self.current_input, style="bold white")
-        
+
         # Add grayed suggestion
         best_suggestion = self.get_best_suggestion()
         if best_suggestion and best_suggestion.startswith(self.current_input):
             remaining = best_suggestion[len(self.current_input):]
             display_text.append(remaining, style="dim white")
-        
+
         # Add cursor
         display_text.append("█", style="bold white blink")
-        
+
         return display_text
-    
+
     def create_suggestions_panel(self):
         """Create panel showing all available suggestions"""
         if not self.suggestions:
             return Text("")
-        
+
         suggestions_text = Text()
         suggestions_text.append("Available commands:\n", style="bold yellow")
-        
+
         for i, cmd in enumerate(self.suggestions[:5]):  # Show max 5 suggestions
             style = "bold green" if i == self.selected_suggestion else "white"
             description = COMMANDS.get(cmd, "")
             suggestions_text.append(f"  {cmd}", style=style)
             suggestions_text.append(f" - {description}\n", style="dim white")
-        
+
         if len(self.suggestions) > 5:
             suggestions_text.append(f"  ... and {len(self.suggestions) - 5} more", style="dim white")
-        
+
         return Panel(suggestions_text, title="Suggestions", border_style="blue")
 
 def get_char():
@@ -131,9 +129,9 @@ def main():
         title="Welcome",
         border_style="green"
     ))
-    
+
     autocomplete = AutoCompleteInput()
-    
+
     try:
         while True:
             # Create layout
@@ -143,14 +141,14 @@ def main():
                 Layout(name="suggestions", size=10),
                 Layout(name="output", size=5)
             )
-            
+
             # Update suggestions based on current input
             autocomplete.suggestions = autocomplete.get_suggestions(autocomplete.current_input)
-            
+
             # Create display components
             input_display = Panel(autocomplete.create_display(), title="Input", border_style="cyan")
             suggestions_display = autocomplete.create_suggestions_panel()
-            
+
             # Status info
             status_text = Text()
             if autocomplete.current_input:
@@ -158,23 +156,23 @@ def main():
                 status_text.append(f"Suggestions: {len(autocomplete.suggestions)}", style="green")
             else:
                 status_text.append("Start typing a command with '/' to see suggestions...", style="dim white")
-            
+
             status_panel = Panel(status_text, title="Status", border_style="yellow")
-            
+
             # Update layout
             layout["input"].update(input_display)
             layout["suggestions"].update(suggestions_display)
             layout["output"].update(status_panel)
-            
+
             # Display everything
             console.clear()
             console.print(layout)
             console.print("\n[dim]Press Ctrl+C to exit[/dim]")
-            
+
             # Get user input
             try:
                 char = get_char()
-                
+
                 # Handle special keys
                 if ord(char) == 3:  # Ctrl+C
                     break
@@ -195,16 +193,16 @@ def main():
                         autocomplete.current_input = autocomplete.current_input[:-1]
                 elif ord(char) >= 32:  # Printable characters
                     autocomplete.current_input += char
-                    
+
             except KeyboardInterrupt:
                 break
             except Exception as e:
                 console.print(f"[red]Error: {e}[/red]")
                 break
-    
+
     except KeyboardInterrupt:
         pass
-    
+
     console.print("\n[green]Thanks for trying the auto-complete demo![/green]")
 
 if __name__ == "__main__":

@@ -1,9 +1,9 @@
 """
 Test runner for all ModelManager tests
 """
-import unittest
-import sys
 import os
+import sys
+import unittest
 
 # Add the parent directory to the path so we can import model_manager
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
@@ -20,7 +20,7 @@ from tests.model_manager_tests.test_thread_safety import TestModelManagerThreadS
 def create_test_suite():
     """Create a comprehensive test suite for ModelManager"""
     suite = unittest.TestSuite()
-    
+
     # Add all test classes
     test_classes = [
         TestModelManagerSingleton,
@@ -29,11 +29,11 @@ def create_test_suite():
         TestModelManagerErrorHandling,
         TestModelManagerThreadSafety
     ]
-    
+
     for test_class in test_classes:
         tests = unittest.TestLoader().loadTestsFromTestCase(test_class)
         suite.addTests(tests)
-    
+
     return suite
 
 
@@ -46,7 +46,7 @@ def run_specific_test_class(test_class_name):
         'error': TestModelManagerErrorHandling,
         'thread': TestModelManagerThreadSafety
     }
-    
+
     if test_class_name.lower() in test_classes:
         suite = unittest.TestLoader().loadTestsFromTestCase(test_classes[test_class_name.lower()])
         runner = unittest.TextTestRunner(verbosity=2)
@@ -67,7 +67,7 @@ def main():
         suite = create_test_suite()
         runner = unittest.TextTestRunner(verbosity=2)
         result = runner.run(suite)
-    
+
     # Return appropriate exit code
     if result and not result.wasSuccessful():
         sys.exit(1)

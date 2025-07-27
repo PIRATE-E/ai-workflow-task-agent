@@ -5,7 +5,7 @@ import os
 from pathlib import Path
 
 # Base directory
-BASE_DIR = Path(__file__).resolve().parent.parent
+BASE_DIR = Path(__file__).resolve().parent.parent  # src directory
 
 # Server configuration
 SOCKET_HOST = os.getenv("SOCKET_HOST", "localhost")
@@ -37,7 +37,7 @@ ENABLE_SOUND_NOTIFICATIONS = os.getenv("ENABLE_SOUND_NOTIFICATIONS", "true").low
 # 'background' - Runs log server in background (logs not visible)
 # 'file' - Logs to file (socket_server.log)
 # 'console' - Shows logs in same console (can be messy)
-LOG_DISPLAY_MODE = os.getenv("LOG_DISPLAY_MODE", "separate_window")
+LOG_DISPLAY_MODE = os.getenv("LOG_DISPLAY_MODE", "file")
 
 # Development/Production mode
 DEBUG = os.getenv("DEBUG", "false").lower() == "true"
@@ -48,4 +48,5 @@ SEMAPHORE_API = int(os.getenv("SEMAPHORE_LIMIT_API", 5))
 
 if __name__ == '__main__':
     # true
-    print(Path(Path().resolve().parent / "RAG" / "RAG_FILES" / "kafka.pdf").resolve().exists())
+    # print(Path(Path().resolve().parent / "RAG" / "RAG_FILES" / "kafka.pdf").resolve().exists())
+    print(Path(Path().resolve().parent / "RAG" / "RAG_FILES" / "kafka.pdf").exists())

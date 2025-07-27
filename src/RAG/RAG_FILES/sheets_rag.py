@@ -15,8 +15,6 @@ Import this module in your project to leverage Google Sheets as a data source fo
 Author: PIRATE-E
 License: MIT
 """
-import timeit
-from time import sleep
 
 import requests
 from bs4 import BeautifulSoup

@@ -1,0 +1,11 @@
+C:\Users\pirat\Downloads\programming\PyCharm Community Edition 2024.3.2\plugins\python-ce\helpers\pydev\pydevd_plugins\__init__.py:2: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+  __import__('pkg_resources').declare_namespace(__name__)
+warning: failed to delete old cython speedups. Please delete all *.so files from the directories "C:\Users\pirat\AppData\Local\JetBrains\PyCharmCE2025.1\cythonExtensions\_pydevd_bundle_ext" and "C:\Users\pirat\AppData\Local\JetBrains\PyCharmCE2025.1\cythonExtensions\_pydevd_frame_eval_ext"
+Server is listening...
+Connection from ('127.0.0.1', 56923)
+Traceback (most recent call last):
+  File "C:\Users\pirat\PycharmProjects\AI_llm\src\utils\error_transfer.py", line 85, in <module>
+    received_error = socket_con.receive_error()
+  File "C:\Users\pirat\PycharmProjects\AI_llm\src\utils\error_transfer.py", line 31, in receive_error
+    data = self.client_socket.recv(1024)
+KeyboardInterrupt

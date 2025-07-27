@@ -1,6 +1,8 @@
+from typing import Any
+
 
 # this is tools for making searches on Google using google search api
-def search_google_tool(query : str):
+def search_google_tool(query : str) -> Any | None:
     # make simple request to google search api
     import requests
     from dotenv import load_dotenv
@@ -27,7 +29,7 @@ def search_google_tool(query : str):
         #     print("No results found.")
     except requests.exceptions.RequestException as e:
         print(f"An error occurred while making the request: {e}")
-    pass
+        return None
 
 if __name__ == '__main__':
     # Example usage of the search_tool function

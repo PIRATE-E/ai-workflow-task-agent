@@ -1,30 +1,38 @@
-# Add the parent directory to the Python path
-# sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+# ✅ LIGHTWEIGHT CORE IMPORTS ONLY
 import asyncio
 import hashlib
 import json
 import os
 from asyncio import Semaphore
-
 import dotenv
-import google.generativeai as genai
-import rich.progress
-import rich.prompt
+
+# ✅ LIGHTWEIGHT LANGCHAIN IMPORTS
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import PyPDFLoader
-from langchain_community.vectorstores import Chroma
 from langchain_core.documents import Document
-# import sys
 from langchain_core.messages import HumanMessage
-from langchain_ollama import OllamaEmbeddings, ChatOllama
-from sympy.printing.pytorch import torch
-from torch import cosine_similarity
 
+# ✅ LOCAL IMPORTS (lightweight)
 from src.RAG.RAG_FILES import neo4j_rag
 from src.config import settings
 from src.utils.socket_manager import SocketManager
 
+# ✅ LAZY LOADING: Heavy imports moved to function level
+# torch, cosine_similarity, genai, Chroma, OllamaEmbeddings, ChatOllama
+# will be imported only when needed
+
 socket_con_rag = SocketManager().get_socket_connection()
+
+# ✅ HELPER FUNCTION: Lazy loading for rich prompts
+def _get_user_input(prompt_text: str, default: str = "y") -> str:
+    """Helper function to get user input with lazy loading of rich.prompt"""
+    try:
+        import rich.prompt
+        return rich.prompt.Prompt.ask(prompt_text, default=default)
+    except ImportError:
+        # Fallback to built-in input if rich not available
+        response = input(f"{prompt_text} (default: {default}): ").strip()
+        return response if response else default
 
 
 def load_pdf_document(
@@ -45,17 +53,21 @@ def load_pdf_document(
         return loader.load()
     # if the file is on web then we can use the web loader
     elif doc_path.split("https://docs.google.com/spreadsheets/")[0].lower() == "":
-        from src.RAG.RAG_FILES.sheets_rag import GoogleSheetsRAG
-        
+        # ✅ LAZY LOADING: Import Google Sheets RAG only when needed
+        try:
+            from src.RAG.RAG_FILES.sheets_rag import GoogleSheetsRAG
+        except ImportError as e:
+            raise ImportError(f"Google Sheets RAG module not available: {e}")
+
         # Define schema mapping for better triple extraction
         schema_config = {
             "entity_columns": "Columns that represent main entities (people, companies, products)",
-            "relationship_columns": "Columns that define relationships or roles", 
+            "relationship_columns": "Columns that define relationships or roles",
             "attribute_columns": "Columns that contain properties or values"
         }
-        
+
         sheets = GoogleSheetsRAG(doc_path, schema_config)
-        
+
         # Use the new structured documents method for better knowledge graph extraction
         return sheets.get_structured_documents_for_kg()
     else:
@@ -85,28 +97,28 @@ def split_into_unique_chunks(documents: list, chunking_size: int, remove_duplica
         chunk_size=chunking_size, chunk_overlap=chunking_size // 10
     )
     doc_splits = splitter.split_documents(documents)
-    
+
     if not remove_duplicates:
         print(f"📊 Total chunks created (with duplicates): {len(doc_splits)}")
         return doc_splits
-    
+
     # Remove duplicates if requested
     seen = set()
     unique_chunks = []
     duplicate_count = 0
-    
+
     for doc in doc_splits:
         if doc.page_content not in seen:
             seen.add(doc.page_content)
             unique_chunks.append(doc)
         else:
             duplicate_count += 1
-    
+
     print(f"📊 Chunk Statistics:")
     print(f"   - Total chunks created: {len(doc_splits)}")
     print(f"   - Unique chunks kept: {len(unique_chunks)}")
     print(f"   - Duplicate chunks removed: {duplicate_count}")
-    
+
     return unique_chunks
 
 
@@ -122,6 +134,13 @@ def find_similar_documents(query: str, file_path: str) -> list:
     Returns:
         list: List of Document objects most similar to the query.
     """
+    # ✅ LAZY LOADING: Import heavy libraries only when this function is called
+    try:
+        from langchain_community.vectorstores import Chroma
+        from langchain_ollama import OllamaEmbeddings
+    except ImportError as e:
+        raise ImportError(f"Required libraries not installed for vector search: {e}")
+    
     documents = load_pdf_document(file_path)
     chunks = split_into_unique_chunks(documents)
     vector_store = Chroma.from_documents(
@@ -146,6 +165,12 @@ def get_genai_embedding(texts: list[str], task: str = "RETRIEVAL_QUERY") -> list
     Returns:
         list: Embedding vectors for the input texts.
     """
+    # ✅ LAZY LOADING: Import Google AI only when this function is called
+    try:
+        import google.generativeai as genai
+    except ImportError as e:
+        raise ImportError(f"Google Generative AI library not installed: {e}")
+    
     dotenv.load_dotenv()
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
@@ -166,6 +191,13 @@ def search_similar_chunks_genai(query: str, chunks: list[Document], top_k=5) -> 
         :param chunks: chunks (list[str]): List of text chunks to compare.
         :param top_k: int: The number of top similar chunks to return.
     """
+    # ✅ LAZY LOADING: Import PyTorch only when this function is called
+    try:
+        import torch
+        from torch import cosine_similarity
+    except ImportError as e:
+        raise ImportError(f"PyTorch not installed. Required for similarity search: {e}")
+    
     chunks = [doc.page_content for doc in chunks]  # Extract text content from Document objects
     query_embedding = get_genai_embedding([query], task="RETRIEVAL_QUERY")
     chunk_embeddings = get_genai_embedding(chunks, task="RETRIEVAL_DOCUMENT")
@@ -191,8 +223,8 @@ async def save_knowledge_graph_local_llm(file_path: str):
     print(f"no of words: {sum(len(doc.page_content.split()) for doc in document_pdf)}")
     print(f"total no of characters: {sum(len(doc.page_content.strip()) for doc in document_pdf)}")
 
-    if rich.prompt.Prompt.ask("do you want chunking? (y/n)", default="y") == "y":
-        no_of_chunks = int(rich.prompt.Prompt.ask("enter how many chunks you want", default=10))
+    if _get_user_input("do you want chunking? (y/n)", default="y") == "y":
+        no_of_chunks = int(_get_user_input("enter how many chunks you want", default="10"))
         chunking_size = sum(len(doc.page_content.strip()) for doc in document_pdf) // no_of_chunks
         all_text_doc = ""
         for doc in document_pdf:
@@ -205,18 +237,26 @@ async def save_knowledge_graph_local_llm(file_path: str):
             no_of_char += len(doc.page_content)
         chunking_size = no_of_char
     # Ask user if they want to keep duplicates for better coverage
-    keep_duplicates = rich.prompt.Prompt.ask("Keep duplicate chunks for better coverage? (y/n)", default="n") == "y"
-    
+    keep_duplicates = _get_user_input("Keep duplicate chunks for better coverage? (y/n)", default="n") == "y"
+
     chunks = split_into_unique_chunks([Document(page_content=all_text_doc.strip())], chunking_size, remove_duplicates=not keep_duplicates)
     print(f"📊 Final chunk count for processing: {len(chunks)}")
     print(f"Total processed chunks: {len(processed_chunks)}")
-    if rich.prompt.Prompt.ask(f"do you want to over write the processed chunks? (y/n)") == "y":
+    if _get_user_input(f"do you want to over write the processed chunks? (y/n)", default="n") == "y":
         with open(settings.DEFAULT_RAG_FILES_HASH_TXT_PATH, "w") as file:
             file.write("")
         with open(settings.DEFAULT_RAG_FILES_PROCESSED_TRIPLES_PATH, "w") as file:
             file.write("[]")
 
-    for chunk in rich.progress.track(chunks):
+    # ✅ LAZY LOADING: Import rich progress only when needed
+    try:
+        import rich.progress
+    except ImportError:
+        # Fallback to simple iteration if rich not available
+        rich = None
+    
+    chunks_iter = rich.progress.track(chunks) if rich else chunks
+    for chunk in chunks_iter:
         if not hashlib.sha256(chunk.page_content.encode()).hexdigest() in processed_chunks:
             triples = neo4j_rag.prompt_local_llm_for_triples(chunk)
             chunk_hash = hashlib.sha256(
@@ -228,7 +268,7 @@ async def save_knowledge_graph_local_llm(file_path: str):
     processed_chunks = get_processed_chunks()
     print(f"Processed chunks after processing: {len(processed_chunks)}")
 
-    for triple in get_all_triples():
+    for triple in get_all_triples_from_file():
         subject = triple.get("subject") or triple.get("Subject")
         predicate = (
                 triple.get("predicate")
@@ -263,15 +303,15 @@ def save_knowledge_graph_gemini_cli(file_path: str):
     else:
         #  # If the document is not structured, we can proceed with chunking
         all_text_doc = "".join(doc.page_content.strip() for doc in documents)
-        if rich.prompt.Prompt.ask("Do you want chunking? (y/n)", default="y") == "y":
-            no_of_chunks = int(rich.prompt.Prompt.ask("Enter how many chunks you want", default=10))
+        if _get_user_input("Do you want chunking? (y/n)", default="y") == "y":
+            no_of_chunks = int(_get_user_input("Enter how many chunks you want", default="10"))
             chunking_size = len(all_text_doc) // no_of_chunks
 
         else:
             chunking_size = len(all_text_doc)  # no chunking, use the whole document as one chunk
 
         # Ask user if they want to keep duplicates for better coverage
-        keep_duplicates = rich.prompt.Prompt.ask("Keep duplicate chunks for better coverage? (y/n)", default="n") == "y"
+        keep_duplicates = _get_user_input("Keep duplicate chunks for better coverage? (y/n)", default="n") == "y"
 
         chunks = split_into_unique_chunks([Document(page_content=all_text_doc.strip())], chunking_size, remove_duplicates=not keep_duplicates)
         print(f"📊 Final chunk count for processing: {len(chunks)}")
@@ -281,7 +321,7 @@ def save_knowledge_graph_gemini_cli(file_path: str):
                              hashlib.sha256(chunk.page_content.encode()).hexdigest() not in processed_chunks]
 
     print(f"Total processed chunks: {len(processed_chunks)}")
-    if rich.prompt.Prompt.ask("Do you want to overwrite the processed chunks? (y/n)") == "y":
+    if _get_user_input("Do you want to overwrite the processed chunks? (y/n)", default="n") == "y":
         with open(settings.DEFAULT_RAG_FILES_HASH_TXT_PATH, "w") as file:
             file.write("")
         with open(settings.DEFAULT_RAG_FILES_PROCESSED_TRIPLES_PATH, "w") as file:
@@ -373,7 +413,7 @@ async def process_chunks_with_immediate_saving(chunks_to_process: list[Document]
     if len(saved_results) == len(chunks_to_process):
         print("All chunks processed, saving triples to Neo4j database...")
         neo4j_rag.clear_database()
-        for triples in get_all_triples():
+        for triples in get_all_triples_from_file():
             subject = triples.get("subject") or triples.get("Subject")
             predicate = (
                     triples.get("predicate") or triples.get("relation") or
@@ -414,15 +454,15 @@ def save_knowledge_graph_gemini_api(filepath: str):
     else:
         #  # If the document is not structured, we can proceed with chunking
         all_text_doc = "".join(doc.page_content.strip() for doc in documents)
-        if rich.prompt.Prompt.ask("Do you want chunking? (y/n)", default="y") == "y":
-            no_of_chunks = int(rich.prompt.Prompt.ask("Enter how many chunks you want", default=10))
+        if _get_user_input("Do you want chunking? (y/n)", default="y") == "y":
+            no_of_chunks = int(_get_user_input("Enter how many chunks you want", default="10"))
             chunking_size = len(all_text_doc) // no_of_chunks
 
         else:
             chunking_size = len(all_text_doc)  # no chunking, use the whole document as one chunk
 
         # Ask user if they want to keep duplicates for better coverage
-        keep_duplicates = rich.prompt.Prompt.ask("Keep duplicate chunks for better coverage? (y/n)", default="n") == "y"
+        keep_duplicates = _get_user_input("Keep duplicate chunks for better coverage? (y/n)", default="n") == "y"
 
         chunks = split_into_unique_chunks([Document(page_content=all_text_doc.strip())], chunking_size, remove_duplicates=not keep_duplicates)
         print(f"📊 Final chunk count for processing: {len(chunks)}")
@@ -432,7 +472,7 @@ def save_knowledge_graph_gemini_api(filepath: str):
                              hashlib.sha256(chunk.page_content.encode()).hexdigest() not in processed_chunks]
     print(f"Total processed chunks: {len(processed_chunks)}")
     # # Ask user if they want to overwrite the processed chunks if they have already processed the chunks
-    if rich.prompt.Prompt.ask("Do you want to overwrite the processed chunks? (y/n)") == "y":
+    if _get_user_input("Do you want to overwrite the processed chunks? (y/n)", default="n") == "y":
         with open(settings.DEFAULT_RAG_FILES_HASH_TXT_PATH, "w") as file:
             file.write("")
         with open(settings.DEFAULT_RAG_FILES_PROCESSED_TRIPLES_PATH, "w") as file:
@@ -449,7 +489,7 @@ def save_knowledge_graph_gemini_api(filepath: str):
     if process_chunks and len(chunks_to_process) > 0:
         asyncio.run(process_chunks_with_immediate_saving(chunks_to_process))
     else:
-        if rich.prompt.Prompt.ask("if you still wanted to process the chunks, press y to continue or n to skip", default="n") == "y":
+        if _get_user_input("if you still wanted to process the chunks, press y to continue or n to skip", default="n") == "y":
             asyncio.run(process_chunks_with_immediate_saving(chunks_to_process))
             return
         socket_con_rag.send_error("Skipping database update since no new chunks were processed.")
@@ -464,7 +504,7 @@ def extract_triples_process_query():
     pass
 
 
-def get_all_triples() -> list:
+def get_all_triples_from_file() -> list:
     """
     Retrieves all triples from the processed_triple.json file.
     Returns:
@@ -483,8 +523,13 @@ async def mark_triple_chunk(triples: list, chunk_hash: str):
     """
     ASYNC VERSION: Non-blocking file operations using aiofiles
     """
-    import aiofiles.os
-    
+    # ✅ LAZY LOADING: Import aiofiles only when this async function is called
+    try:
+        import aiofiles
+        import aiofiles.os
+    except ImportError as e:
+        raise ImportError(f"aiofiles library required for async file operations: {e}")
+
     # Async file append for hash
     async with aiofiles.open(settings.DEFAULT_RAG_FILES_HASH_TXT_PATH, "a") as file:
         await file.write(chunk_hash + "\n")
@@ -494,9 +539,9 @@ async def mark_triple_chunk(triples: list, chunk_hash: str):
         async with aiofiles.open(settings.DEFAULT_RAG_FILES_PROCESSED_TRIPLES_PATH, "r") as file:
             content = await file.read()
             existing_triples = json.loads(content)
-        
+
         existing_triples.extend(triples)
-        
+
         async with aiofiles.open(settings.DEFAULT_RAG_FILES_PROCESSED_TRIPLES_PATH, "w") as file:
             await file.write(json.dumps(existing_triples, indent=4))
     else:
@@ -527,6 +572,12 @@ def text_rag_search_using_llm(query: str, chunks: list[Document]) -> dict:
     :param chunks: List of Document objects representing the PDF content.
     """
     try:
+        # ✅ LAZY LOADING: Import ChatOllama only when this function is called
+        try:
+            from langchain_ollama import ChatOllama
+        except ImportError as e:
+            raise ImportError(f"Ollama library not installed: {e}")
+        
         similar = search_similar_chunks_genai(query, chunks)
         system_prompt = (
             "You are an intelligent document analysis assistant that helps users find and understand information from text documents.\n\n"
