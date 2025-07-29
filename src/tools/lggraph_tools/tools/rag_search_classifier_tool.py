@@ -10,7 +10,7 @@ from src.RAG.RAG_FILES import rag
 from src.config import settings
 from src.models.state import StateAccessor  # Import the global state object
 from src.tools.lggraph_tools.tool_response_manager import ToolResponseManager
-from src.utils.model_manager import socket_con, ModelManager
+from src.utils.model_manager import get_socket_con, ModelManager
 
 
 def retrieve_knowledge_graph(query: str) -> str:
@@ -24,11 +24,15 @@ def retrieve_knowledge_graph(query: str) -> str:
     # Get actual relationship types from database
     relationship_types = neo4j_rag.get_all_relationship_types()
 
-    socket_con.send_error(f"[LOG] CYPHER QUERY GENERATION STARTED with {len(labels)} labels, {len(names)} names, and {len(relationship_types)} relationship types.")
+    socket_con = get_socket_con()
+    if socket_con:
+        socket_con.send_error(f"[LOG] CYPHER QUERY GENERATION STARTED with {len(labels)} labels, {len(names)} names, and {len(relationship_types)} relationship types.")
 
     # If no names available, return early
     if not names:
-        socket_con.send_error("[ERROR] No entity names available in knowledge graph")
+        socket_con = get_socket_con()
+        if socket_con:
+            socket_con.send_error("[ERROR] No entity names available in knowledge graph")
         return "[ERROR] Knowledge graph appears to be empty. Please ensure data is loaded."
 
     # Debug: Check if (user query name) and email-related terms exist
@@ -44,9 +48,13 @@ def retrieve_knowledge_graph(query: str) -> str:
     relation_found = any(token in rel.lower() for rel in relationship_types for token in query_tokens)
 
     if not name_found and not relation_found:
-        socket_con.send_error(f"[WARNING] No matching entity names or relationship types found for query: '{query}'")
-    socket_con.send_error(f"[DEBUG] Query tokens: {query_tokens} | Name found: {name_found} | Relation found: {relation_found}")
-    socket_con.send_error(f"[DEBUG] User query: '{query}'")
+        socket_con = get_socket_con()
+        if socket_con:
+            socket_con.send_error(f"[WARNING] No matching entity names or relationship types found for query: '{query}'")
+    socket_con = get_socket_con()
+    if socket_con:
+        socket_con.send_error(f"[DEBUG] Query tokens: {query_tokens} | Name found: {name_found} | Relation found: {relation_found}")
+        socket_con.send_error(f"[DEBUG] User query: '{query}'")
 
     # Create enhanced prompt with complete workflow and decision logic
     SYSTEM_PROMPT_CYPHER_GENERATION = src.prompts.rag_search_classifier_prompts.Prompts.get_system_prompt_cypher(names, relationship_types, labels, query)
@@ -64,7 +72,9 @@ def retrieve_knowledge_graph(query: str) -> str:
             ToolResponseManager().set_response_base([result])
             return result.content
         except Exception as e:
-            socket_con.send_error(f"[ERROR] Failed to invoke model {model_name}: {e}")
+            socket_con = get_socket_con()
+            if socket_con:
+                socket_con.send_error(f"[ERROR] Failed to invoke model {model_name}: {e}")
             return None
 
     # ✅ FIX 2: Actually call the function to generate cypher
@@ -84,17 +94,23 @@ def retrieve_knowledge_graph(query: str) -> str:
         reasoning = cypher_result.get("reasoning", "")
         
     except json.JSONDecodeError as e:
-        socket_con.send_error(f"[ERROR] Failed to parse JSON response: {e}")
+        socket_con = get_socket_con()
+        if socket_con:
+            socket_con.send_error(f"[ERROR] Failed to parse JSON response: {e}")
         return f"[ERROR] Invalid JSON response for query: {query}"
     except Exception as e:
-        socket_con.send_error(f"[ERROR] Unexpected error processing response: {e}")
+        socket_con = get_socket_con()
+        if socket_con:
+            socket_con.send_error(f"[ERROR] Unexpected error processing response: {e}")
         return f"[ERROR] Failed to process response for query: {query}"
 
     if not final_cypher:
         return f"[ERROR] Failed to generate any valid cypher query for: {query}"
 
-    socket_con.send_error(f"[LOG] FINAL CYPHER QUERY: {final_cypher}")
-    socket_con.send_error(f"[LOG] REASONING: {reasoning}")
+    socket_con = get_socket_con()
+    if socket_con:
+        socket_con.send_error(f"[LOG] FINAL CYPHER QUERY: {final_cypher}")
+        socket_con.send_error(f"[LOG] REASONING: {reasoning}")
 
     # Execute the cypher query
     receive_triples = neo4j_rag.get_retrieve_triples(final_cypher)
@@ -105,7 +121,9 @@ def retrieve_knowledge_graph(query: str) -> str:
     # Convert the triples to a readable format by llm
     triples_text = "\n".join(
         [neo4j_rag.extract_triple_text(triple) for triple in receive_triples])
-    socket_con.send_error(f"[LOG] TRIPLES TEXT: {triples_text}")
+    socket_con = get_socket_con()
+    if socket_con:
+        socket_con.send_error(f"[LOG] TRIPLES TEXT: {triples_text}")
 
     # Create a comprehensive, user-friendly explanation prompt (HYBRID APPROACH)
     explanation_prompt = src.prompts.rag_search_classifier_prompts.Prompts.get_system_prompt_classifier(StateAccessor, triples_text, query)

@@ -46,6 +46,9 @@ DEBUG = os.getenv("DEBUG", "false").lower() == "true"
 SEMAPHORE_CLI = int(os.getenv("SEMAPHORE_LIMIT_CLI", 15))
 SEMAPHORE_API = int(os.getenv("SEMAPHORE_LIMIT_API", 5))
 
+# PNG FILE PATH
+PNG_FILE_PATH = BASE_DIR.parent / "basic_logs" / "graph.png"
+
 if __name__ == '__main__':
     # true
     # print(Path(Path().resolve().parent / "RAG" / "RAG_FILES" / "kafka.pdf").resolve().exists())

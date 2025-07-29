@@ -1,3 +1,6 @@
+import atexit
+import os
+import signal
 import socket
 import sys
 
@@ -5,6 +8,7 @@ import winsound
 
 
 class SocketCon:
+    got_killed : bool = None  # Flag to indicate if the server was killed
     def __init__(self, _client_socket: socket.socket):
         self.client_socket = _client_socket
 
@@ -21,7 +25,10 @@ class SocketCon:
                 self.client_socket.sendall(error_message.encode('utf-8'))
             # self.client_socket.sendall(error_message.encode('utf-8'))
         except socket.error as e:
-            print(f"Error sending message: {e}")
+            if str(e) == "Socket is not connected.":
+                pass
+            else:
+                print(f"Error sending message: {e}")
         finally:
             if close_socket:
                 self.client_socket.close()
@@ -62,33 +69,121 @@ class SocketCon:
             return False
 
 
-if __name__ == '__main__':
-    # Example usage
-    server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server_socket.bind(('localhost', 5390))
-    server_socket.listen(1)
-    server_socket.settimeout(30)  # Set a 30-second timeout for accepting connections
-    listening = True
+def signal_handler(signum, frame):
+    """Handle termination signals gracefully"""
+    print(f"Received signal {signum}, shutting down server...")
+    SocketCon.got_killed = True
 
-    print("Server is listening...")
+def cleanup_lock_file():
+    """Remove lock file on exit"""
+    lock_file = os.path.join(os.path.dirname(__file__), '..', '..', 'basic_logs', 'server.lock')
     try:
-        while listening:
+        if os.path.exists(lock_file):
+            os.remove(lock_file)
+            print("Lock file removed")
+    except Exception as e:
+        print(f"Error removing lock file: {e}")
+
+def create_lock_file():
+    """Create lock file to prevent multiple instances"""
+    lock_file = os.path.join(os.path.dirname(__file__), '..', '..', 'basic_logs', 'server.lock')
+    
+    # Check if another instance is already running
+    if os.path.exists(lock_file):
+        try:
+            with open(lock_file, 'r') as f:
+                pid = int(f.read().strip())
+            
+            # Check if the process is still running
+            try:
+                os.kill(pid, 0)  # This doesn't kill, just checks if process exists
+                print(f"Another server instance is already running (PID: {pid})")
+                return False
+            except OSError:
+                # Process doesn't exist, remove stale lock file
+                os.remove(lock_file)
+                print("Removed stale lock file")
+        except (ValueError, FileNotFoundError):
+            # Invalid or missing lock file, remove it
+            try:
+                os.remove(lock_file)
+            except:
+                pass
+    
+    # Create new lock file
+    try:
+        os.makedirs(os.path.dirname(lock_file), exist_ok=True)
+        with open(lock_file, 'w') as f:
+            f.write(str(os.getpid()))
+        print(f"Created lock file with PID: {os.getpid()}")
+        return True
+    except Exception as e:
+        print(f"Error creating lock file: {e}")
+        return False
+
+if __name__ == '__main__':
+    # Check for existing instance and create lock file
+    if not create_lock_file():
+        print("Exiting: Another server instance is already running")
+        sys.exit(1)
+    
+    # Register cleanup function
+    atexit.register(cleanup_lock_file)
+    
+    # Set up signal handlers for graceful shutdown
+    try:
+        signal.signal(signal.SIGTERM, signal_handler)
+        signal.signal(signal.SIGINT, signal_handler)
+        # On Windows, also handle SIGBREAK
+        if hasattr(signal, 'SIGBREAK'):
+            signal.signal(signal.SIGBREAK, signal_handler)
+    except Exception as e:
+        print(f"Warning: Could not set up signal handlers: {e}")
+    
+    # Initialize server
+    server_socket = None
+    try:
+        server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)  # Allow socket reuse
+        server_socket.bind(('localhost', 5390))
+        server_socket.listen(1)
+        server_socket.settimeout(1)  # Shorter timeout to check got_killed flag more frequently
+        listening = True
+        SocketCon.got_killed = False  # Flag to indicate if the server was killed
+
+        print("Server is listening...")
+        
+        while listening and not SocketCon.got_killed:
             try:
                 client_socket, addr = server_socket.accept()
+                print(f"Connection from {addr}")
+                try:
+                    socket_con = SocketCon(client_socket)
+                    while not SocketCon.got_killed and client_socket:
+                        received_error = socket_con.receive_error()
+                        if not received_error:
+                            print("No data received, closing connection.", flush=True, file=sys.stderr)
+                            break  # Client disconnected or error occurred
+                        print(f"{received_error}", flush=True, file=sys.stderr)
+                    listening = False  # Exit the loop after handling the connection
+                finally:
+                    client_socket.close()
             except socket.timeout:
-                print("No connection made within 30 seconds. Timing out.")
-                break  # Exit the loop after timeout
-            print(f"Connection from {addr}")
-            try:
-                socket_con = SocketCon(client_socket)
-                while True and client_socket:
-                    received_error = socket_con.receive_error()
-                    if not received_error:
-                        print("No data received, closing connection.", flush=True, file=sys.stderr)
-                        break  # Client disconnected or error occurred
-                    print(f"{received_error}", flush=True, file=sys.stderr)
-                listening = False  # Exit the loop after handling the connection
-            finally:
-                client_socket.close()
+                # Check got_killed flag on timeout and continue if not killed
+                if SocketCon.got_killed:
+                    print("Server shutdown requested, exiting...")
+                    break
+                continue  # Continue listening if not killed
+            except Exception as e:
+                if not SocketCon.got_killed:
+                    print(f"Error accepting connection: {e}")
+                break
+                
+    except Exception as e:
+        print(f"Server error: {e}")
     finally:
-        server_socket.close()
+        if server_socket:
+            print("Closing server socket...")
+            server_socket.close()
+        cleanup_lock_file()
+        print("Server shutdown complete.")

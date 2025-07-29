@@ -21,7 +21,9 @@ from src.utils.socket_manager import SocketManager
 # torch, cosine_similarity, genai, Chroma, OllamaEmbeddings, ChatOllama
 # will be imported only when needed
 
-socket_con_rag = SocketManager().get_socket_connection()
+def get_socket_con_rag():
+    """Get socket connection only when needed"""
+    return SocketManager().get_socket_connection()
 
 # ✅ HELPER FUNCTION: Lazy loading for rich prompts
 def _get_user_input(prompt_text: str, default: str = "y") -> str:
@@ -366,6 +368,7 @@ async def process_chunks_with_immediate_saving(chunks_to_process: list[Document]
 
                 return result
             except Exception as e:
+                socket_con_rag = get_socket_con_rag()
                 if socket_con_rag:
                     socket_con_rag.send_error(f"❌ Error processing chunk, active taskc count {active_task}: {e}")
                 else:
@@ -401,6 +404,7 @@ async def process_chunks_with_immediate_saving(chunks_to_process: list[Document]
                 try:
                     await mark_triple_chunk(triples, hashlib.sha256(chunk.page_content.encode()).hexdigest())
                 except Exception as e:
+                    socket_con_rag = get_socket_con_rag()
                     if socket_con_rag:
                         socket_con_rag.send_error(f"❌ Error saving triples: {e} chunk : {chunk.page_content[:20]}")
                     else:
@@ -424,6 +428,7 @@ async def process_chunks_with_immediate_saving(chunks_to_process: list[Document]
                 try:
                     neo4j_rag.insert_triples([(subject, predicate, object_val)])
                 except Exception as e:
+                    socket_con_rag = get_socket_con_rag()
                     if socket_con_rag:
                         socket_con_rag.send_error(f"❌ Error inserting triples to Neo4j:"
                                               f" {e} \n subject: {subject}, predicate: {predicate}, object: {object_val}")
@@ -492,7 +497,9 @@ def save_knowledge_graph_gemini_api(filepath: str):
         if _get_user_input("if you still wanted to process the chunks, press y to continue or n to skip", default="n") == "y":
             asyncio.run(process_chunks_with_immediate_saving(chunks_to_process))
             return
-        socket_con_rag.send_error("Skipping database update since no new chunks were processed.")
+        socket_con_rag = get_socket_con_rag()
+        if socket_con_rag:
+            socket_con_rag.send_error("Skipping database update since no new chunks were processed.")
 
 def extract_triples_process_query():
     """
@@ -630,6 +637,7 @@ def text_rag_search_using_llm(query: str, chunks: list[Document]) -> dict:
             raise ValueError("Response format is incorrect. Expected keys 'answer' and 'source_chunks'.")
         return result
     except Exception as e:
+        socket_con_rag = get_socket_con_rag()
         if socket_con_rag:
             socket_con_rag.send_error(f"Error during RAG search: {e}")
         else:

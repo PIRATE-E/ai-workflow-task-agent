@@ -4,8 +4,6 @@ import subprocess
 import sys
 import time
 
-import src.config.settings
-
 # Handle imports - works both as module and standalone script
 try:
     # Try relative import first (when run as module)
@@ -19,29 +17,20 @@ except ImportError:
         sys.path.append(os.path.dirname(os.path.abspath(__file__)))
         from error_transfer import SocketCon
 
-# Import config - handle case where it might not be available
-try:
-    from src.config import settings as config
-except ImportError:
-    # Fallback config if main config is not available
-    class Config:
-        ENABLE_SOCKET_LOGGING = False
-        SOCKET_HOST = 'localhost'
-        SOCKET_PORT = 5390
-
-
-    config = Config()
+# Import settings - handle case where it might not be available
+from src.config import settings
 
 
 class SocketManager:
-    _instance = None
+    instance = None
     _socket_con = None
     _log_server_process = None
+    _cleanup_in_progress = False  # Flag to prevent new connections during cleanup
 
     def __new__(cls):
-        if cls._instance is None:
-            cls._instance = super().__new__(cls)
-        return cls._instance
+        if cls.instance is None:
+            cls.instance = super().__new__(cls)
+        return cls.instance
 
     def start_log_server(self):
         """Start the log server as a subprocess"""
@@ -65,8 +54,8 @@ class SocketManager:
 
             print(f"🚀 Starting log server subprocess: {error_transfer_path}")
 
-            # Start the subprocess - choose method based on config
-            log_display_mode = getattr(config, 'LOG_DISPLAY_MODE', 'separate_window')
+            # Start the subprocess - choose method based on settings
+            log_display_mode = getattr(settings, 'LOG_DISPLAY_MODE', 'separate_window')
 
             if log_display_mode == 'separate_window':
                 # Option 1: Separate console window (recommended)
@@ -89,7 +78,7 @@ class SocketManager:
             elif log_display_mode == 'file':
                 from pathlib import Path
                 # Option 3: Log to file
-                log_file = src.config.settings.BASE_DIR.parent / "basic_logs" / "error_log.txt"  ######
+                log_file = settings.BASE_DIR.parent / "basic_logs" / "error_log.txt"  ######
                 print(log_file.exists(), "error transfer path exists")
                 with open(log_file, 'w') as f:
                     self._log_server_process = subprocess.Popen(
@@ -130,26 +119,59 @@ class SocketManager:
             return False
 
     def stop_log_server(self):
-        """Stop the log server subprocess"""
+        """Stop the log server subprocess with enhanced cleanup"""
         if self._log_server_process is not None:
             try:
                 print("🛑 Stopping log server...")
-                self._log_server_process.terminate()
 
-                # Wait for process to terminate gracefully
-                try:
-                    self._log_server_process.wait(timeout=5)
-                    print("✅ Log server stopped gracefully")
-                except subprocess.TimeoutExpired:
-                    print("⚠️ Log server didn't stop gracefully, forcing termination...")
-                    self._log_server_process.kill()
-                    self._log_server_process.wait()
-                    print("✅ Log server forcefully terminated")
+                # Check if process is still alive before terminating
+                if self._log_server_process.poll() is None:
+                    print(f"Terminating log server process (PID: {self._log_server_process.pid})")
+                    
+                    # First try graceful termination
+                    self._log_server_process.terminate()
+
+                    # Wait for process to terminate gracefully
+                    try:
+                        self._log_server_process.wait(timeout=5)  # Increased timeout
+                        print("✅ Log server stopped gracefully")
+                    except subprocess.TimeoutExpired:
+                        print("⚠️ Log server didn't stop gracefully, forcing termination...")
+                        self._log_server_process.kill()
+                        try:
+                            self._log_server_process.wait(timeout=3)  # Increased timeout
+                            print("✅ Log server forcefully terminated")
+                        except subprocess.TimeoutExpired:
+                            print("❌ Could not terminate log server process")
+                            # Try to clean up any remaining processes
+                            try:
+                                import psutil
+                                parent = psutil.Process(self._log_server_process.pid)
+                                for child in parent.children(recursive=True):
+                                    child.kill()
+                                parent.kill()
+                                print("✅ Forcefully killed process tree")
+                            except ImportError:
+                                print("⚠️ psutil not available for process tree cleanup")
+                            except Exception as cleanup_error:
+                                print(f"⚠️ Error during process tree cleanup: {cleanup_error}")
+                else:
+                    print("✅ Log server process already terminated")
 
             except Exception as e:
                 print(f"❌ Error stopping log server: {e}")
             finally:
                 self._log_server_process = None
+                
+                # Also clean up any stale lock files
+                try:
+                    import os
+                    lock_file = os.path.join(os.path.dirname(__file__), '..', '..', 'basic_logs', 'server.lock')
+                    if os.path.exists(lock_file):
+                        os.remove(lock_file)
+                        print("🧹 Cleaned up server lock file")
+                except Exception as lock_cleanup_error:
+                    print(f"⚠️ Error cleaning up lock file: {lock_cleanup_error}")
 
     def is_log_server_running(self):
         """Check if the log server subprocess is running"""
@@ -159,10 +181,13 @@ class SocketManager:
 
     def get_socket_connection(self):
         """Get or create the socket connection (singleton pattern)"""
+        if self._cleanup_in_progress:  # Prevent new connections during cleanup
+            return None
+
         if self._socket_con is None:
             try:
-                if not config.ENABLE_SOCKET_LOGGING:
-                    print("Socket logging is disabled in config")
+                if not settings.ENABLE_SOCKET_LOGGING:
+                    print("Socket logging is disabled in settings")
                     return None
 
                 # First, try to connect to existing server
@@ -170,7 +195,7 @@ class SocketManager:
                 socket_req.settimeout(2)  # Short timeout for initial connection attempt
 
                 try:
-                    socket_req.connect((config.SOCKET_HOST, config.SOCKET_PORT))
+                    socket_req.connect((settings.SOCKET_HOST, settings.SOCKET_PORT))
                     self._socket_con = SocketCon(socket_req)
                     print("✅ Connected to existing log server")
                     return self._socket_con
@@ -187,7 +212,7 @@ class SocketManager:
                         # Try to connect again
                         socket_req = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                         socket_req.settimeout(5)  # Longer timeout for new server
-                        socket_req.connect((config.SOCKET_HOST, config.SOCKET_PORT))
+                        socket_req.connect((settings.SOCKET_HOST, settings.SOCKET_PORT))
                         self._socket_con = SocketCon(socket_req)
                         print("✅ Connected to newly started log server")
                         return self._socket_con
@@ -236,6 +261,38 @@ class SocketManager:
         if self.is_log_server_running():
             print("🔄 Stopping log server subprocess...")
             self.stop_log_server()
+
+    @classmethod
+    def cleanup(cls):
+        """Simple cleanup - just kill the subprocess"""
+        print("🧹 Cleaning up SocketManager...")
+
+        # Set flag to prevent new connections
+        if hasattr(cls, 'instance') and cls.instance is not None:
+            cls.instance._cleanup_in_progress = True
+            instance = cls.instance
+
+            # Close socket first (optional, but good practice)
+            if instance._socket_con:
+                try:
+                    instance._socket_con.client_socket.close()
+                    print("🔌 Socket closed")
+                except:
+                    pass  # Ignore errors
+                instance._socket_con = None
+
+            # SIMPLE APPROACH: Just kill the subprocess immediately
+            if instance._log_server_process is not None:
+                try:
+                    print("🛑 Killing log server subprocess...")
+                    instance._log_server_process.kill()  # ✅ Direct kill, no waiting
+                    print("✅ Log server killed")
+                except Exception as e:
+                    print(e)
+                finally:
+                    instance._log_server_process = None
+
+        print("✅ SocketManager cleanup completed")
 
 
 # Global instance

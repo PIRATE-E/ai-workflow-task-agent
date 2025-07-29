@@ -1,6 +1,8 @@
 # this class is used to manage the loading models of ollama
 import os
 import subprocess
+import signal
+import atexit
 from typing import ClassVar, Optional, Any
 
 from langchain_core.language_models import LanguageModelInput
@@ -12,7 +14,9 @@ from src.config import settings
 # Import socket manager for logging
 from .socket_manager import SocketManager
 
-socket_con = SocketManager().get_socket_connection() if settings.ENABLE_SOCKET_LOGGING else None
+def get_socket_con():
+    """Get socket connection only when needed"""
+    return SocketManager().get_socket_connection() if settings.ENABLE_SOCKET_LOGGING else None
 
 class ModelManager(ChatOllama):
     """
@@ -48,16 +52,27 @@ class ModelManager(ChatOllama):
         super().__init__(*args, **kwargs)
         ModelManager.load_model(kwargs.get('model', settings.DEFAULT_MODEL))
 
-    def __del__(self):
+    @classmethod
+    def cleanup_all_models(cls):
         """
-        Destructor to clean up resources when the ModelManager instance is deleted.
-        Stops the current model if it exists.
+        Public method to explicitly clean up all models.
+        Can be called manually or by signal handlers.
         """
-        if ModelManager.current_model:
-            ModelManager._stop_model()
-            ModelManager.current_model = None
+        try:
+            if cls.current_model:
+                socket_con = get_socket_con()
+                if socket_con:
+                    socket_con.send_error(f"🧹 Cleaning up model: {cls.current_model}")
+                cls._stop_model()
+                cls.current_model = None
+                socket_con = get_socket_con()
+                if socket_con:
+                    socket_con.send_error("✅ Model cleanup completed")
+        except Exception as e:
+            socket_con = get_socket_con()
             if socket_con:
-                socket_con.send_error(f"Model {ModelManager.current_model} stopped and cleaned up.")
+                socket_con.send_error(f"❌ Error during model cleanup: {e}")
+
 
     @staticmethod
     def load_model(model_name: str):
@@ -80,10 +95,12 @@ class ModelManager(ChatOllama):
         if model_name not in ModelManager.model_list:
             raise ValueError(f"Model {model_name} is not available. Available models: {ModelManager.model_list}")
         else:
+            socket_con = get_socket_con()
             if socket_con:
                 socket_con.send_error(f"\t[log]current model {ModelManager.current_model}, loading model {model_name}")
             if not ModelManager.current_model is None:
                 if ModelManager.current_model == model_name:
+                    socket_con = get_socket_con()
                     if socket_con:
                         socket_con.send_error(f"\t[log]Model {model_name} is already loaded.")
                 else:
@@ -92,6 +109,7 @@ class ModelManager(ChatOllama):
                     # Here you would add the actual loading logic
             else:
                 ModelManager.current_model = model_name
+                socket_con = get_socket_con()
                 if socket_con:
                     socket_con.send_error(f"Model {model_name} loaded successfully.")
 
@@ -101,6 +119,7 @@ class ModelManager(ChatOllama):
         Stops the currently running model using the Ollama CLI.
         """
         if cls.current_model:
+            socket_con = get_socket_con()
             if socket_con:
                 socket_con.send_error(f"Stopping previous model: {cls.current_model}")
             os.system(f"ollama stop {cls.current_model}")
@@ -132,6 +151,7 @@ if __name__ == '__main__':
     # Example usage
     manager = ModelManager(model=settings.DEFAULT_MODEL, temperature=0.7, format="json")
     response = manager.invoke([HumanMessage(content="Hello, how are you?")])
+    socket_con = get_socket_con()
     if socket_con:
         socket_con.send_error(response.content if response else "No response received.")
     else:
@@ -139,6 +159,7 @@ if __name__ == '__main__':
 
     manager2 = ModelManager(model=settings.CLASSIFIER_MODEL, temperature=0.5, format="json")
     response = manager2.invoke([HumanMessage(content="What is the capital of France?")])
+    socket_con = get_socket_con()
     if socket_con:
         socket_con.send_error(response.content if response else "No response received.")
     else:
@@ -146,6 +167,7 @@ if __name__ == '__main__':
 
     manager2 = ModelManager(model=settings.CLASSIFIER_MODEL, temperature=0.5, format="json")
     response = manager2.invoke([HumanMessage(content="What is the capital of France?")])
+    socket_con = get_socket_con()
     if socket_con:
         socket_con.send_error(response.content if response else "No response received.")
     else:

@@ -2,7 +2,7 @@ from langchain_core.messages import HumanMessage
 from rich.console import Console
 from src.agents.agents_schema.agents_schema import message_classifier
 from src.config import settings
-from src.utils.model_manager import socket_con, ModelManager
+from src.utils.model_manager import get_socket_con, ModelManager
 
 
 def classify_message_type(state) -> dict:
@@ -21,6 +21,7 @@ def classify_message_type(state) -> dict:
     lowered_content = content.lower()
     for phrase in explicit_ai_phrases:
         if phrase in lowered_content:
+            socket_con = get_socket_con()
             if socket_con:
                 socket_con.send_error(f"[LOG] Removing explicit AI phrase: {phrase}")
             else:
@@ -32,6 +33,7 @@ def classify_message_type(state) -> dict:
     explicit_tool_phrases = ["/search", "/use tool"]
     for phrase in explicit_tool_phrases:
         if phrase in lowered_content:
+            socket_con = get_socket_con()
             if socket_con:
                 socket_con.send_error(f"[LOG] Removing explicit tool phrase: {phrase}")
             else:
