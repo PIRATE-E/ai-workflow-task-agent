@@ -167,6 +167,8 @@ processed_*.json
 chromaDB_*/
 Screenshot*.png
 New Text Document.txt
+*.kiro*
+*error_log.txt
 
 # Temporary files
 *.tmp
