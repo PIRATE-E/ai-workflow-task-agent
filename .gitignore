@@ -168,7 +168,10 @@ chromaDB_*/
 Screenshot*.png
 New Text Document.txt
 *.kiro*
+copilot_instructions/
 *error_log.txt
+# Old project files (main)
+lggraphOLD_MAIN.py
 
 # Temporary files
 *.tmp
