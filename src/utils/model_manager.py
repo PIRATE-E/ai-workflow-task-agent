@@ -6,8 +6,8 @@ import atexit
 from typing import ClassVar, Optional, Any
 
 from langchain_core.language_models import LanguageModelInput
-from langchain_core.messages import BaseMessage, HumanMessage
 from langchain_core.runnables import RunnableConfig
+from src.config import settings
 from langchain_ollama import ChatOllama
 
 from src.config import settings
@@ -132,7 +132,7 @@ class ModelManager(ChatOllama):
         *,
         stop: Optional[list[str]] = None,
         **kwargs: Any,
-    ) -> BaseMessage:
+    ) -> settings.BaseMessage:
         """
         Invokes the loaded model with the given input.
 
@@ -150,7 +150,7 @@ class ModelManager(ChatOllama):
 if __name__ == '__main__':
     # Example usage
     manager = ModelManager(model=settings.DEFAULT_MODEL, temperature=0.7, format="json")
-    response = manager.invoke([HumanMessage(content="Hello, how are you?")])
+    response = manager.invoke([settings.HumanMessage(content="Hello, how are you?")])
     socket_con = get_socket_con()
     if socket_con:
         socket_con.send_error(response.content if response else "No response received.")
@@ -158,7 +158,7 @@ if __name__ == '__main__':
         print(response.content if response else "No response received.", type(manager))
 
     manager2 = ModelManager(model=settings.CLASSIFIER_MODEL, temperature=0.5, format="json")
-    response = manager2.invoke([HumanMessage(content="What is the capital of France?")])
+    response = manager2.invoke([settings.HumanMessage(content="What is the capital of France?")])
     socket_con = get_socket_con()
     if socket_con:
         socket_con.send_error(response.content if response else "No response received.")
@@ -166,7 +166,7 @@ if __name__ == '__main__':
         print(response.content if response else "No response received.", type(manager2))
 
     manager2 = ModelManager(model=settings.CLASSIFIER_MODEL, temperature=0.5, format="json")
-    response = manager2.invoke([HumanMessage(content="What is the capital of France?")])
+    response = manager2.invoke([settings.HumanMessage(content="What is the capital of France?")])
     socket_con = get_socket_con()
     if socket_con:
         socket_con.send_error(response.content if response else "No response received.")

@@ -1,5 +1,3 @@
-from langchain_core.messages import HumanMessage, AIMessage, BaseMessage
-
 from src.config import settings
 from src.tools.lggraph_tools.tool_response_manager import ToolResponseManager
 from src.tools.lggraph_tools.tools.google_search_tool import search_google_tool
@@ -12,7 +10,7 @@ class GoogleSearchToolWrapper:
     This class is used to manage the response from the Google Search Tool.
     """
 
-    def _parse_response(self) -> BaseMessage | None:
+    def _parse_response(self) -> settings.BaseMessage | None:
         """
         CONVERT the response from the Google Search Tool into a human-readable format by extracting the snippets and process it using llm.
         :return: Parsed response.
@@ -32,7 +30,7 @@ class GoogleSearchToolWrapper:
             from src.prompts.system_prompts import prompt_manager
             system_prompt = prompt_manager.get_web_search_prompt()
             response = ModelManager(model=settings.CLASSIFIER_MODEL, temperature=0.7, format="json").invoke(
-                [HumanMessage(content=system_prompt), HumanMessage(content=snippets)])
+                [settings.HumanMessage(content=system_prompt), settings.HumanMessage(content=snippets)])
         else:
             response = None
         return response
@@ -49,11 +47,11 @@ class GoogleSearchToolWrapper:
         if response is not None:
             # If the response is a dictionary, we can assume it's a valid response
             ToolResponseManager().set_response(
-                [AIMessage(content=response.content, additional_kwargs=response.additional_kwargs,
+                [settings.AIMessage(content=response.content, additional_kwargs=response.additional_kwargs,
                            response_metadata=getattr(response, "response_metadata", {}),
                            id=getattr(response, "id", None))
                  ]
             )
         else:
             # If the response is None, we can set an empty response
-            ToolResponseManager().set_response([AIMessage(content="No results found for the query.")])
+            ToolResponseManager().set_response([settings.AIMessage(content="No results found for the query.")])

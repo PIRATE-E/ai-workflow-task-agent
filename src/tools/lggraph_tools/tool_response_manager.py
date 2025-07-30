@@ -6,13 +6,13 @@ description:
 
 from typing import Optional, List
 
-from langchain_core.messages import HumanMessage, AIMessage, BaseMessage
+from src.config import settings
 
 
 class ToolResponseManager:
     instance = None
     _tool_response: Optional[
-        List[HumanMessage | AIMessage]] = None  # because the response always be human or AI message list
+        List[settings.HumanMessage | settings.AIMessage]] = None  # because the response always be human or AI message list
 
     def __new__(cls):
         """
@@ -34,7 +34,7 @@ class ToolResponseManager:
         """
         return self._tool_response
 
-    def set_response(self, new_response: list[HumanMessage | AIMessage]):
+    def set_response(self, new_response: list[settings.HumanMessage | settings.AIMessage]):
         """
         Set a new response for the tool.
         :param new_response: The new response to set for the tool.
@@ -47,7 +47,7 @@ class ToolResponseManager:
             raise ValueError("new_response cannot be empty")
         
         # ✅ TYPE VALIDATION: Ensure all items are correct message types
-        if not all(isinstance(msg, (HumanMessage, AIMessage)) for msg in new_response):
+        if not all(isinstance(msg, (settings.HumanMessage, settings.AIMessage)) for msg in new_response):
             raise TypeError("All messages must be HumanMessage or AIMessage instances")
         
         if self._tool_response is not None:
@@ -55,7 +55,7 @@ class ToolResponseManager:
         else:
             self._tool_response = new_response
 
-    def set_response_base(self, new_message: list[BaseMessage], type: int = 0):
+    def set_response_base(self, new_message: list[settings.BaseMessage], type: int = 0):
         """
         Set a new response for the tool.
 
@@ -64,7 +64,7 @@ class ToolResponseManager:
         """
         if self._tool_response is None:
             self._tool_response = []
-        message_class = HumanMessage if type == 0 else AIMessage if type == 1 else None
+        message_class = settings.HumanMessage if type == 0 else settings.AIMessage if type == 1 else None
         if message_class is None:
             raise ValueError("Invalid type specified. Use 0 for HumanMessage or 1 for AIMessage.")
         self._tool_response.extend(

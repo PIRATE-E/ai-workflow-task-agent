@@ -6,9 +6,9 @@ This replicates the behavior where you type '/h' and see 'elp' grayed out
 
 import sys
 
-from rich.console import Console
 from rich.panel import Panel
 from rich.text import Text
+from src.config import settings
 
 # Cross-platform keyboard input
 try:
@@ -17,8 +17,6 @@ try:
 except ImportError:
     import termios, tty
     WINDOWS = False
-
-console = Console()
 
 # Commands like Gemini CLI
 COMMANDS = {
@@ -107,6 +105,7 @@ def create_suggestions_list(current_input):
 
 def main():
     """Main demo"""
+    console = settings.console
     console.clear()
 
     # Welcome message

@@ -1,7 +1,5 @@
 import json
 
-from langchain_core.messages import AIMessage, HumanMessage
-from rich.console import Console
 from src.agents.agents_schema.agents_schema import ToolSelection
 from src.config import settings
 from src.utils.model_manager import get_socket_con, ModelManager
@@ -13,7 +11,7 @@ def tool_selection_agent(state) -> dict:
     """
     Selects and invokes the most appropriate tool for the user's request, or returns a message if no tool is needed.
     """
-    console = Console()
+    console = settings.console
     console.print("\t\t----[bold][green]Node is tool_agent[/bold][/green]")
 
     # Access state directly from LangGraph parameter (no sync needed)
@@ -88,8 +86,8 @@ def tool_selection_agent(state) -> dict:
         ).with_structured_output(ToolSelection)
         with console.status("[bold green]Thinking...[/bold green]", spinner="dots"):
             selection = structured_llm.invoke([
-                HumanMessage(content=system_prompt),
-                HumanMessage(content=content)
+                settings.HumanMessage(content=system_prompt),
+                settings.HumanMessage(content=content)
             ])
         print("Tool selected:", selection.tool_name)
         print("Reasoning:", selection.reasoning)
@@ -100,7 +98,7 @@ def tool_selection_agent(state) -> dict:
             socket_con.send_error(f"[ERROR] Exception in tool_agent: {e}")
         else:
             print(f"[ERROR] Exception in tool_agent: {e}")
-        return {"messages": [AIMessage(content=f"Error processing tool selection: {str(e)}")]}
+        return {"messages": [settings.AIMessage(content=f"Error processing tool selection: {str(e)}")]}
     parameters = selection.parameters
     if isinstance(parameters, str):
         try:
@@ -127,7 +125,7 @@ def tool_selection_agent(state) -> dict:
                     socket_con = get_socket_con()
                     if socket_con:
                         socket_con.send_error(f"[RESULT] Result from {tool.name}: {result}")
-                    return {"messages": [AIMessage(content=f"Result from {tool.name}: {result}")]}
+                    return {"messages": [settings.AIMessage(content=f"Result from {tool.name}: {result}")]}
                 except Exception as e:
                     socket_con = get_socket_con()
                     if socket_con:
@@ -135,11 +133,11 @@ def tool_selection_agent(state) -> dict:
                             f"[ERROR] Error using tool {tool.name}: {e} function: {tool.func.__name__}")
                     else:
                         print(f"[ERROR] Error using tool {tool.name}: {e} function: {tool.func.__name__}")
-                    return {"messages": [AIMessage(content=f"Error using {tool.name}: {str(e)}")]}
+                    return {"messages": [settings.AIMessage(content=f"Error using {tool.name}: {str(e)}")]}
         socket_con = get_socket_con()
         if socket_con:
             socket_con.send_error(f"[ERROR] Tool '{selection.tool_name}' not found.")
         else:
             print(f"[ERROR] Tool '{selection.tool_name}' not found.")
-        return {"messages": [AIMessage(content=f"Tool '{selection.tool_name}' not found.")]}
-    return {"messages": [AIMessage(content='No tool was used.')]}
+        return {"messages": [settings.AIMessage(content=f"Tool '{selection.tool_name}' not found.")]}
+    return {"messages": [settings.AIMessage(content='No tool was used.')]}

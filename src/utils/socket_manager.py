@@ -180,9 +180,26 @@ class SocketManager:
         return self._log_server_process.poll() is None
 
     def get_socket_connection(self):
-        """Get or create the socket connection (singleton pattern)"""
+        """Get or create the socket connection with adaptive timeout and health checking"""
         if self._cleanup_in_progress:  # Prevent new connections during cleanup
             return None
+
+        # === STEP 1: HEALTH CHECK EXISTING CONNECTION ===
+        # Your brilliant insight: Check if connection is HEALTHY, not just exists
+        if self._socket_con is not None:
+            if self._socket_con._is_connected():
+                # Connection exists and is healthy - reuse it
+                return self._socket_con
+            else:
+                # Connection exists but is dead - clear it for reconnection
+                print("🔄 Detected dead connection, clearing for reconnection...")
+                try:
+                    self._socket_con.client_socket.close()
+                except Exception as e:
+                    print(f"❌ Error closing dead socket: {e}")
+                self._socket_con = None
+
+
 
         if self._socket_con is None:
             try:
@@ -192,7 +209,7 @@ class SocketManager:
 
                 # First, try to connect to existing server
                 socket_req = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                socket_req.settimeout(2)  # Short timeout for initial connection attempt
+                socket_req.settimeout(0.5)  # Short timeout for initial connection attempt
 
                 try:
                     socket_req.connect((settings.SOCKET_HOST, settings.SOCKET_PORT))
@@ -211,7 +228,7 @@ class SocketManager:
 
                         # Try to connect again
                         socket_req = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                        socket_req.settimeout(5)  # Longer timeout for new server
+                        socket_req.settimeout(2)  # Longer timeout for new server
                         socket_req.connect((settings.SOCKET_HOST, settings.SOCKET_PORT))
                         self._socket_con = SocketCon(socket_req)
                         print("✅ Connected to newly started log server")

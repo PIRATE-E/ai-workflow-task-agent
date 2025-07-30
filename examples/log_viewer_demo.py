@@ -7,16 +7,15 @@ import os
 import time
 
 import config
-from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 from utils.socket_manager import socket_manager
-
-console = Console()
+from src.config import settings
 
 def show_log_display_options():
     """Show all available log display options"""
+    console = settings.console
     console.print(Panel.fit(
         Text("📊 Log Display Options", style="bold magenta"),
         title="LangGraph Chatbot - Log Viewing",
@@ -61,6 +60,7 @@ def show_log_display_options():
 
 def demo_separate_window():
     """Demo the separate window log display"""
+    console = settings.console
     console.print("\n🪟 Demonstrating Separate Window Mode...")
     console.print("   This will open a new console window for logs")
 
@@ -97,6 +97,7 @@ def demo_separate_window():
 
 def demo_file_logging():
     """Demo the file-based log display"""
+    console = settings.console
     console.print("\n📄 Demonstrating File Logging Mode...")
 
     # Temporarily set to file mode
@@ -154,6 +155,7 @@ def demo_file_logging():
 
 def show_current_logs():
     """Show what logs are currently being generated"""
+    console = settings.console
     console.print("\n📊 Current Log Activity...")
 
     socket_con = socket_manager.get_socket_connection()
@@ -178,6 +180,7 @@ def show_current_logs():
 
 def interactive_log_demo():
     """Interactive demo where user can send custom log messages"""
+    console = settings.console
     console.print("\n🎮 Interactive Log Demo")
     console.print("Type messages to send to the log server (type 'quit' to exit)")
 
@@ -212,6 +215,7 @@ def interactive_log_demo():
 
 def main():
     """Main log viewer demo"""
+    console = settings.console
     console.print("=" * 80)
     console.print("📊 LANGGRAPH CHATBOT - LOG VIEWER DEMO")
     console.print("=" * 80)

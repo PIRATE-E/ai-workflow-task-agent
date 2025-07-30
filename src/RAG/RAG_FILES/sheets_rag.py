@@ -31,7 +31,7 @@ class GoogleSheetsRAG:
 
     def _parse_html_table(self):
         """Enhanced parsing with schema awareness and structured data preservation"""
-        response = requests.get(self.sheets_url)
+        response = requests.get(self.sheets_url, timeout=5)
         response.raise_for_status()
         soup = BeautifulSoup(response.text, 'html.parser')
         table = soup.find('table')

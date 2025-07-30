@@ -7,11 +7,9 @@ This shows exactly how Gemini CLI-style suggestions work
 from prompt_toolkit import prompt
 from prompt_toolkit.completion import Completer, Completion
 from prompt_toolkit.shortcuts import CompleteStyle
-from rich.console import Console
 from rich.panel import Panel
 from rich.text import Text
-
-console = Console()
+from src.config import settings
 
 # Command registry - exactly like Gemini CLI
 COMMANDS = {
@@ -49,6 +47,7 @@ class SmartCompleter(Completer):
 
 def print_banner():
     """Print welcome banner"""
+    console = settings.console
     banner_text = Text()
     banner_text.append("🚀 Auto-Complete Demo\n", style="bold magenta")
     banner_text.append("Type commands starting with '/' to see magic happen!\n\n", style="cyan")
@@ -69,6 +68,7 @@ def print_banner():
 
 def execute_command(command_input):
     """Execute the entered command"""
+    console = settings.console
     parts = command_input.strip().split()
     if not parts:
         return
@@ -99,6 +99,7 @@ def execute_command(command_input):
 
 def show_help():
     """Show help information"""
+    console = settings.console
     help_text = Text()
     help_text.append("📚 Available Commands:\n\n", style="bold yellow")
 
@@ -110,6 +111,7 @@ def show_help():
 
 def main():
     """Main demo loop"""
+    console = settings.console
     console.clear()
     print_banner()
 

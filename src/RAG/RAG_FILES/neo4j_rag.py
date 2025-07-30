@@ -7,7 +7,7 @@ from typing import Any
 import google.generativeai as genai
 from dotenv import load_dotenv
 from langchain_core.documents import Document
-from langchain_core.messages import HumanMessage
+from src.config import settings
 from langchain_ollama import ChatOllama
 from neo4j import GraphDatabase
 
@@ -300,7 +300,7 @@ def prompt_local_llm_for_triples(chunk: Document) -> list:
         
         Focus on quality over quantity - extract only meaningful, verifiable relationships.
         """
-    response = llm.invoke([HumanMessage(content=prompt)])
+    response = llm.invoke([settings.HumanMessage(content=prompt)])
     output = response.content
 
     print(f"LLM response: {output}")

@@ -1,5 +1,3 @@
-from langchain_core.messages import HumanMessage
-from rich.console import Console
 from src.agents.agents_schema.agents_schema import message_classifier
 from src.config import settings
 from src.utils.model_manager import get_socket_con, ModelManager
@@ -10,7 +8,7 @@ def classify_message_type(state) -> dict:
     Classifies the latest message in the conversation as either requiring an LLM response or a tool response.
     """
     print("\t\t----Node is classify_message")
-    console = Console()
+    console = settings.console
 
     # Access state directly from LangGraph parameter (no sync needed)
     messages = state.get("messages", [])
@@ -90,8 +88,8 @@ def classify_message_type(state) -> dict:
 
 Classify thoughtfully based on true user intent, not just keywords."""
     result = classified_llm.invoke([
-        HumanMessage(content=system_prompt),
-        HumanMessage(content=content)
+        settings.HumanMessage(content=system_prompt),
+        settings.HumanMessage(content=content)
     ])
     console.print(f"[u][red]Message classified as[/u][/red]: {result.message_type}")
     return {"message_type": result.message_type}

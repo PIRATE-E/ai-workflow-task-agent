@@ -49,6 +49,13 @@ SEMAPHORE_API = int(os.getenv("SEMAPHORE_LIMIT_API", 5))
 # PNG FILE PATH
 PNG_FILE_PATH = BASE_DIR.parent / "basic_logs" / "graph.png"
 
+console = None  # Placeholder for console object, to be initialized in main_orchestrator.py
+
+# Message class placeholders - to be initialized in chat_initializer.py
+HumanMessage = None  # Placeholder for HumanMessage class
+AIMessage = None     # Placeholder for AIMessage class  
+BaseMessage = None   # Placeholder for BaseMessage class
+
 if __name__ == '__main__':
     # true
     # print(Path(Path().resolve().parent / "RAG" / "RAG_FILES" / "kafka.pdf").resolve().exists())

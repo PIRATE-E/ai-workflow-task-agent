@@ -1,5 +1,4 @@
 import winsound
-from rich.console import Console
 from rich.align import Align
 from rich.panel import Panel
 from rich.text import Text
@@ -7,7 +6,7 @@ from src.config import settings
 
 
 def print_message(msg, sender="user"):
-    console = Console()
+    console = settings.console
     if sender == "user":
         icon = "👤"
         style = "bold cyan"

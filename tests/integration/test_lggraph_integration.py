@@ -6,13 +6,12 @@ This simulates the key parts of lggraph.py that use the socket manager
 
 import time
 
-from rich.console import Console
 from utils.socket_manager import socket_manager
-
-console = Console()
+from src.config import settings
 
 def simulate_lggraph_startup():
     """Simulate what happens when lggraph.py starts"""
+    console = settings.console
     console.print("🚀 Simulating lggraph.py startup...")
 
     # This is what happens in your lggraph.py
@@ -31,6 +30,7 @@ def simulate_lggraph_startup():
 
 def simulate_lggraph_operations(socket_con):
     """Simulate typical lggraph.py operations with logging"""
+    console = settings.console
     console.print("\n🔄 Simulating typical lggraph.py operations...")
 
     operations = [
@@ -58,6 +58,7 @@ def simulate_lggraph_operations(socket_con):
 
 def simulate_lggraph_errors(socket_con):
     """Simulate error scenarios in lggraph.py"""
+    console = settings.console
     console.print("\n🧪 Simulating error scenarios...")
 
     errors = [
@@ -82,6 +83,7 @@ def simulate_lggraph_errors(socket_con):
 
 def simulate_lggraph_shutdown():
     """Simulate what happens when lggraph.py shuts down"""
+    console = settings.console
     console.print("\n🛑 Simulating lggraph.py shutdown...")
 
     # This is what happens in your on_exit function
@@ -97,6 +99,7 @@ def simulate_lggraph_shutdown():
 
 def main():
     """Main integration test"""
+    console = settings.console
     console.print("=" * 80)
     console.print("🧪 LGGRAPH.PY INTEGRATION TEST")
     console.print("=" * 80)

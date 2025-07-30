@@ -1,13 +1,12 @@
-from rich.console import Console
-
 from src.models.state import StateAccessor
+from src.config import settings
 
 
 def route_message(state):
     """
     Determines the next node in the workflow based on the classified message type.
     """
-    console = Console()
+    console = settings.console
     state_accessor = StateAccessor()
     console.print("\t\t[bold][green]----Node is router[/bold][/green]")
     # 🔄 Sync StateAccessor with current LangGraph state

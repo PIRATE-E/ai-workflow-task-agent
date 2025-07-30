@@ -1,4 +1,4 @@
-from langchain_core.messages import AIMessage
+from src.config import settings
 
 
 class RagSearchClassifierWrapper:
@@ -28,13 +28,13 @@ class RagSearchClassifierWrapper:
                     print(f"[WARNING] RAG tool returned error: {result}")
                 
                 # Create AIMessage with the string result
-                ai_message = AIMessage(content=result)
+                ai_message = settings.AIMessage(content=result)
                 ToolResponseManager().set_response([ai_message])
             else:
                 # Handle None or empty result
                 error_message = f"[ERROR] RAG search returned no results for query: '{self.query}'"
                 print(f"[ERROR] Empty result from RAG tool for query: '{self.query}'")
-                ai_message = AIMessage(content=error_message)
+                ai_message = settings.AIMessage(content=error_message)
                 ToolResponseManager().set_response([ai_message])
                 
         except Exception as e:
@@ -44,5 +44,5 @@ class RagSearchClassifierWrapper:
             error_message = f"[ERROR] Exception during RAG search for '{self.query}': {str(e)}"
             
             print(f"[ERROR] Full traceback:\n{error_details}")
-            ai_message = AIMessage(content=error_message)
+            ai_message = settings.AIMessage(content=error_message)
             ToolResponseManager().set_response([ai_message])

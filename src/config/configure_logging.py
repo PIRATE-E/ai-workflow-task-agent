@@ -4,15 +4,14 @@ Configuration helper for LangGraph Chatbot logging
 Helps you set up the best logging configuration for your needs
 """
 
-from rich.console import Console
 from rich.panel import Panel
 from rich.prompt import Prompt, Confirm
 from rich.table import Table
-
-console = Console()
+from src.config import settings
 
 def show_current_config():
     """Show current logging configuration"""
+    console = settings.console
     console.print(Panel.fit(
         "🔧 Current Logging Configuration",
         style="bold blue"
@@ -30,6 +29,7 @@ def show_current_config():
 
 def recommend_configuration():
     """Recommend the best configuration based on user needs"""
+    console = settings.console
     console.print("\n🎯 Let's find the best logging setup for you!")
 
     # Ask about use case
@@ -79,6 +79,7 @@ def recommend_configuration():
 
 def update_config_file(new_mode):
     """Update the config.py file with new logging mode"""
+    console = settings.console
     config_path = "config.py"
 
     try:
@@ -110,6 +111,7 @@ def update_config_file(new_mode):
 
 def test_configuration():
     """Test the current logging configuration"""
+    console = settings.console
     console.print("\n🧪 Testing current configuration...")
 
     try:
@@ -144,6 +146,7 @@ def test_configuration():
 
 def show_troubleshooting():
     """Show troubleshooting tips"""
+    console = settings.console
     console.print("\n🔧 Troubleshooting Tips")
 
     table = Table(title="Common Issues and Solutions")
@@ -175,6 +178,7 @@ def show_troubleshooting():
 
 def main():
     """Main configuration helper"""
+    console = settings.console
     console.print("=" * 80)
     console.print("🔧 LANGGRAPH CHATBOT - LOGGING CONFIGURATION")
     console.print("=" * 80)

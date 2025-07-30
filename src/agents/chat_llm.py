@@ -1,5 +1,4 @@
 from langchain_core.messages import HumanMessage, AIMessage
-from rich.console import Console
 from src.config import settings
 from src.tools.lggraph_tools.tool_assign import ToolAssign
 from src.ui.print_message_style import print_message
@@ -11,7 +10,7 @@ def generate_llm_response(state) -> dict:
     Generates a response using the LLM based on the conversation history and the latest user message.
     Shows a spinner while generating the response.
     """
-    console = Console()
+    console = settings.console
     console.print("\t\t----[bold][green]Node is chatBot[/bold][/green]")
     # Access state directly from LangGraph parameter
     messages = state.get("messages", [])

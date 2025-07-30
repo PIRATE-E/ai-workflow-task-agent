@@ -1,13 +1,14 @@
 import json
 import winsound
-from langchain_core.messages import HumanMessage, AIMessage
 from rich.prompt import Prompt
+from src.config import settings
 
 import src.prompts.rag_search_classifier_prompts
-from lggraph import console  # this need to fixed we are importing console from "lggraph" file
+# from lggraph import console  # this need to fixed we are importing console from "lggraph" file
 from src.RAG.RAG_FILES import neo4j_rag
 from src.RAG.RAG_FILES import rag
 from src.config import settings
+from src.config.settings import console
 from src.models.state import StateAccessor  # Import the global state object
 from src.tools.lggraph_tools.tool_response_manager import ToolResponseManager
 from src.utils.model_manager import get_socket_con, ModelManager
@@ -67,7 +68,7 @@ def retrieve_knowledge_graph(query: str) -> str:
                 temperature=temperature,
                 format="json"
             )
-            result = llm.invoke([HumanMessage(content=SYSTEM_PROMPT_CYPHER_GENERATION)])
+            result = llm.invoke([settings.HumanMessage(content=SYSTEM_PROMPT_CYPHER_GENERATION)])
             # ✅ FIX 1: Use correct method name
             ToolResponseManager().set_response_base([result])
             return result.content
@@ -136,7 +137,7 @@ def retrieve_knowledge_graph(query: str) -> str:
     )
 
     with console.status("[bold green]Generating explanation...[/bold green]", spinner="dots"):
-        explanation_result = explanation_llm.invoke([HumanMessage(content=explanation_prompt)])
+        explanation_result = explanation_llm.invoke([settings.HumanMessage(content=explanation_prompt)])
 
     # Clean up the response and return just the explanation
     explanation = explanation_result.content.strip()
@@ -221,8 +222,8 @@ def rag_search_classifier_tool(query: str) -> str:
         temperature=0.7,
         format="json",
     )
-    prompt_list = [HumanMessage(content=system_prompt),
-                   HumanMessage(content=prompt)]
+    prompt_list = [settings.HumanMessage(content=system_prompt),
+                   settings.HumanMessage(content=prompt)]
     with console.status("[bold green]Thinking...[/bold green]", spinner="dots"):
         llm_response = llm.invoke(prompt_list)
     print("\n\nLLM Response:", llm_response.content)

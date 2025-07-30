@@ -1,7 +1,7 @@
-from rich.console import Console
 from rich.align import Align
 from rich.panel import Panel
 from rich.text import Text
+from src.config import settings
 
 
 
@@ -24,7 +24,7 @@ SP                 SP          SP   SP                SP                 SP     
 Y                  Y           Y    Y                 Y                  Y                 Y    Y          Y                               Y         
 
     """
-    console = Console()
+    console = settings.console
     console.print(Align.center(
         Panel.fit(Text(banner, style="bold magenta"), title="LangGraph Chatbot", subtitle="made by pirate",
                   style="bold blue")))

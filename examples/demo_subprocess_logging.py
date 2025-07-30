@@ -6,16 +6,15 @@ This shows how lggraph.py will now work with automatic log server startup
 
 import time
 
-from rich.console import Console
 from rich.panel import Panel
 from rich.text import Text
 # Add project imports
 from utils.socket_manager import socket_manager
-
-console = Console()
+from src.config import settings
 
 def demo_automatic_logging():
     """Demonstrate automatic log server startup and usage"""
+    console = settings.console
 
     console.print(Panel.fit(
         Text("🚀 Automatic Log Server Demo", style="bold magenta"),
@@ -115,6 +114,7 @@ def demo_automatic_logging():
 
 def demo_cleanup():
     """Demonstrate proper cleanup"""
+    console = settings.console
     console.print("\n6. 🧹 Demonstrating cleanup process...")
 
     console.print("   📝 In your actual lggraph.py, this happens when:")
@@ -136,6 +136,7 @@ def demo_cleanup():
 
 def show_integration_example():
     """Show how this integrates with lggraph.py"""
+    console = settings.console
     console.print("\n" + "="*80)
     console.print("📖 HOW THIS INTEGRATES WITH YOUR LGGRAPH.PY")
     console.print("="*80)
@@ -180,6 +181,7 @@ socket_manager.close_connection()
 
 def main():
     """Main demonstration function"""
+    console = settings.console
     try:
         console.print("🎬 Starting Automatic Subprocess Logging Demo...")
         console.print("   (This simulates what happens when you run lggraph.py)")

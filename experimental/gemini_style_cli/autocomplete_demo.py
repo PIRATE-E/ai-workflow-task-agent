@@ -6,10 +6,10 @@ Demonstrates real-time command suggestions like Gemini CLI
 
 import sys
 
-from rich.console import Console
 from rich.layout import Layout
 from rich.panel import Panel
 from rich.text import Text
+from src.config import settings
 
 # For cross-platform keyboard input
 try:
@@ -19,8 +19,6 @@ except ImportError:
     import termios
     import tty
     WINDOWS = False
-
-console = Console()
 
 # Command registry - like Gemini CLI commands
 COMMANDS = {
@@ -117,6 +115,7 @@ def get_char():
         return char
 
 def main():
+    console = settings.console
     console.print(Panel.fit(
         "[bold magenta]Auto-Complete Demo[/bold magenta]\n"
         "[cyan]Type commands starting with '/' to see suggestions[/cyan]\n"

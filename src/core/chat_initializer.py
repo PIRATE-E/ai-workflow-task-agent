@@ -3,14 +3,13 @@ import json
 import platform
 from threading import Thread
 
-from langchain_core.messages import HumanMessage, AIMessage
+from src.config import settings
 from langgraph.graph.state import CompiledStateGraph
 from rich import console, prompt, inspect
 
 from src.config.settings import PNG_FILE_PATH
 from src.models.state import StateAccessor, State
 from src.ui.print_message_style import print_message
-from src.utils.socket_manager import socket_manager
 
 
 class ChatInitializer:
@@ -19,10 +18,25 @@ class ChatInitializer:
         self._exit_function = None
         self.os = platform.system()
         self.console = console.Console()
+        self._set_core_classes()  # set core classes for messages
+        # Initialize state with empty messages and no message type
         self._state: State = {"messages": [], "message_type": None}
         self.state_accessor = StateAccessor()
         self.graph = None  # graph.compile() will be called later
         self.tools = None
+
+
+    def _set_core_classes(self):
+        # Import here to avoid circular imports
+        from langchain_core.messages import HumanMessage, AIMessage, BaseMessage
+        
+        # we must set the console for rich console to use it in different classes to the settings
+        settings.console = self.console
+        
+        # Set message classes for centralized access
+        settings.HumanMessage = HumanMessage
+        settings.AIMessage = AIMessage
+        settings.BaseMessage = BaseMessage
 
     def set_graph(self, graph):
         if not isinstance(graph, CompiledStateGraph):
@@ -64,7 +78,7 @@ class ChatInitializer:
             self.console.print("[bold red]No exit function set. Exiting without cleanup.[/bold red]")
         # print the final state for debugging
         inspect(self._state)
-        return {"messages": [AIMessage(content="Thank you for using the LangGraph Chatbot!")]}
+        return {"messages": [settings.AIMessage(content="Thank you for using the LangGraph Chatbot!")]}
 
     def save_graph_png(self):
         import os
@@ -127,7 +141,7 @@ class ChatInitializer:
             self.on_exit()
             self.break_loop = True
         else:
-            self._state["messages"].append(HumanMessage(content=user_input))
+            self._state["messages"].append(settings.HumanMessage(content=user_input))
             print_message(user_input, sender="user")
             self._state = self.graph.invoke(self._state)
             self.state_accessor.sync_with_langgraph(self._state)
