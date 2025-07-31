@@ -2,7 +2,8 @@ import atexit
 import signal
 from typing import Callable, List
 
-from src.utils.model_manager import get_socket_con
+# Socket connection now centralized in settings
+from src.config import settings
 
 
 # this is cleanup code for the chat system
@@ -37,9 +38,8 @@ class ChatDestructor:
         This ensures models are stopped even during abrupt termination.
         """
         if cls.is_cleaned_registered:
-            socket_con = get_socket_con()
-            if socket_con:
-                socket_con.send_error("[LOG]Cleanup handlers already registered.")
+            if settings.socket_con:
+                settings.socket_con.send_error("[LOG]Cleanup handlers already registered.")
             return
 
         # Register atexit handler (called during normal Python exit)
@@ -57,18 +57,16 @@ class ChatDestructor:
             print(f"Could not register signal handler: {e}")
 
         cls.is_cleaned_registered = True
-        socket_con = get_socket_con()
-        if socket_con:
-            socket_con.send_error("[LOG]✅ Chat cleanup handlers registered successfully")
+        if settings.socket_con:
+            settings.socket_con.send_error("[LOG]✅ Chat cleanup handlers registered successfully")
 
     @classmethod
     def _signal_handler(cls, signum, frame):
         """
         Handle termination signals and ensure proper cleanup.
         """
-        socket_con = get_socket_con()
-        if socket_con:
-            socket_con.send_error(f"🛑 Signal {signum} received, cleaning up models...")
+        if settings.socket_con:
+            settings.socket_con.send_error(f"🛑 Signal {signum} received, cleaning up models...")
         cls.call_all_cleanup_functions()
 
         # Call original handler if it existed
@@ -84,44 +82,38 @@ class ChatDestructor:
     def call_all_cleanup_functions(cls):
         # Prevent double cleanup execution
         if cls._cleanup_executed:
-            socket_con = get_socket_con()
-            if socket_con:
-                socket_con.send_error("[LOG]Cleanup already executed, skipping.")
+            if settings.socket_con:
+                settings.socket_con.send_error("[LOG]Cleanup already executed, skipping.")
             return
             
         cls._cleanup_executed = True  # Set flag to prevent re-execution
         
         if len(cls._all_functions) == 0:
-            socket_con = get_socket_con()
-            if socket_con:
-                socket_con.send_error("[LOG]No cleanup functions registered.")
+            if settings.socket_con:
+                settings.socket_con.send_error("[LOG]No cleanup functions registered.")
             return
 
-        socket_con = get_socket_con()
-        if socket_con:
-            socket_con.send_error("[LOG]🧹 Starting cleanup process...")
+        if settings.socket_con:
+            settings.socket_con.send_error("[LOG]🧹 Starting cleanup process...")
 
         terminated_count = 0
         for func in cls._all_functions:
             try:
                 if callable(func):
-                    socket_con = get_socket_con()
-                    if socket_con:
-                        socket_con.send_error(f"[LOG]Executing cleanup: {func.__name__}")
+                    if settings.socket_con:
+                        settings.socket_con.send_error(f"[LOG]Executing cleanup: {func.__name__}")
                     func()  # Call the cleanup function
                     terminated_count += 1
                 else:
                     print(f"[LOG]Function {func} is not callable, skipping.")
             except Exception as e:
                 error_msg = f"[LOG]Error during cleanup function {func.__name__ if hasattr(func, '__name__') else func}: {e}"
-                socket_con = get_socket_con()
-                if socket_con:
-                    socket_con.send_error(error_msg)
+                if settings.socket_con:
+                    settings.socket_con.send_error(error_msg)
                 else:
                     print(error_msg)
 
-        socket_con = get_socket_con()
-        if socket_con:
-            socket_con.send_error(f"[LOG]✅ Cleanup completed. {terminated_count} functions executed.")
+        if settings.socket_con:
+            settings.socket_con.send_error(f"[LOG]✅ Cleanup completed. {terminated_count} functions executed.")
         else:
             print(f"[LOG]✅ Cleanup completed. {terminated_count} functions executed.")

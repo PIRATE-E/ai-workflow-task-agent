@@ -2,9 +2,9 @@ import json
 
 from src.agents.agents_schema.agents_schema import ToolSelection
 from src.config import settings
-from src.utils.model_manager import get_socket_con, ModelManager
-from src.ui.print_message_style import print_message
 from src.tools.lggraph_tools.tool_assign import ToolAssign
+from src.ui.print_message_style import print_message
+from src.utils.model_manager import ModelManager
 
 
 def tool_selection_agent(state) -> dict:
@@ -24,7 +24,7 @@ def tool_selection_agent(state) -> dict:
     tools_context = "\n\n".join([
         f"Tool: {tool.name}\nDescription: {tool.description}\nParameters: {json.dumps(tool.args_schema.model_json_schema())}"
         for tool in tools
-    ]) if tools else get_socket_con().send_error("[ERROR] No tools available for selection.") if get_socket_con() else print("[ERROR] No tools available for selection.")
+    ]) if tools else settings.socket_con.send_error("[ERROR] No tools available for selection.") if settings.socket_con else print("[ERROR] No tools available for selection.")
 
     system_prompt = (
         "You are an intelligent tool selection agent with deep contextual understanding and reasoning capabilities.\n\n"
@@ -93,9 +93,8 @@ def tool_selection_agent(state) -> dict:
         print("Reasoning:", selection.reasoning)
         print("Parameters:", selection.parameters)
     except Exception as e:
-        socket_con = get_socket_con()
-        if socket_con:
-            socket_con.send_error(f"[ERROR] Exception in tool_agent: {e}")
+        if settings.socket_con:
+            settings.socket_con.send_error(f"[ERROR] Exception in tool_agent: {e}")
         else:
             print(f"[ERROR] Exception in tool_agent: {e}")
         return {"messages": [settings.AIMessage(content=f"Error processing tool selection: {str(e)}")]}
@@ -104,9 +103,8 @@ def tool_selection_agent(state) -> dict:
         try:
             parameters = json.loads(parameters)
         except Exception as e:
-            socket_con = get_socket_con()
-            if socket_con:
-                socket_con.send_error(f"[ERROR] Could not parse parameters: {e}")
+            if settings.socket_con:
+                settings.socket_con.send_error(f"[ERROR] Could not parse parameters: {e}")
             else:
                 print(f"[ERROR] Could not parse parameters: {e}")
             pass
@@ -122,21 +120,18 @@ def tool_selection_agent(state) -> dict:
                         -1].content  # Get the last response from the tool manager
                     # Print tool result in modern style
                     print_message(result, sender="tool")
-                    socket_con = get_socket_con()
-                    if socket_con:
-                        socket_con.send_error(f"[RESULT] Result from {tool.name}: {result}")
+                    if settings.socket_con:
+                        settings.socket_con.send_error(f"[RESULT] Result from {tool.name}: {result}")
                     return {"messages": [settings.AIMessage(content=f"Result from {tool.name}: {result}")]}
                 except Exception as e:
-                    socket_con = get_socket_con()
-                    if socket_con:
-                        socket_con.send_error(
+                    if settings.socket_con:
+                        settings.socket_con.send_error(
                             f"[ERROR] Error using tool {tool.name}: {e} function: {tool.func.__name__}")
                     else:
                         print(f"[ERROR] Error using tool {tool.name}: {e} function: {tool.func.__name__}")
                     return {"messages": [settings.AIMessage(content=f"Error using {tool.name}: {str(e)}")]}
-        socket_con = get_socket_con()
-        if socket_con:
-            socket_con.send_error(f"[ERROR] Tool '{selection.tool_name}' not found.")
+        if settings.socket_con:
+            settings.socket_con.send_error(f"[ERROR] Tool '{selection.tool_name}' not found.")
         else:
             print(f"[ERROR] Tool '{selection.tool_name}' not found.")
         return {"messages": [settings.AIMessage(content=f"Tool '{selection.tool_name}' not found.")]}

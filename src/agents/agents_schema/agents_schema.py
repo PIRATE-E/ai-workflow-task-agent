@@ -1,5 +1,6 @@
-from pydantic import Field, BaseModel
 from typing import Literal
+
+from pydantic import Field, BaseModel
 
 
 class ToolSelection(BaseModel):

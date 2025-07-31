@@ -1,9 +1,9 @@
 """
 Node Factory: Creates LangGraph-compatible node functions with dependency injection
 """
+from src.agents.chat_llm import generate_llm_response
 from src.agents.classify_agent import classify_message_type
 from src.agents.router import route_message
-from src.agents.chat_llm import generate_llm_response
 from src.agents.tool_selector import tool_selection_agent
 
 

@@ -10,7 +10,9 @@ from rich.panel import Panel
 from rich.text import Text
 # Add project imports
 from utils.socket_manager import socket_manager
+
 from src.config import settings
+
 
 def demo_automatic_logging():
     """Demonstrate automatic log server startup and usage"""

@@ -11,7 +11,9 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 from utils.socket_manager import socket_manager
+
 from src.config import settings
+
 
 def show_log_display_options():
     """Show all available log display options"""

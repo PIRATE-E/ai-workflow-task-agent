@@ -1,3 +1,4 @@
+import inspect
 import os
 import socket
 import subprocess
@@ -31,6 +32,11 @@ class SocketManager:
         if cls.instance is None:
             cls.instance = super().__new__(cls)
         return cls.instance
+
+    @staticmethod
+    def get_socket_con():
+        """Get socket connection only when needed"""
+        return SocketManager().get_socket_connection() if settings.ENABLE_SOCKET_LOGGING else None
 
     def start_log_server(self):
         """Start the log server as a subprocess"""
@@ -181,6 +187,9 @@ class SocketManager:
 
     def get_socket_connection(self):
         """Get or create the socket connection with adaptive timeout and health checking"""
+        # debug -----
+        print("🔍 DEBUG: get_socket_connection() called for FIRST time!")
+        print(f"🔍 DEBUG: Called from: {inspect.stack()[1].filename}:{inspect.stack()[1].lineno}")
         if self._cleanup_in_progress:  # Prevent new connections during cleanup
             return None
 

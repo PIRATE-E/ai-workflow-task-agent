@@ -7,7 +7,9 @@ This simulates the key parts of lggraph.py that use the socket manager
 import time
 
 from utils.socket_manager import socket_manager
+
 from src.config import settings
+
 
 def simulate_lggraph_startup():
     """Simulate what happens when lggraph.py starts"""

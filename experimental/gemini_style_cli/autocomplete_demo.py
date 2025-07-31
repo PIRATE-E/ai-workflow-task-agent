@@ -9,6 +9,7 @@ import sys
 from rich.layout import Layout
 from rich.panel import Panel
 from rich.text import Text
+
 from src.config import settings
 
 # For cross-platform keyboard input

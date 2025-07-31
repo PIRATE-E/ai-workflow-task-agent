@@ -7,11 +7,11 @@ from typing import Any
 import google.generativeai as genai
 from dotenv import load_dotenv
 from langchain_core.documents import Document
-from src.config import settings
 from langchain_ollama import ChatOllama
 from neo4j import GraphDatabase
 
-from src.utils.model_manager import get_socket_con
+from src.config import settings
+# Socket connection now centralized in settings
 from src.utils.structured_triple_prompt import create_structured_prompt
 
 SYSTEM_PROMPT_GENERATE_TRIPLE_ENHANCED = """
@@ -232,9 +232,8 @@ async def prompt_gemini_for_triples_api(chunk: Document) -> None | dict[str, Doc
         try:
             return model.generate_content(prompt_g)
         except Exception as e_G:
-            socket_con = get_socket_con()
-            if socket_con:
-                socket_con.send_error(f"Error calling Gemini API: {e_G}")
+            if settings.socket_con:
+                settings.socket_con.send_error(f"Error calling Gemini API: {e_G}")
             return None
 
     loop = asyncio.get_event_loop()
@@ -403,9 +402,8 @@ def get_triples(cypher_query: str):
                 })
             return triples
     except Exception as e:
-        socket_con = get_socket_con()
-        if socket_con:
-            socket_con.send_error(f"Error executing cypher query: {e}")
+        if settings.socket_con:
+            settings.socket_con.send_error(f"Error executing cypher query: {e}")
         return []
 
 
@@ -444,9 +442,8 @@ def get_retrieve_triples(cypher_query: str):
                 records.append(dict(record))
             return records
     except Exception as e:
-        socket_con = get_socket_con()
-        if socket_con:
-            socket_con.send_error(f"Error executing cypher query: {e}")
+        if settings.socket_con:
+            settings.socket_con.send_error(f"Error executing cypher query: {e}")
         return []
 
 

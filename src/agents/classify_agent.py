@@ -1,6 +1,6 @@
 from src.agents.agents_schema.agents_schema import message_classifier
 from src.config import settings
-from src.utils.model_manager import get_socket_con, ModelManager
+from src.utils.model_manager import ModelManager
 
 
 def classify_message_type(state) -> dict:
@@ -19,9 +19,8 @@ def classify_message_type(state) -> dict:
     lowered_content = content.lower()
     for phrase in explicit_ai_phrases:
         if phrase in lowered_content:
-            socket_con = get_socket_con()
-            if socket_con:
-                socket_con.send_error(f"[LOG] Removing explicit AI phrase: {phrase}")
+            if settings.socket_con:
+                settings.socket_con.send_error(f"[LOG] Removing explicit AI phrase: {phrase}")
             else:
                 print(f"[LOG] Removing explicit AI phrase: {phrase}")
             last_message.content = last_message.content.replace(phrase, "")
@@ -31,9 +30,8 @@ def classify_message_type(state) -> dict:
     explicit_tool_phrases = ["/search", "/use tool"]
     for phrase in explicit_tool_phrases:
         if phrase in lowered_content:
-            socket_con = get_socket_con()
-            if socket_con:
-                socket_con.send_error(f"[LOG] Removing explicit tool phrase: {phrase}")
+            if settings.socket_con:
+                settings.socket_con.send_error(f"[LOG] Removing explicit tool phrase: {phrase}")
             else:
                 print(f"[LOG] Removing explicit tool phrase: {phrase}")
             last_message.content = last_message.content.replace(phrase, "")

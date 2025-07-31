@@ -4,26 +4,24 @@ import hashlib
 import json
 import os
 from asyncio import Semaphore
-import dotenv
 
+import dotenv
 # ✅ LIGHTWEIGHT LANGCHAIN IMPORTS
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_core.documents import Document
-from src.config import settings
 
 # ✅ LOCAL IMPORTS (lightweight)
 from src.RAG.RAG_FILES import neo4j_rag
 from src.config import settings
 from src.utils.socket_manager import SocketManager
 
+
 # ✅ LAZY LOADING: Heavy imports moved to function level
 # torch, cosine_similarity, genai, Chroma, OllamaEmbeddings, ChatOllama
 # will be imported only when needed
 
-def get_socket_con_rag():
-    """Get socket connection only when needed"""
-    return SocketManager().get_socket_connection()
+# Socket connection now centralized in settings - no longer needed
 
 # ✅ HELPER FUNCTION: Lazy loading for rich prompts
 def _get_user_input(prompt_text: str, default: str = "y") -> str:
@@ -368,9 +366,8 @@ async def process_chunks_with_immediate_saving(chunks_to_process: list[Document]
 
                 return result
             except Exception as e:
-                socket_con_rag = get_socket_con_rag()
-                if socket_con_rag:
-                    socket_con_rag.send_error(f"❌ Error processing chunk, active taskc count {active_task}: {e}")
+                if settings.socket_con:
+                    settings.socket_con.send_error(f"❌ Error processing chunk, active taskc count {active_task}: {e}")
                 else:
                     print(f"❌ Error processing chunk, active taskc count {active_task}: {e}")
                 return {"chunk": chunk, "triples": []}
@@ -404,9 +401,8 @@ async def process_chunks_with_immediate_saving(chunks_to_process: list[Document]
                 try:
                     await mark_triple_chunk(triples, hashlib.sha256(chunk.page_content.encode()).hexdigest())
                 except Exception as e:
-                    socket_con_rag = get_socket_con_rag()
-                    if socket_con_rag:
-                        socket_con_rag.send_error(f"❌ Error saving triples: {e} chunk : {chunk.page_content[:20]}")
+                    if settings.socket_con:
+                        settings.socket_con.send_error(f"❌ Error saving triples: {e} chunk : {chunk.page_content[:20]}")
                     else:
                         print(f"❌ Error saving triples: {e} chunk : {chunk.page_content[:20]}")
             else:
@@ -428,9 +424,8 @@ async def process_chunks_with_immediate_saving(chunks_to_process: list[Document]
                 try:
                     neo4j_rag.insert_triples([(subject, predicate, object_val)])
                 except Exception as e:
-                    socket_con_rag = get_socket_con_rag()
-                    if socket_con_rag:
-                        socket_con_rag.send_error(f"❌ Error inserting triples to Neo4j:"
+                    if settings.socket_con:
+                        settings.socket_con.send_error(f"❌ Error inserting triples to Neo4j:"
                                               f" {e} \n subject: {subject}, predicate: {predicate}, object: {object_val}")
                     else:
                         print(f"❌ Error inserting triples to Neo4j:"
@@ -497,9 +492,8 @@ def save_knowledge_graph_gemini_api(filepath: str):
         if _get_user_input("if you still wanted to process the chunks, press y to continue or n to skip", default="n") == "y":
             asyncio.run(process_chunks_with_immediate_saving(chunks_to_process))
             return
-        socket_con_rag = get_socket_con_rag()
-        if socket_con_rag:
-            socket_con_rag.send_error("Skipping database update since no new chunks were processed.")
+        if settings.socket_con:
+            settings.socket_con.send_error("Skipping database update since no new chunks were processed.")
 
 def extract_triples_process_query():
     """
@@ -630,16 +624,18 @@ def text_rag_search_using_llm(query: str, chunks: list[Document]) -> dict:
                 f"Similar Chunks:\n"
                 + "\n".join([f"{i + 1} : {chunk.page_content}" for i, chunk in enumerate(similar)])
         )
+
+
+
         llm = ChatOllama(model="llama3.1:8B", temperature=0.1, format="json")
-        response = llm.invoke([HumanMessage(content=system_prompt), prompt])
+        response = llm.invoke([settings.HumanMessage(content=system_prompt), prompt])
         result = json.loads(response.content)
         if "answer" not in result or "source_chunks" not in result:
             raise ValueError("Response format is incorrect. Expected keys 'answer' and 'source_chunks'.")
         return result
     except Exception as e:
-        socket_con_rag = get_socket_con_rag()
-        if socket_con_rag:
-            socket_con_rag.send_error(f"Error during RAG search: {e}")
+        if settings.socket_con:
+            settings.socket_con.send_error(f"Error during RAG search: {e}")
         else:
             print(f"Error during RAG search: {e}")
         return {"answer": "An error occurred during the search.", "source_chunks": []}

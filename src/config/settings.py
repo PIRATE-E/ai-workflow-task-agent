@@ -55,6 +55,7 @@ console = None  # Placeholder for console object, to be initialized in main_orch
 HumanMessage = None  # Placeholder for HumanMessage class
 AIMessage = None     # Placeholder for AIMessage class  
 BaseMessage = None   # Placeholder for BaseMessage class
+socket_con = None  # Placeholder for socket connection, to be initialized in main_orchestrator.py
 
 if __name__ == '__main__':
     # true

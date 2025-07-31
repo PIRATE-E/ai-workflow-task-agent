@@ -1,5 +1,5 @@
-from src.models.state import StateAccessor
 from src.config import settings
+from src.models.state import StateAccessor
 
 
 def route_message(state):

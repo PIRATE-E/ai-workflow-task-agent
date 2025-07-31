@@ -1,22 +1,18 @@
 # this class is used to manage the loading models of ollama
+import inspect
 import os
 import subprocess
-import signal
-import atexit
 from typing import ClassVar, Optional, Any
 
 from langchain_core.language_models import LanguageModelInput
 from langchain_core.runnables import RunnableConfig
-from src.config import settings
 from langchain_ollama import ChatOllama
 
 from src.config import settings
 # Import socket manager for logging
-from .socket_manager import SocketManager
+from src.utils.socket_manager import SocketManager
 
-def get_socket_con():
-    """Get socket connection only when needed"""
-    return SocketManager().get_socket_connection() if settings.ENABLE_SOCKET_LOGGING else None
+
 
 class ModelManager(ChatOllama):
     """
@@ -60,18 +56,15 @@ class ModelManager(ChatOllama):
         """
         try:
             if cls.current_model:
-                socket_con = get_socket_con()
-                if socket_con:
-                    socket_con.send_error(f"🧹 Cleaning up model: {cls.current_model}")
+                if settings.socket_con:
+                    settings.socket_con.send_error(f"🧹 Cleaning up model: {cls.current_model}")
                 cls._stop_model()
                 cls.current_model = None
-                socket_con = get_socket_con()
-                if socket_con:
-                    socket_con.send_error("✅ Model cleanup completed")
+                if settings.socket_con:
+                    settings.socket_con.send_error("✅ Model cleanup completed")
         except Exception as e:
-            socket_con = get_socket_con()
-            if socket_con:
-                socket_con.send_error(f"❌ Error during model cleanup: {e}")
+            if settings.socket_con:
+                settings.socket_con.send_error(f"❌ Error during model cleanup: {e}")
 
 
     @staticmethod
@@ -95,23 +88,20 @@ class ModelManager(ChatOllama):
         if model_name not in ModelManager.model_list:
             raise ValueError(f"Model {model_name} is not available. Available models: {ModelManager.model_list}")
         else:
-            socket_con = get_socket_con()
-            if socket_con:
-                socket_con.send_error(f"\t[log]current model {ModelManager.current_model}, loading model {model_name}")
+            if settings.socket_con:
+                settings.socket_con.send_error(f"\t[log]current model {ModelManager.current_model}, loading model {model_name}")
             if not ModelManager.current_model is None:
                 if ModelManager.current_model == model_name:
-                    socket_con = get_socket_con()
-                    if socket_con:
-                        socket_con.send_error(f"\t[log]Model {model_name} is already loaded.")
+                    if settings.socket_con:
+                        settings.socket_con.send_error(f"\t[log]Model {model_name} is already loaded.")
                 else:
                     ModelManager._stop_model()
                     ModelManager.current_model = model_name
                     # Here you would add the actual loading logic
             else:
                 ModelManager.current_model = model_name
-                socket_con = get_socket_con()
-                if socket_con:
-                    socket_con.send_error(f"Model {model_name} loaded successfully.")
+                if settings.socket_con:
+                    settings.socket_con.send_error(f"Model {model_name} loaded successfully.")
 
     @classmethod
     def _stop_model(cls):
@@ -119,9 +109,8 @@ class ModelManager(ChatOllama):
         Stops the currently running model using the Ollama CLI.
         """
         if cls.current_model:
-            socket_con = get_socket_con()
-            if socket_con:
-                socket_con.send_error(f"Stopping previous model: {cls.current_model}")
+            if settings.socket_con:
+                settings.socket_con.send_error(f"Stopping previous model: {cls.current_model}")
             os.system(f"ollama stop {cls.current_model}")
         pass
 
@@ -151,24 +140,21 @@ if __name__ == '__main__':
     # Example usage
     manager = ModelManager(model=settings.DEFAULT_MODEL, temperature=0.7, format="json")
     response = manager.invoke([settings.HumanMessage(content="Hello, how are you?")])
-    socket_con = get_socket_con()
-    if socket_con:
-        socket_con.send_error(response.content if response else "No response received.")
+    if settings.socket_con:
+        settings.socket_con.send_error(response.content if response else "No response received.")
     else:
         print(response.content if response else "No response received.", type(manager))
 
     manager2 = ModelManager(model=settings.CLASSIFIER_MODEL, temperature=0.5, format="json")
     response = manager2.invoke([settings.HumanMessage(content="What is the capital of France?")])
-    socket_con = get_socket_con()
-    if socket_con:
-        socket_con.send_error(response.content if response else "No response received.")
+    if settings.socket_con:
+        settings.socket_con.send_error(response.content if response else "No response received.")
     else:
         print(response.content if response else "No response received.", type(manager2))
 
     manager2 = ModelManager(model=settings.CLASSIFIER_MODEL, temperature=0.5, format="json")
     response = manager2.invoke([settings.HumanMessage(content="What is the capital of France?")])
-    socket_con = get_socket_con()
-    if socket_con:
-        socket_con.send_error(response.content if response else "No response received.")
+    if settings.socket_con:
+        settings.socket_con.send_error(response.content if response else "No response received.")
     else:
         print(response.content if response else "No response received.", type(manager2))

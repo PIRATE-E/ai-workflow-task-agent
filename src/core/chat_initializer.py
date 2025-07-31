@@ -10,6 +10,7 @@ from rich import console, prompt, inspect
 from src.config.settings import PNG_FILE_PATH
 from src.models.state import StateAccessor, State
 from src.ui.print_message_style import print_message
+from src.utils.socket_manager import SocketManager
 
 
 class ChatInitializer:
@@ -29,6 +30,13 @@ class ChatInitializer:
     def _set_core_classes(self):
         # Import here to avoid circular imports
         from langchain_core.messages import HumanMessage, AIMessage, BaseMessage
+        import sentry_sdk
+        sentry_sdk.init(
+            dsn="https://1df631d527493b6f96c55ffe9d42cc32@o4509761254981632.ingest.us.sentry.io/4509761281458176",
+            # Add data like request headers and IP for users,
+            # see https://docs.sentry.io/platforms/python/data-management/data-collected/ for more info
+            send_default_pii=True,
+        )
         
         # we must set the console for rich console to use it in different classes to the settings
         settings.console = self.console
@@ -37,6 +45,8 @@ class ChatInitializer:
         settings.HumanMessage = HumanMessage
         settings.AIMessage = AIMessage
         settings.BaseMessage = BaseMessage
+        # Set the socket connection for logging
+        settings.socket_con = SocketManager.get_socket_con()
 
     def set_graph(self, graph):
         if not isinstance(graph, CompiledStateGraph):

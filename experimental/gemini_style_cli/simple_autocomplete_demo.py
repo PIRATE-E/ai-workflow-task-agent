@@ -9,6 +9,7 @@ from prompt_toolkit.completion import Completer, Completion
 from prompt_toolkit.shortcuts import CompleteStyle
 from rich.panel import Panel
 from rich.text import Text
+
 from src.config import settings
 
 # Command registry - exactly like Gemini CLI

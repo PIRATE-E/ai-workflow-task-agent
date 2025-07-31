@@ -7,7 +7,9 @@ Helps you set up the best logging configuration for your needs
 from rich.panel import Panel
 from rich.prompt import Prompt, Confirm
 from rich.table import Table
+
 from src.config import settings
+
 
 def show_current_config():
     """Show current logging configuration"""
@@ -115,7 +117,7 @@ def test_configuration():
     console.print("\n🧪 Testing current configuration...")
 
     try:
-        from utils.socket_manager import socket_manager
+        from src.utils.socket_manager import socket_manager
 
         # Test connection
         socket_con = socket_manager.get_socket_connection()
