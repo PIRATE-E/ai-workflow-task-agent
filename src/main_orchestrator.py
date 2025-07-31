@@ -29,7 +29,7 @@ def run_chat(destructor: ChatDestructor):
     graph = GraphBuilder(State).compile_graph()
     chat.set_graph(graph).tools_register().set_exit(destructor.call_all_cleanup_functions)
 
-    # os.system('cls' if os.name == 'nt' else 'clear')  # Clear console for better UX
+    os.system('cls' if os.name == 'nt' else 'clear')  # Clear console for better UX
     print_banner()
     console = settings.console
     console.print(Align.center("[bold blue]Welcome to the LangGraph Chatbot![/bold blue]"))

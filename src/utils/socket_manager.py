@@ -133,7 +133,7 @@ class SocketManager:
                 # Check if process is still alive before terminating
                 if self._log_server_process.poll() is None:
                     print(f"Terminating log server process (PID: {self._log_server_process.pid})")
-                    
+
                     # First try graceful termination
                     self._log_server_process.terminate()
 
@@ -168,7 +168,7 @@ class SocketManager:
                 print(f"❌ Error stopping log server: {e}")
             finally:
                 self._log_server_process = None
-                
+
                 # Also clean up any stale lock files
                 try:
                     import os
@@ -187,9 +187,6 @@ class SocketManager:
 
     def get_socket_connection(self):
         """Get or create the socket connection with adaptive timeout and health checking"""
-        # debug -----
-        print("🔍 DEBUG: get_socket_connection() called for FIRST time!")
-        print(f"🔍 DEBUG: Called from: {inspect.stack()[1].filename}:{inspect.stack()[1].lineno}")
         if self._cleanup_in_progress:  # Prevent new connections during cleanup
             return None
 
