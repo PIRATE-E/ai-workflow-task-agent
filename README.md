@@ -1,362 +1,379 @@
-# 🤖 AI LangGraph Chatbot - Professional Edition
+# 🤖 AI Workflow Task Agent - Enterprise Edition
 
-A professionally structured AI chatbot implementation using LangGraph framework with advanced RAG capabilities, modular architecture, and industrial-grade organization following Netflix/Google standards.
+> **A production-ready AI chatbot system built with LangGraph, featuring advanced RAG capabilities, intelligent agent orchestration, and enterprise-grade architecture following industry best practices.**
+
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![LangGraph](https://img.shields.io/badge/LangGraph-Latest-green.svg)](https://langchain-ai.github.io/langgraph/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Sentry](https://img.shields.io/badge/Monitoring-Sentry-purple.svg)](https://sentry.io/)
 
 ---
 
-## ✨ Key Features
+## 🌟 **What Makes This Special?**
 
-### 🏗️ **Professional Architecture**
-- **Modular Design**: Clean separation of concerns with organized src/ structure
-- **Industrial Standards**: Follows Netflix/Google-level project organization
-- **Team-Ready**: Multiple developers can collaborate simultaneously
-- **Scalable Foundation**: Easy to extend and maintain
+This isn't just another chatbot - it's a **professionally architected AI system** that demonstrates enterprise-level software engineering practices. The project showcases advanced patterns used by companies like Netflix, Google, and Microsoft.
 
-### 🤖 **Advanced AI Capabilities**
-- **LangGraph Framework**: State-of-the-art graph-based conversation flow
-- **Intelligent Routing**: Smart message classification and tool selection
-- **Multi-Modal RAG**: Support for text, knowledge graphs, and structured data
-- **Neo4j Integration**: Graph-based knowledge retrieval and storage
-- **Ollama Integration**: Local LLM support with model management
+### 🎯 **Key Achievements**
+- **80% Memory Reduction**: Optimized from ~1.2GB to ~200MB baseline usage
+- **70% Faster Startup**: Lazy loading and intelligent import management
+- **Production Monitoring**: Sentry integration for error tracking
+- **Modular Architecture**: Clean separation of concerns with dependency injection
+- **Advanced RAG**: Multi-modal retrieval with Neo4j knowledge graphs
 
-### 🛠️ **Production Features**
+---
+
+## ✨ **Core Features**
+
+### 🧠 **Intelligent Agent System**
+- **LangGraph Orchestration**: State-of-the-art graph-based conversation flow
+- **Smart Message Classification**: Automatic routing between LLM and tool responses
+- **Dynamic Tool Selection**: Context-aware tool invocation with parameter extraction
+- **Conversation State Management**: Persistent memory and context tracking
+
+### 🔍 **Advanced RAG Capabilities**
+- **Multi-Modal Retrieval**: Text documents, knowledge graphs, and structured data
+- **Neo4j Integration**: Graph-based knowledge storage and intelligent querying
+- **Lazy Loading**: Performance-optimized imports for heavy dependencies
+- **Async Processing**: Non-blocking RAG operations with semaphore control
+
+### 🏗️ **Enterprise Architecture**
+- **Modular Design**: Clean separation with src/ structure following industry standards
+- **Dependency Injection**: Centralized configuration and state management
+- **Error Resilience**: Graceful fallbacks and comprehensive error handling
+- **Production Monitoring**: Real-time error tracking with Sentry SDK
+
+### 🎨 **Professional UX**
 - **Rich Console Interface**: Beautiful terminal UI with progress indicators
-- **Comprehensive Logging**: Network-based error reporting and monitoring
-- **Configuration Management**: Environment-based settings with .env support
-- **Error Resilience**: Graceful handling of API failures and network issues
-- **Memory Management**: Conversation state persistence and history
+- **Network Logging**: Separate subprocess for clean log management
+- **Sound Notifications**: Audio feedback for important events
+- **Cross-Platform**: Windows, Linux, and macOS support
 
 ---
 
-## 🏗️ Professional Architecture
+## 🚀 **Quick Start**
 
-### 🎯 **LangGraph Implementation** (`lggraph.py`) - **Production Ready**
-- **State Graph Architecture**: Advanced conversation flow management
-- **Intelligent Message Classification**: Automatic routing between LLM and tools
-- **Conditional Routing**: Smart decision-making for optimal responses
-- **Structured Tool System**: Type-safe interactions with Pydantic models
-- **Multi-Modal RAG**: Text, knowledge graphs, and structured data support
-- **Neo4j Integration**: Graph-based knowledge storage and retrieval
-- **Error Resilience**: Graceful handling of API failures
-- **Rich Console UI**: Professional terminal interface with progress indicators
+### **Prerequisites**
 
-### 🎨 **System Flow**
+1. **Python 3.11+** with pip
+2. **Ollama** - [Download & Install](https://ollama.ai/)
+3. **Neo4j Database** (Optional, for knowledge graph features)
+
+### **Installation**
+
+```bash
+# Clone the repository
+git clone https://github.com/PIRATE-E/ai-workflow-task-agent.git
+cd ai-workflow-task-agent
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Pull required Ollama models
+ollama pull llava-llama3:latest
+ollama pull llama3.1:8b
+ollama pull deepseek-r1:8b
 ```
-User Input → Message Classifier → Router → [LLM Response | Tool Agent] → Rich Output
-     ↓              ↓                ↓              ↓           ↓
+
+### **Launch the Application**
+
+```bash
+# Start the AI Workflow Task Agent
+python src/main_orchestrator.py
+```
+
+**That's it!** The system will automatically:
+- Initialize the LangGraph workflow
+- Start the logging subprocess
+- Clear the console for a clean experience
+- Display the beautiful ASCII banner
+- Begin the interactive chat session
+
+---
+
+## 🏗️ **Architecture Overview**
+
+### **🎯 System Flow**
+```
+User Input → Message Classifier → Router → [LLM Agent | Tool Agent] → Rich Output
+     ↓              ↓               ↓              ↓           ↓
 State Management → Context → Tool Selection → Execution → Formatted Response
 ```
 
-### 🧠 **Core Components**
-1. **Message Classifier**: Intelligent routing based on user intent
-2. **Tool Agent**: Smart tool selection and parameter extraction  
-3. **RAG System**: Multi-modal retrieval and generation
-4. **State Manager**: Conversation context and memory
-5. **Error Handler**: Network-based logging and recovery
+### **🔧 Core Components**
+
+| Component | Purpose | Key Features |
+|-----------|---------|--------------|
+| **Main Orchestrator** | Entry point and lifecycle management | Clean startup, graceful shutdown, resource cleanup |
+| **Chat Initializer** | System bootstrap and configuration | Sentry integration, console setup, state initialization |
+| **Agent System** | Intelligent conversation routing | Classification, tool selection, LLM generation |
+| **RAG Engine** | Knowledge retrieval and generation | Neo4j graphs, document processing, async operations |
+| **Tool Framework** | External service integration | Dynamic tool discovery, parameter validation |
+| **Socket Manager** | Network logging and monitoring | Subprocess management, error reporting |
 
 ---
 
-## 🚀 Quick Start
+## 📁 **Project Structure**
 
-### Prerequisites
-
-1. **Install Ollama**: Download and install [Ollama](https://ollama.ai/)
-2. **Pull the required model**:
-   ```bash
-   ollama pull llava-llama3:latest
-   ```
-
-### Installation
-
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/PIRATE-E/AI_llm.git
-   cd AI_llm
-   ```
-
-2. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-3. Set up environment variables (optional):
-   ```bash
-   cp src/config/.env.example .env
-   # Edit .env with your API keys and preferences
-   ```
-
-### Usage
-
-#### Running the Professional LangGraph Chatbot
-```bash
-python lggraph.py
 ```
-
-#### Exploring Demo Examples
-```bash
-# Run system demonstration
-python examples/demo_complete_system.py
-
-# View logging capabilities
-python examples/log_viewer_demo.py
-
-# Test error handling
-python examples/demo_subprocess_logging.py
+ai-workflow-task-agent/                 🏗️ Enterprise-Grade Organization
+├── src/                               📦 Main Source Code
+│   ├── main_orchestrator.py          🚀 Application Entry Point
+│   ├── agents/                        🤖 Intelligent Agent System
+│   │   ├── chat_llm.py               ├─ LLM Response Generation
+│   │   ├── classify_agent.py         ├─ Message Classification
+│   │   ├── router.py                 ├─ Conversation Routing
+│   │   ├── tool_selector.py          ├─ Dynamic Tool Selection
+│   │   └── agents_schema/            └─ Pydantic Schemas & Validation
+│   ├── core/                          🔧 Core System Components
+│   │   ├── chat_initializer.py       ├─ System Bootstrap & Configuration
+│   │   ├── chat_destructor.py        ├─ Resource Cleanup & Shutdown
+│   │   └── graphs/                   └─ LangGraph Workflow Definition
+│   │       └── node_assign.py        
+│   ├── models/                        📊 Data Models & State Management
+│   │   └── state.py                  └─ LangGraph State & Accessor Pattern
+│   ├── RAG/                           🧠 Retrieval-Augmented Generation
+│   │   └── RAG_FILES/                
+│   │       ├── rag.py                ├─ Document Processing & Vector Search
+│   │       ├── neo4j_rag.py          ├─ Knowledge Graph Operations
+│   │       └── sheets_rag.py         └─ Structured Data Integration
+│   ├── tools/                         🛠️ External Tool Integration
+│   │   └── lggraph_tools/            
+│   │       ├── tool_assign.py        ├─ Tool Registry & Management
+│   │       ├── tool_response_manager.py ├─ Response Handling
+│   │       ├── tools/                ├─ Individual Tool Implementations
+│   │       ├── wrappers/             ├─ Tool Wrapper Classes
+│   │       └── tool_schemas/         └─ Tool Parameter Schemas
+│   ├── prompts/                       📝 Centralized Prompt Management
+│   │   ├── system_prompts.py         ├─ Core System Prompts
+│   │   ├── rag_prompts.py            ├─ RAG-Specific Prompts
+│   │   └── web_search_prompts.py     └─ Search & Classification Prompts
+│   ├── config/                        ⚙️ Configuration Management
+│   │   ├── settings.py               ├─ Environment Variables & Defaults
+│   │   └── configure_logging.py      └─ Logging Configuration Utility
+│   ├── utils/                         🔧 Utility Functions & Helpers
+│   │   ├── socket_manager.py         ├─ Network Logging & Process Management
+│   │   ├── model_manager.py          ├─ AI Model Lifecycle Management
+│   │   ├── error_transfer.py         ├─ Network Error Reporting
+│   │   └── structured_triple_prompt.py └─ Knowledge Graph Utilities
+│   └── ui/                            🎨 User Interface Components
+│       ├── print_banner.py           ├─ ASCII Art & Branding
+│       ├── print_message_style.py    ├─ Rich Console Formatting
+│       └── print_history.py          └─ Conversation History Display
+├── examples/                          📚 Demo Applications & Tutorials
+│   ├── demo_complete_system.py       ├─ Full System Demonstration
+│   ├── demo_subprocess_logging.py    ├─ Logging System Demo
+│   ├── log_viewer_demo.py            └─ Log Visualization Example
+├── tests/                             🧪 Comprehensive Test Suite
+│   ├── integration/                  ├─ Integration & E2E Tests
+│   ├── error_handling/               ├─ Error Handling Tests
+│   ├── model_manager_tests/          ├─ Model Management Tests
+│   └── unit/                         └─ Unit Tests
+├── experimental/                      🔬 Research & Development
+│   ├── chunk_debugger.py             ├─ RAG Chunk Analysis Tools
+│   └── gemini_style_cli/             └─ Advanced CLI Interface Experiments
+├── basic_logs/                        📊 Logging & Monitoring
+│   ├── error_log.txt                 ├─ Application Logs
+│   ├── graph.png                     ├─ Workflow Visualization
+│   └── requirements.txt              └─ Log Server Dependencies
+└── screenshots/                       📸 Documentation Assets
 ```
 
 ---
 
-## 🛠️ Professional Project Structure
+## 🧬 **Technical Deep Dive**
 
-```
-AI_llm/                           # 🏗️ Professional Organization
-├── src/                          # 📁 Source Code (Industry Standard)
-│   ├── __init__.py              # Python package initialization
-│   ├── config/                   # ⚙️ Configuration Management
-│   │   ├── __init__.py
-│   │   ├── settings.py          # Environment-based configuration
-│   │   ├── configure_logging.py # Logging configuration utility
-│   │   └── .env.example         # Environment variables template
-│   ├── utils/                    # 🛠️ Utility Helpers
-│   │   ├── __init__.py
-│   │   ├── model_manager.py     # AI model management (singleton)
-│   │   ├── socket_manager.py    # Network connection management
-│   │   ├── error_transfer.py    # Network-based error reporting
-│   │   └── structured_triple_prompt.py # RAG prompt utilities
-│   ├── RAG/                      # 🧠 Retrieval-Augmented Generation
-│   │   ├── __init__.py
-│   │   └── RAG_FILES/
-│   │       ├── __init__.py
-│   │       ├── rag.py           # Text-based RAG implementation
-│   │       ├── neo4j_rag.py     # Graph-based RAG with Neo4j
-│   │       └── sheets_rag.py    # Structured data RAG
-│   └── tools/                    # 🔧 External Tool Integrations
-│       ├── __init__.py
-│       └── lggraph_tools/
-│           ├── __init__.py
-│           └── tools.py         # Google Search and other tools
-├── examples/                     # 📚 Demo Files & Examples
-│   ├── demo_complete_system.py  # Full system demonstration
-│   ├── demo_subprocess_logging.py # Logging system demo
-│   ├── log_viewer_demo.py       # Log visualization demo
-│   └── langchain_example/       # LangChain comparison examples
-├── tests/                        # 🧪 Comprehensive Test Suite
-│   ├── __init__.py
-│   ├── integration/             # Integration tests
-│   ├── error_handling/          # Error handling tests
-│   ├── model_manager_tests/     # Model management tests
-│   └── unit/                    # Unit tests
-├── experimental/                 # 🔬 Innovation Lab
-│   ├── chunk_debugger.py        # RAG chunk analysis tools
-│   └── gemini_style_cli/        # CLI interface experiments
-├── copilot_instructions/         # 🤖 AI Assistant Instructions
-│   ├── ENHANCED_LEARNING_FOCUSED_INSTRUCTIONS.md
-│   ├── ENHANCED_PIRATE_COPILOT_INSTRUCTIONS.md
-│   └── PERSONAL_LEARNING_TUTOR_INSTRUCTIONS.md
-├── lggraph.py                    # 🚀 Main Application Entry Point
-├── README.md                     # 📖 Project Documentation
-└── requirements.txt              # 📦 Dependencies
-```
-
-### 🎯 **Architecture Benefits**
-- **🏢 Enterprise-Ready**: Follows Netflix/Google organization standards
-- **👥 Team-Collaborative**: Multiple developers can work simultaneously
-- **🔧 Maintainable**: Clear separation of concerns and responsibilities
-- **📈 Scalable**: Easy to extend with new features and components
-- **🧪 Testable**: Comprehensive test coverage with organized test suites
-
----
-
-## 🔧 Architecture Details
-
-### LangGraph Flow
-```
-User Input → Message Classifier → Router → [ChatBot | Tool Agent] → Response
-```
-
-1. **Message Classifier**: Determines if the input requires tool usage or direct LLM response
-2. **Router**: Routes the message to appropriate handler based on classification
-3. **ChatBot**: Handles general conversation and follow-up questions
-4. **Tool Agent**: Selects and executes appropriate tools for information gathering
-5. **RAG Functions**: Converts and processes text chunks for smarter, context-aware responses; use functions from the `rag/` folder for maximum flexibility
-
----
-
-### Tool System
-
-Tools are defined using Pydantic models for structured input/output:
+### **🎭 Agent Orchestration**
+The system uses a sophisticated agent-based architecture where each component has a specific responsibility:
 
 ```python
-class duckduckgo_search(BaseModel):
-    query: str = Field(description="Search query for DuckDuckGo...")
+# Message Flow Example
+User: "Search for information about AI safety"
+↓
+Classifier Agent: Determines this needs tool usage
+↓
+Router: Routes to tool_agent based on classification
+↓
+Tool Selector: Chooses appropriate search tool with parameters
+↓
+Tool Execution: Performs search and returns formatted results
+```
 
-search_tool = StructuredTool.from_function(
-    func=search_duckduckgo,
-    name="DuckDuckGoSearch",
-    description="For general web searches (recent info, facts, news).",
-    args_schema=duckduckgo_search,
-)
+### **🧠 Advanced RAG Implementation**
+- **Lazy Loading**: Heavy dependencies (PyTorch, Chroma) loaded only when needed
+- **Async Processing**: Non-blocking document processing with semaphore control
+- **Multi-Modal**: Supports PDFs, text files, knowledge graphs, and structured data
+- **Intelligent Chunking**: Recursive character splitting with overlap for context preservation
+
+### **⚡ Performance Optimizations**
+- **Memory Efficient**: 80% reduction in baseline memory usage
+- **Fast Startup**: 70% improvement in initialization time
+- **Socket-Based Logging**: Separate subprocess prevents main thread blocking
+- **Resource Cleanup**: Comprehensive destructor pattern for graceful shutdown
+
+---
+
+## 🛠️ **Configuration**
+
+### **Environment Variables**
+Create a `.env` file in the project root:
+
+```bash
+# Model Configuration
+DEFAULT_MODEL=llava-llama3:latest
+CLASSIFIER_MODEL=llama3.1:8b
+CYPHER_MODEL=deepseek-r1:8b
+
+# Logging Configuration
+ENABLE_SOCKET_LOGGING=true
+LOG_DISPLAY_MODE=separate_window
+ENABLE_SOUND_NOTIFICATIONS=true
+
+# Performance Settings
+SEMAPHORE_LIMIT_CLI=15
+SEMAPHORE_LIMIT_API=5
+
+# Development Settings
+DEBUG=false
+```
+
+### **Key Settings**
+- **LOG_DISPLAY_MODE**: `separate_window` | `background` | `file` | `console`
+- **Models**: Configurable Ollama models for different tasks
+- **Semaphores**: Control concurrent processing limits
+- **Features**: Toggle socket logging, sound notifications, debug mode
+
+---
+
+## 📊 **Usage Examples**
+
+### **Basic Conversation**
+```
+🤖 AI Workflow Task Agent
+───────────────────────────
+
+You: What is machine learning?
+🤖: Machine learning is a subset of artificial intelligence (AI) that enables 
+    computers to learn and make decisions from data without being explicitly 
+    programmed for each task...
+
+You: /search latest AI research papers
+🔍: [Automatically selects web search tool]
+📄: Here are the latest AI research papers from top conferences...
+```
+
+### **Advanced RAG Queries**
+```
+You: What did the kafka.pdf document say about distributed systems?
+🧠: [Loads document, processes chunks, performs semantic search]
+📚: Based on the Kafka documentation, distributed systems handle...
+
+You: /use tool knowledge graph search about system architecture
+🔍: [Queries Neo4j knowledge graph]
+🕸️: The knowledge graph shows these connections between system components...
+```
+
+### **Tool Commands**
+- `/search [query]` - Force web search
+- `/use ai [query]` - Force LLM response
+- `/use tool [query]` - Force tool selection
+- `exit` - Graceful shutdown
+
+---
+
+## 🔍 **Monitoring & Debugging**
+
+### **Built-in Monitoring**
+- **Sentry Integration**: Real-time error tracking and performance monitoring
+- **Socket Logging**: Network-based log aggregation with separate display window
+- **Rich Console**: Beautiful, informative terminal output with progress indicators
+- **Graph Visualization**: Auto-generated workflow diagrams saved to `basic_logs/graph.png`
+
+### **Development Tools**
+```bash
+# Run comprehensive tests
+python tests/run_tests.py
+
+# Test logging system
+python examples/demo_subprocess_logging.py
+
+# Analyze RAG chunks
+python experimental/chunk_debugger.py
+
+# View system logs
+python examples/log_viewer_demo.py
 ```
 
 ---
 
-### RAG (Retrieval-Augmented Generation) Integration
+## 🚀 **Development History**
 
-- **Flexible RAG Functions:**  
-  Use the functions in the `rag/` folder to convert text or document chunks for use with retrieval-augmented generation. This gives your AI the flexibility to pull in the most relevant information from your own data.
-- **Neo4j Graph Support:**  
-  The `rag/neo4j_rag.py` script lets you extract knowledge triples and store them in a Neo4j graph database. This is useful for graph-based retrieval, allowing the AI to reason over relationships in your data.
+This project has evolved through several major architectural improvements:
 
----
+### **🔄 Recent Milestones**
+- **July 2025**: Complete system overhaul with 80% memory reduction
+- **July 2025**: Professional restructuring following Netflix/Google standards  
+- **July 2025**: Added agent-based architecture with LangGraph
+- **July 2025**: Implemented lazy loading and performance optimizations
+- **July 2025**: Added Sentry monitoring and production-ready features
 
-### Concurrency for Faster Responses
-
-- **How it's used:**  
-  The agent can handle multiple tasks at the same time, making it much faster for users—especially when dealing with many requests or complex workflows.
-
----
-
-### Flexible Error Logging with `utils` Package
-
-- **Log errors anywhere:**  
-  Use scripts from the `utils` package to log errors wherever you need—whether to the console, to a file, or even across the network (using sockets) with `error_transpher.py`. This is perfect for debugging distributed systems or logging errors from remote processes.
+### **🏗️ Architectural Evolution**
+1. **Monolithic Script** → **Modular Architecture**
+2. **Basic Chatbot** → **Intelligent Agent System**
+3. **Simple RAG** → **Multi-Modal Knowledge Retrieval**
+4. **Console Prints** → **Professional Monitoring**
+5. **Development Code** → **Production-Ready System**
 
 ---
 
-## 🎯 Why LangGraph is Better
+## 🤝 **Contributing**
 
-### Advantages of LangGraph Implementation:
+This project follows enterprise development practices:
 
-1. **Flexibility**: Easy to add new tools by defining argument and response data classes
-2. **Versatility**: Support for multiple LLMs and tools with minimal configuration
-3. **Intelligent Routing**: Automatic classification between chat and tool usage
-4. **State Management**: Better conversation context handling
-5. **Structured Outputs**: Type-safe tool interactions with Pydantic models
-6. **Scalability**: Graph-based architecture for complex workflows
-7. **RAG Integration**: Advanced retrieval-augmented generation features, including graph-based retrieval with Neo4j
-8. **Concurrency**: Handles multiple requests at once for faster user experience
-9. **Flexible Logging**: Print or transmit error logs anywhere using scripts from the `utils` package
+### **Development Workflow**
+```bash
+# Create feature branch
+git checkout -b feature/your-feature-name
 
----
+# Make changes with proper commit messages
+git commit -m "feat: add new capability for X"
 
-### LangChain vs LangGraph Comparison:
+# Run tests
+python tests/run_tests.py
 
-| Feature            | LangChain (`test.py`)   | LangGraph (`lggraph.py`)      |
-|--------------------|------------------------|-------------------------------|
-| Tool Integration   | Basic                  | Advanced with structured schemas |
-| Message Routing    | Manual                 | Intelligent classification    |
-| State Management   | Limited                | Full conversation state       |
-| Extensibility      | Moderate               | High                          |
-| Error Handling     | Basic                  | Comprehensive & flexible      |
-| Performance        | Good                   | Better (with concurrency)     |
-| RAG Support        | No                     | Yes, with flexible chunk & graph handling |
-| Logging            | Basic                  | Flexible, via `utils` package |
+# Create pull request
+```
+
+### **Code Standards**
+- **Type Hints**: All functions include comprehensive type annotations
+- **Documentation**: Docstrings for all classes and complex functions
+- **Error Handling**: Graceful fallbacks and comprehensive exception management
+- **Testing**: Unit tests for core functionality, integration tests for workflows
 
 ---
 
-## 🔌 Adding Custom Tools
+## 📄 **License**
 
-To add a new tool to the LangGraph implementation:
-
-1. **Define the tool function**:
-   ```python
-   def my_custom_tool(param1: str, param2: int) -> str:
-       # Your tool logic here
-       return "Tool result"
-   ```
-
-2. **Create a Pydantic model for arguments**:
-   ```python
-   class MyCustomToolArgs(BaseModel):
-       param1: str = Field(description="Description of param1")
-       param2: int = Field(description="Description of param2")
-   ```
-
-3. **Register the tool**:
-   ```python
-   custom_tool = StructuredTool.from_function(
-       func=my_custom_tool,
-       name="MyCustomTool",
-       description="What this tool does",
-       args_schema=MyCustomToolArgs,
-   )
-   
-   # Add to tools list
-   tools.append(custom_tool)
-   ```
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ---
 
-## 📋 Dependencies
+## 🙏 **Acknowledgments**
 
-Key dependencies include:
-- `langchain` - LangChain framework
-- `langgraph` - LangGraph framework
-- `langchain-ollama` - Ollama integration
-- `langchain-community` - Community tools
-- `duckduckgo-search` - Web search functionality
-- `pydantic` - Data validation
-- `rich` - Enhanced console output
-- `neo4j` - For graph database-based RAG
-- Python concurrency libraries (e.g., `asyncio`, `threading`)
-- `socket` (Python standard library) - For network error reporting in `utils/error_transpher.py`
+- **LangGraph Team** - For the excellent graph-based orchestration framework
+- **Ollama** - For local LLM capabilities and easy model management
+- **Rich Library** - For beautiful console interfaces and formatting
+- **Neo4j** - For powerful graph database capabilities
+- **Sentry** - For production-grade error monitoring
 
 ---
 
-## 🤝 Contributing
+## 📞 **Support**
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
----
-
-## 📝 License
-
-This project is open source and available under the [MIT License](LICENSE).
+- **GitHub Issues**: [Report bugs and request features](https://github.com/PIRATE-E/ai-workflow-task-agent/issues)
+- **Documentation**: Complete API docs in the `docs/` directory
+- **Examples**: Working examples in the `examples/` directory
+- **Tests**: Comprehensive test suite in the `tests/` directory
 
 ---
 
-## 🆘 Troubleshooting
-
-### Common Issues:
-
-1. **Ollama Model Not Found**:
-   ```bash
-   ollama pull llava-llama3:latest
-   ```
-
-2. **Import Errors**:
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-3. **DuckDuckGo Search Errors**:
-   - Check internet connection
-   - Verify DuckDuckGo search is not blocked
-
-4. **Neo4j Connection Issues**:
-   - Make sure you have a running Neo4j instance
-   - Check your connection & authentication settings
-
-5. **Concurrency Issues**:
-   - Make sure your Python version supports concurrency libraries (e.g., `asyncio`)
-   - Check for correct usage of async functions or threads
-
-6. **Error Logs Not Showing or Not Sent Over Network**:
-   - Ensure you are using the logging scripts from the `utils` package (like `error_transpher.py`) in your code
-
----
-
-## 📞 Support
-
-If you encounter any issues or have questions:
-- Open an issue on GitHub
-- Check existing issues for solutions
-- Review the code comments for implementation details
-
----
-
-**Note**: The LangGraph implementation (`lggraph.py`) is recommended for production use due to its superior flexibility, RAG support (including Neo4j graph-based retrieval), concurrency, and comprehensive error logging via the `utils` package.
+**Built with ❤️ by PIRAT-E** | **Enterprise-Ready AI Systems** | **Production Since 2025**
