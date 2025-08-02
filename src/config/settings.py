@@ -57,6 +57,16 @@ AIMessage = None     # Placeholder for AIMessage class
 BaseMessage = None   # Placeholder for BaseMessage class
 socket_con = None  # Placeholder for socket connection, to be initialized in main_orchestrator.py
 
+
+# mcp configs
+MCP_CONFIG = {
+    "MCP_ENABLED": os.getenv("MCP_ENABLED", "true").lower() == "true",
+    "MCP_HOST": os.getenv("MCP_HOST", "localhost"),
+    "MCP_PORT": int(os.getenv("MCP_PORT", 5000)),
+    "MCP_API_KEY": os.getenv("MCP_API_KEY", "your_api_key_here"),
+    "MCP_TIMEOUT": int(os.getenv("MCP_TIMEOUT", 30)),  # Timeout in seconds
+}
+
 if __name__ == '__main__':
     # true
     # print(Path(Path().resolve().parent / "RAG" / "RAG_FILES" / "kafka.pdf").resolve().exists())
