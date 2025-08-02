@@ -18,6 +18,7 @@ from src.core.graphs.node_assign import GraphBuilder
 from src.models.state import State
 from src.ui.print_banner import print_banner
 from src.utils.model_manager import ModelManager
+from src.mcp.manager import MCP_Manager
 
 
 def run_chat(destructor: ChatDestructor):
@@ -54,6 +55,7 @@ if __name__ == '__main__':
         # (SocketManager last because it handles logging for other cleanups)
         destructor.add_destroyer_function(SocketManager.cleanup)
         destructor.add_destroyer_function(ModelManager.cleanup_all_models)
+        destructor.add_destroyer_function(MCP_Manager.cleanup)
         destructor.register_cleanup_handlers()  # Register cleanup handlers
 
         # Pass destructor to run_chat function

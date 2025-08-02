@@ -71,10 +71,33 @@ class MCP_Manager:
             command = [runner, package] + args
             try:
                 # Here you would implement the logic to start the server
-                server_process = subprocess.Popen(command, shell=False, stdout=subprocess.PIPE,
-                                                  stderr=subprocess.PIPE, stdin=subprocess.PIPE, text=True)
+                server_process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE,
+                                                  stderr=subprocess.PIPE, stdin=subprocess.PIPE, text=True, bufsize=1)
                 MCP_Manager.running_servers[name] = server_process
                 server_info["status"] = "running"
+                
+                # Initialize MCP server with handshake
+                try:
+                    init_request = {
+                        "jsonrpc": "2.0",
+                        "id": 0,
+                        "method": "initialize",
+                        "params": {
+                            "protocolVersion": "2024-11-05",
+                            "capabilities": {},
+                            "clientInfo": {"name": "langgraph-mcp-client", "version": "1.0.0"}
+                        }
+                    }
+                    init_json = json.dumps(init_request) + "\n"
+                    server_process.stdin.write(init_json)
+                    server_process.stdin.flush()
+                    
+                    # Read initialization response (but don't process it for now)
+                    init_response = server_process.stdout.readline()
+                    settings.socket_con.send_error(f"[LOG] MCP server '{name}' initialized the response is :- {init_response}")
+                    
+                except Exception as e:
+                    settings.socket_con.send_error(f"[WARNING] MCP initialization failed for '{name}': {e}")
                 settings.socket_con.send_error(
                     f"[LOG] Starting server '{name}' with package '{package}' and args {args}.")
                 return True
@@ -105,79 +128,150 @@ class MCP_Manager:
         return MCP_Manager.mcp_enabled
 
     @classmethod
-    def call_mcp_server(cls, name: str, tool_name: str, args: dict) -> str | None:
+    def call_mcp_server(cls, name: str, tool_name: str, args: dict) -> dict | None:
         """
         Call a specific MCP server by its name with additional arguments.
         :param name: Name of the server to call.
         :param tool_name: Name of the tool to call on the server.
         :param args: Additional arguments to pass to the server.
-        :return: Result of the server call or None if the server is not found.
+        :return: Structured response dict with success/error status, or None for critical failures.
         """
-        if name in MCP_Manager.mcp_servers and MCP_Manager.mcp_servers[name]["status"] == "running":
-            settings.socket_con.send_error(f"[LOG] Calling server '{name}' with tool '{tool_name}' and args {args}.")
+        # Check if server exists and is running
+        if name not in MCP_Manager.mcp_servers:
+            error_msg = f"Server '{name}' not found"
+            settings.socket_con.send_error(f"[ERROR] {error_msg}")
+            return {"success": False, "error": error_msg}
+        
+        if MCP_Manager.mcp_servers[name]["status"] != "running":
+            error_msg = f"Server '{name}' is not running"
+            settings.socket_con.send_error(f"[ERROR] {error_msg}")
+            return {"success": False, "error": error_msg}
 
-            get_mcp_server_process = MCP_Manager.running_servers.get(name)
+        settings.socket_con.send_error(f"[LOG] Calling server '{name}' with tool '{tool_name}' and args {args}.")
 
-            # Check if the server process is running
-            if get_mcp_server_process:
-                try:
-                    # Here you would implement the logic to call the server
-                    # For example, sending a request to the server and getting a response
-                    # This is a placeholder for actual server communication logic
+        get_mcp_server_process = MCP_Manager.running_servers.get(name)
+        if not get_mcp_server_process:
+            error_msg = f"Server '{name}' process not found"
+            settings.socket_con.send_error(f"[ERROR] {error_msg}")
+            return {"success": False, "error": error_msg}
 
-                    mcp_request_template = {
-                        "jsonrpc": "2.0",
-                        "id": 1,
-                        "method": "tools/call",
-                        "params": {
-                            "name": tool_name,
-                            "arguments": args
-                        }
-                    }
+        try:
+            # Create MCP JSON-RPC request
+            mcp_request = {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "tools/call",
+                "params": {
+                    "name": tool_name,
+                    "arguments": args
+                }
+            }
 
-                    json_actual_request = json.dumps(mcp_request_template) + "\n"
-                    get_mcp_server_process.stdin.write(json_actual_request)
-                    get_mcp_server_process.stdin.flush()
+            # Send request to MCP server
+            request_json = json.dumps(mcp_request) + "\n"
+            get_mcp_server_process.stdin.write(request_json)
+            get_mcp_server_process.stdin.flush()
 
-                    # Simulate a response from the server
-                    response_line = get_mcp_server_process.stdout.readline().decode().strip()
-                    return response_line
-                except Exception as e:
-                    settings.socket_con.send_error(f"[ERROR] Failed to call server '{name}': {e}")
-                    return None
-            else:
-                settings.socket_con.send_error(f"[ERROR] Server '{name}' is not running.")
-                return None
-        else:
-            settings.socket_con.send_error(f"[ERROR] Server '{name}' not found or not running.")
-            return None
+            # Read response from MCP server
+            response_line = get_mcp_server_process.stdout.readline().strip()
+            if not response_line:
+                error_msg = f"No response from server '{name}'"
+                settings.socket_con.send_error(f"[ERROR] {error_msg}")
+                return {"success": False, "error": error_msg}
+            
+            # Parse JSON-RPC response
+            try:
+                json_response = json.loads(response_line)
+                
+                # Check for JSON-RPC error
+                if "error" in json_response:
+                    error_msg = f"MCP server error: {json_response['error']}"
+                    settings.socket_con.send_error(f"[ERROR] {error_msg}")
+                    return {"success": False, "error": error_msg}
+                
+                # Extract result from JSON-RPC response
+                if "result" in json_response:
+                    result_data = json_response["result"]
+                    settings.socket_con.send_error(f"[LOG] Server '{name}' tool '{tool_name}' executed successfully")
+                    return {"success": True, "data": result_data}
+                else:
+                    # Fallback: return entire response if no result field
+                    settings.socket_con.send_error(f"[LOG] Server '{name}' returned response without result field")
+                    return {"success": True, "data": json_response}
+                    
+            except json.JSONDecodeError as e:
+                error_msg = f"Invalid JSON response from server '{name}': {e}"
+                settings.socket_con.send_error(f"[ERROR] {error_msg}")
+                # Return raw response as data for debugging
+                return {"success": False, "error": error_msg, "raw_response": response_line}
+                
+        except Exception as e:
+            error_msg = f"Communication error with server '{name}': {str(e)}"
+            settings.socket_con.send_error(f"[ERROR] {error_msg}")
+            return {"success": False, "error": error_msg}
 
     @classmethod
-    def stop_server(cls, name: str = "all"):
+    def stop_server(cls, name: str) -> bool:
         """
-        Stop a server by its name.
+        Stop a specific server by its name.
         :param name: Name of the server to stop.
+        :return: True if server was stopped successfully, False otherwise.
         """
-        if name and name in MCP_Manager.running_servers:
-            server_process = MCP_Manager.running_servers[name]
-            try:
-                server_process.terminate()  # Gracefully terminate the server process
-                server_process.wait()  # Wait for the process to terminate
-                del MCP_Manager.running_servers[name]  # Remove from running servers
-                MCP_Manager.mcp_servers[name]["status"] = "stopped"  # Update status
-                settings.socket_con.send_error(f"[LOG] Server '{name}' stopped successfully.")
-                return True
-            except Exception as e:
-                settings.socket_con.send_error(f"[ERROR] Failed to stop server '{name}': {e}")
-                return False
-        else:
-            settings.socket_con.send_error(f"[ERROR] Server '{name}' not found or not running.")
-        if name and name == "all":
-            # means stop all servers
-            for server_name in list(MCP_Manager.running_servers.keys()):
-                MCP_Manager.stop_server(server_name)
-            settings.socket_con.send_error("[LOG] All MCP servers stopped successfully.")
-            return True
-        else:
+        if name not in cls.running_servers:
             settings.socket_con.send_error(f"[ERROR] Server '{name}' not found or not running.")
             return False
+        
+        server_process = cls.running_servers[name]
+        try:
+            server_process.terminate()
+            server_process.wait(timeout=5)  # Wait up to 5 seconds
+            del cls.running_servers[name]
+            cls.mcp_servers[name]["status"] = "stopped"
+            settings.socket_con.send_error(f"[LOG] Server '{name}' stopped successfully.")
+            return True
+        except Exception as e:
+            settings.socket_con.send_error(f"[ERROR] Failed to stop server '{name}': {e}")
+            return False
+
+    @classmethod
+    def stop_all_servers(cls) -> bool:
+        """
+        Stop all running MCP servers. Safe for cleanup - doesn't fail on errors.
+        :return: True if all servers were stopped, False if any failed.
+        """
+        if not cls.running_servers:
+            settings.socket_con.send_error("[LOG] No MCP servers running to stop.")
+            return True
+        
+        success = True
+        server_names = list(cls.running_servers.keys())  # Copy to avoid modification during iteration
+        
+        for server_name in server_names:
+            try:
+                if not cls.stop_server(server_name):
+                    success = False
+            except Exception as e:
+                settings.socket_con.send_error(f"[ERROR] Exception stopping server '{server_name}': {e}")
+                success = False
+        
+        if success:
+            settings.socket_con.send_error("[LOG] All MCP servers stopped successfully.")
+        else:
+            settings.socket_con.send_error("[WARNING] Some MCP servers failed to stop cleanly.")
+        
+        return success
+
+    @classmethod
+    def cleanup(cls):
+        """
+        Cleanup method for ChatDestructor integration.
+        Stops all servers and handles any cleanup errors gracefully.
+        """
+        try:
+            cls.stop_all_servers()
+        except Exception as e:
+            # Don't let cleanup errors crash the application
+            if hasattr(settings, 'socket_con') and settings.socket_con:
+                settings.socket_con.send_error(f"[ERROR] MCP cleanup failed: {e}")
+            else:
+                print(f"[ERROR] MCP cleanup failed: {e}")

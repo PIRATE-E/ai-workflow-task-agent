@@ -6,9 +6,12 @@ import sys
 
 import winsound
 
+from src.config import settings
+
 
 class SocketCon:
-    got_killed : bool = None  # Flag to indicate if the server was killed
+    got_killed: bool = None  # Flag to indicate if the server was killed
+
     def __init__(self, _client_socket: socket.socket):
         self.client_socket = _client_socket
 
@@ -74,6 +77,7 @@ def signal_handler(signum, frame):
     print(f"Received signal {signum}, shutting down server...")
     SocketCon.got_killed = True
 
+
 def cleanup_lock_file():
     """Remove lock file on exit"""
     lock_file = os.path.join(os.path.dirname(__file__), '..', '..', 'basic_logs', 'server.lock')
@@ -84,16 +88,16 @@ def cleanup_lock_file():
     except Exception as e:
         print(f"Error removing lock file: {e}")
 
+
 def create_lock_file():
     """Create lock file to prevent multiple instances"""
-    lock_file = os.path.join(os.path.dirname(__file__), '..', '..', 'basic_logs', 'server.lock')
-    
+    lock_file = settings.BASE_DIR / 'basic_logs' / 'server.lock'
     # Check if another instance is already running
     if os.path.exists(lock_file):
         try:
             with open(lock_file, 'r') as f:
                 pid = int(f.read().strip())
-            
+
             # Check if the process is still running
             try:
                 os.kill(pid, 0)  # This doesn't kill, just checks if process exists
@@ -107,9 +111,10 @@ def create_lock_file():
             # Invalid or missing lock file, remove it
             try:
                 os.remove(lock_file)
-            except:
+            except Exception as e:
+                print(f"Error removing stale lock file: {e}")
                 pass
-    
+
     # Create new lock file
     try:
         os.makedirs(os.path.dirname(lock_file), exist_ok=True)
@@ -121,15 +126,16 @@ def create_lock_file():
         print(f"Error creating lock file: {e}")
         return False
 
+
 if __name__ == '__main__':
     # Check for existing instance and create lock file
     if not create_lock_file():
         print("Exiting: Another server instance is already running")
         sys.exit(1)
-    
+
     # Register cleanup function
     atexit.register(cleanup_lock_file)
-    
+
     # Set up signal handlers for graceful shutdown
     try:
         signal.signal(signal.SIGTERM, signal_handler)
@@ -139,7 +145,7 @@ if __name__ == '__main__':
             signal.signal(signal.SIGBREAK, signal_handler)
     except Exception as e:
         print(f"Warning: Could not set up signal handlers: {e}")
-    
+
     # Initialize server
     server_socket = None
     try:
@@ -152,7 +158,7 @@ if __name__ == '__main__':
         SocketCon.got_killed = False  # Flag to indicate if the server was killed
 
         print("Server is listening...")
-        
+
         while listening and not SocketCon.got_killed:
             try:
                 client_socket, addr = server_socket.accept()
@@ -178,7 +184,7 @@ if __name__ == '__main__':
                 if not SocketCon.got_killed:
                     print(f"Error accepting connection: {e}")
                 break
-                
+
     except Exception as e:
         print(f"Server error: {e}")
     finally:
