@@ -37,7 +37,7 @@ class ChatInitializer:
             # see https://docs.sentry.io/platforms/python/data-management/data-collected/ for more info
             send_default_pii=True,
         )
-        
+
         # we must set the console for rich console to use it in different classes to the settings
         settings.console = self.console
         
@@ -116,9 +116,10 @@ class ChatInitializer:
         from src.tools.lggraph_tools.wrappers.google_wrapper import GoogleSearchToolWrapper
         from src.tools.lggraph_tools.wrappers.translate_wrapper import TranslateToolWrapper
         from src.tools.lggraph_tools.wrappers.rag_search_classifier_wrapper import RagSearchClassifierWrapper
+        from src.tools.lggraph_tools.wrappers.mcp_wrapper.filesystem_wrapper import FileSystemWrapper
         # schema
         from src.tools.lggraph_tools.tool_schemas.tools_structured_classes import google_search, rag_search_message, \
-            TranslationMessage
+            TranslationMessage, mcp_tool_filesystem
         tools = [
             # google search tool assigning
             ToolAssign(func=GoogleSearchToolWrapper,
@@ -134,7 +135,11 @@ class ChatInitializer:
             ToolAssign(func=TranslateToolWrapper,
                        name="Translatetool",
                        description="For translating messages into different languages.",
-                       args_schema=TranslationMessage, )
+                       args_schema=TranslationMessage, ),
+            ToolAssign(func=FileSystemWrapper,
+                       name="FileSystemTool",
+                       description="For performing file system operations (read, write, delete).",
+                       args_schema=mcp_tool_filesystem)
         ]
         ToolAssign.set_tools_list(tools)
         self.tools = ToolAssign.get_tools_list()
