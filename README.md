@@ -1,6 +1,6 @@
-# 🤖 AI Workflow Task Agent - Enterprise Edition
+# 🤖 AI Agent Workflow - Consumer Desktop AI Assistant
 
-> **A production-ready AI chatbot system built with LangGraph, featuring advanced RAG capabilities, intelligent agent orchestration, and enterprise-grade architecture following industry best practices.**
+> **A production-ready consumer desktop AI assistant featuring LangGraph multi-agent architecture, fundamental tools (GoogleSearch, RAGSearch, Translate), MCP filesystem integration, and enterprise-grade development practices.**
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![LangGraph](https://img.shields.io/badge/LangGraph-Latest-green.svg)](https://langchain-ai.github.io/langgraph/)
@@ -11,42 +11,50 @@
 
 ## 🌟 **What Makes This Special?**
 
-This isn't just another chatbot - it's a **professionally architected AI system** that demonstrates enterprise-level software engineering practices. The project showcases advanced patterns used by companies like Netflix, Google, and Microsoft.
+This is a **consumer desktop AI assistant** with fundamental tools (GoogleSearch, RAGSearch, Translate) and MCP filesystem integration. Built with enterprise-grade LangGraph architecture and professional development practices.
 
 ### 🎯 **Key Achievements**
-- **80% Memory Reduction**: Optimized from ~1.2GB to ~200MB baseline usage
-- **70% Faster Startup**: Lazy loading and intelligent import management
-- **Production Monitoring**: Sentry integration for error tracking
-- **Modular Architecture**: Clean separation of concerns with dependency injection
-- **Advanced RAG**: Multi-modal retrieval with Neo4j knowledge graphs
+- **🔧 Fundamental Tool System**: GoogleSearch, RAGSearch, Translate tools integrated
+- **🏗️ LangGraph Architecture**: Multi-agent system with StateAccessor singleton
+- **📊 Production Monitoring**: Sentry integration with socket logging infrastructure
+- **🔒 Privacy-First Design**: Local processing, no cloud dependency, user-controlled data
+- **⚡ MCP Integration**: Filesystem MCP server with JSON-RPC communication
+- **🎯 Professional Git Workflow**: Clean branch hierarchy with v1.4.0 stable release
 
 ---
 
 ## ✨ **Core Features**
 
-### 🧠 **Intelligent Agent System**
-- **LangGraph Orchestration**: State-of-the-art graph-based conversation flow
+### 🧠 **LangGraph Multi-Agent System**
+- **Production-Ready**: LangGraph orchestration with enterprise-grade architecture
 - **Smart Message Classification**: Automatic routing between LLM and tool responses
-- **Dynamic Tool Selection**: Context-aware tool invocation with parameter extraction
-- **Conversation State Management**: Persistent memory and context tracking
+- **StateAccessor Singleton**: Thread-safe state management across all agents
+- **Conversation Memory**: Persistent context tracking and learning
 
-### 🔍 **Advanced RAG Capabilities**
-- **Multi-Modal Retrieval**: Text documents, knowledge graphs, and structured data
-- **Neo4j Integration**: Graph-based knowledge storage and intelligent querying
-- **Lazy Loading**: Performance-optimized imports for heavy dependencies
-- **Async Processing**: Non-blocking RAG operations with semaphore control
+### 🛠️ **Tool System**
+- **Fundamental Tools**: GoogleSearch, RAGSearch, Translate (always available)
+- **MCP Integration**: Filesystem MCP server with read/write/create capabilities
+- **JSON-RPC Communication**: Professional MCP protocol implementation
+- **Tool Registry**: Unified management of fundamental and MCP tools
 
-### 🏗️ **Enterprise Architecture**
-- **Modular Design**: Clean separation with src/ structure following industry standards
-- **Dependency Injection**: Centralized configuration and state management
-- **Error Resilience**: Graceful fallbacks and comprehensive error handling
-- **Production Monitoring**: Real-time error tracking with Sentry SDK
+### 🏗️ **Current Architecture**
+- **LangGraph System**: Multi-agent conversation orchestration
+- **StateAccessor**: Centralized state management with singleton pattern
+- **Tool Registry**: Manages fundamental tools and MCP filesystem integration
+- **MCP Manager**: JSON-RPC communication with subprocess management
+- **RAG Engine**: Knowledge retrieval with Neo4j and vector search
 
-### 🎨 **Professional UX**
-- **Rich Console Interface**: Beautiful terminal UI with progress indicators
-- **Network Logging**: Separate subprocess for clean log management
-- **Sound Notifications**: Audio feedback for important events
-- **Cross-Platform**: Windows, Linux, and macOS support
+### 🔒 **Privacy-First Design**
+- **Local Processing**: No cloud dependency, all computation local
+- **User-Controlled Data**: Complete control over information and privacy
+- **Secure Architecture**: Enterprise-grade security patterns
+- **Transparent Operations**: Full visibility into AI assistant behavior
+
+### 📊 **Production Infrastructure**
+- **Sentry Monitoring**: Real-time error tracking and performance monitoring
+- **Socket Logging**: Separate subprocess for clean log management
+- **ChatDestructor**: Comprehensive resource cleanup and graceful shutdown
+- **Enterprise Patterns**: Singleton patterns, modular design, error resilience
 
 ---
 
@@ -96,19 +104,19 @@ python src/main_orchestrator.py
 ```
 User Input → Message Classifier → Router → [LLM Agent | Tool Agent] → Rich Output
      ↓              ↓               ↓              ↓           ↓
-State Management → Context → Tool Selection → Execution → Formatted Response
+StateAccessor → Context → Tool Registry → [GoogleSearch | RAGSearch | Translate | MCP Filesystem]
 ```
 
 ### **🔧 Core Components**
 
 | Component | Purpose | Key Features |
 |-----------|---------|--------------|
-| **Main Orchestrator** | Entry point and lifecycle management | Clean startup, graceful shutdown, resource cleanup |
-| **Chat Initializer** | System bootstrap and configuration | Sentry integration, console setup, state initialization |
-| **Agent System** | Intelligent conversation routing | Classification, tool selection, LLM generation |
-| **RAG Engine** | Knowledge retrieval and generation | Neo4j graphs, document processing, async operations |
-| **Tool Framework** | External service integration | Dynamic tool discovery, parameter validation |
-| **Socket Manager** | Network logging and monitoring | Subprocess management, error reporting |
+| **LangGraph System** | Multi-agent conversation orchestration | State management, agent routing, memory integration |
+| **StateAccessor** | Centralized state management | Thread-safe singleton, conversation context |
+| **Tool Registry** | Unified tool management | Fundamental tools + MCP filesystem integration |
+| **MCP Manager** | Model Context Protocol integration | JSON-RPC communication, subprocess management |
+| **RAG Engine** | Knowledge retrieval and generation | Multi-modal retrieval, Neo4j graphs, async operations |
+| **Monitoring Stack** | Production infrastructure | Sentry integration, socket logging, error tracking |
 
 ---
 
@@ -307,21 +315,29 @@ python examples/log_viewer_demo.py
 
 ## 🚀 **Development History**
 
-This project has evolved through several major architectural improvements:
+This project has evolved into a professional consumer desktop AI assistant with enterprise-grade architecture:
 
 ### **🔄 Recent Milestones**
-- **July 2025**: Complete system overhaul with 80% memory reduction
-- **July 2025**: Professional restructuring following Netflix/Google standards  
-- **July 2025**: Added agent-based architecture with LangGraph
-- **July 2025**: Implemented lazy loading and performance optimizations
-- **July 2025**: Added Sentry monitoring and production-ready features
+- **August 2025**: v1.4.0 - Professional Git workflow with clean branch hierarchy
+- **August 2025**: MCP integration with JSON-RPC protocol implementation
+- **August 2025**: LangGraph multi-agent architecture with tool integration
+- **August 2025**: StateAccessor singleton for enterprise-grade state management
+- **August 2025**: Production monitoring with Sentry and socket logging
+- **August 2025**: Privacy-first design with local processing
 
 ### **🏗️ Architectural Evolution**
-1. **Monolithic Script** → **Modular Architecture**
-2. **Basic Chatbot** → **Intelligent Agent System**
-3. **Simple RAG** → **Multi-Modal Knowledge Retrieval**
-4. **Console Prints** → **Professional Monitoring**
-5. **Development Code** → **Production-Ready System**
+1. **Basic Chatbot** → **LangGraph Multi-Agent System**
+2. **Simple Tools** → **Integrated Tool System (Fundamental + MCP Filesystem)**
+3. **Basic State** → **StateAccessor Singleton Pattern**
+4. **Development Code** → **Production-Ready Consumer Assistant**
+5. **Feature Branches** → **Professional Git Workflow (v1.4.0)**
+
+### **🎯 Current Status (v1.4.0)**
+- ✅ **Production-Ready**: LangGraph multi-agent system operational
+- ✅ **Enterprise Architecture**: LangGraph design with professional patterns
+- ✅ **Clean Git History**: Professional branch hierarchy and release management
+- ✅ **MCP Integration**: JSON-RPC protocol with subprocess management
+- ⚡ **Next Phase**: Dynamic MCP tool discovery for expanded ecosystem
 
 ---
 
