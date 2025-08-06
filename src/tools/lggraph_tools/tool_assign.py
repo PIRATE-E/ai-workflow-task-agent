@@ -1,8 +1,9 @@
 from langchain_core.tools.structured import StructuredTool
+from typing import List, Optional, ClassVar
 
 
 class ToolAssign(StructuredTool):
-    _tool_list = []
+    tool_list : ClassVar[List['ToolAssign']] = []
 
     def __init__(self, name: str, description: str, func=None, args_schema=None):
         """
@@ -24,7 +25,7 @@ class ToolAssign(StructuredTool):
 
         :param tools_list: List of tool instances to be used in the tool selection process.
         """
-        ToolAssign._tools_list = tools_list
+        ToolAssign._tool_list = tools_list
 
     @classmethod
     def get_tools_list(cls):
@@ -33,4 +34,15 @@ class ToolAssign(StructuredTool):
 
         :return: List of tool instances.
         """
-        return cls._tools_list
+        return cls._tool_list
+
+    @classmethod
+    def append_tools_list(cls, tools: List['ToolAssign']):
+        """
+        Append a new tool to the existing list of tools.
+
+        :param tools: The tool instance to be added.
+        """
+        if cls._tool_list is None:
+            cls._tool_list = tools
+        cls._tool_list.extend(tools)
