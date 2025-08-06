@@ -1,12 +1,13 @@
+import inspect
 import json
 
 from src.agents.agents_schema.agents_schema import ToolSelection
 from src.config import settings
+from src.prompts.system_prompt_tool_selector import get_tool_selector_prompt
 from src.tools.lggraph_tools.tool_assign import ToolAssign
 from src.ui.print_message_style import print_message
 from src.utils.model_manager import ModelManager
-
-
+from src.utils.argument_schema_util import get_tool_argument_schema
 def tool_selection_agent(state) -> dict:
     """
     Selects and invokes the most appropriate tool for the user's request, or returns a message if no tool is needed.
@@ -22,67 +23,25 @@ def tool_selection_agent(state) -> dict:
     tools = ToolAssign.get_tools_list()
 
     tools_context = "\n\n".join([
-        f"Tool: {tool.name}\nDescription: {tool.description}\nParameters: {json.dumps(tool.args_schema.model_json_schema())}"
+        f"Tool: {tool.name}\nDescription: {tool.description}\nParameters: {get_tool_argument_schema(tool)}"
         for tool in tools
     ]) if tools else settings.socket_con.send_error("[ERROR] No tools available for selection.") if settings.socket_con else print("[ERROR] No tools available for selection.")
 
-    system_prompt = (
-        "You are an intelligent tool selection agent with deep contextual understanding and reasoning capabilities.\n\n"
-
-        "**Your Mission:**\n"
-        "Analyze the user's request within the full conversation context to determine if they need a specific tool or if their question can be answered without external tools.\n\n"
-
-        "**Available Tools:**\n"
-        f"{tools_context}\n\n"
-
-        "**Conversation Context Analysis:**\n"
-        f"Full conversation history: {history}\n"
-        f"Current user request: {content}\n\n"
-
-        "**Smart Tool Selection Logic:**\n\n"
-
-        "1. **Context-Aware Reasoning:**\n"
-        "   - If the user references previous messages ('that result', 'the search we did', 'translate that'), understand what they're referring to\n"
-        "   - Consider the flow of conversation - are they asking for new information or clarification of existing information?\n"
-        "   - Look for implicit requests based on conversation context\n\n"
-
-        "2. **Tool Selection Criteria:**\n"
-        "   - **GoogleSearch**: For current information, facts, news, or anything requiring web search\n"
-        "   - **RAGSearch**: For document analysis, knowledge base queries, or file-specific searches\n"
-        "   - **Translatetool**: For language translation requests\n"
-        "   - **'none'**: For explanations, clarifications, reasoning, or general conversation\n\n"
-
-        "3. **Context-Sensitive Examples:**\n"
-        "   - User: 'search for AI news' → GoogleSearch with query 'AI news'\n"
-        "   - User: 'what does that mean?' (after a search result) → 'none' (explanation needed)\n"
-        "   - User: 'translate the previous message to Spanish' → Translatetool with message from history\n"
-        "   - User: 'find information about quantum computing in the document' → RAGSearch\n"
-        "   - User: 'explain how that works' (referring to previous content) → 'none'\n\n"
-
-        "4. **Parameter Extraction Intelligence:**\n"
-        "   - Extract parameters from current message AND conversation history when relevant\n"
-        "   - If user says 'translate that', find the 'that' in conversation history\n"
-        "   - If user says 'search for more about X' where X was mentioned before, use context\n\n"
-        "   - If user says 'RAG SEARCH :- {query}', extract the query and use it for RAG search\n"
-        "   - If user says 'search on web  :- {query}', extract the query and use it for RAG search\n"
-
-        "**Response Format:**\n"
-        "Return a JSON object with this exact structure:\n"
-        "{\n"
-        '  "tool_name": "TOOL_NAME or none",\n'
-        '  "reasoning": "Clear explanation of your decision based on context and user intent",\n'
-        '  "parameters": {"param": "value"} // Extract from message and/or conversation history\n'
-        "}\n\n"
-
-        "**Key Principle:** Think like a human assistant who understands context, references, and the natural flow of conversation. Don't just match keywords - understand intent."
+    # Use the centralized tool selector prompt
+    system_prompt = get_tool_selector_prompt(
+        tools_context=tools_context,
+        history=history,
+        content=content
     )
 
     try:
         structured_llm = ModelManager(
             model=settings.CLASSIFIER_MODEL,
             format="json",
-            temperature=0.7,
-            stream=False
+            temperature=0.3, # Lower temperature for more consistent tool selection
+            stream=False,
+            max_tokens=1000,  # Allow enough tokens for reasoning and parameters
+            top_p=1.0,        # Focus on most likely tokens for better accuracy
         ).with_structured_output(ToolSelection)
         with console.status("[bold green]Thinking...[/bold green]", spinner="dots"):
             selection = structured_llm.invoke([
@@ -126,7 +85,7 @@ def tool_selection_agent(state) -> dict:
                 except Exception as e:
                     if settings.socket_con:
                         settings.socket_con.send_error(
-                            f"[ERROR] Error using tool {tool.name}: {e} function: {tool.func.__name__}")
+                            f"[ERROR] Error using tool {tool.name}: {e} function: {tool.func.__name__} {inspect.trace()}")
                     else:
                         print(f"[ERROR] Error using tool {tool.name}: {e} function: {tool.func.__name__}")
                     return {"messages": [settings.AIMessage(content=f"Error using {tool.name}: {str(e)}")]}

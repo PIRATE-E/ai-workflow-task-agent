@@ -20,14 +20,12 @@ def generate_llm_response(state) -> dict:
     )
     latest_message_content = messages[-1].content if messages else ""
 
-
     tools = ToolAssign.get_tools_list()
 
     tools_context = "\n\n".join([
         f"Tool: {tool.name}\nDescription: {tool.description}"
         for tool in tools
     ]) if tools else "No tools available."
-
 
     system_prompt = (
         "You are an intelligent AI assistant with deep reasoning capabilities and full conversation awareness.\n\n"

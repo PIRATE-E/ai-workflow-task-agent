@@ -3,8 +3,13 @@ import os
 import signal
 import socket
 import sys
+from pathlib import Path
 
 import winsound
+
+# Add project root to Python path
+project_root = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(project_root))
 
 from src.config import settings
 
@@ -80,7 +85,7 @@ def signal_handler(signum, frame):
 
 def cleanup_lock_file():
     """Remove lock file on exit"""
-    lock_file = os.path.join(os.path.dirname(__file__), '..', '..', 'basic_logs', 'server.lock')
+    lock_file = settings.BASE_DIR / 'basic_logs' / 'server.lock'
     try:
         if os.path.exists(lock_file):
             os.remove(lock_file)
