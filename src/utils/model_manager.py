@@ -1,5 +1,4 @@
-# this class is used to manage the loading models of ollama
-import os
+﻿import os
 import subprocess
 import time
 from typing import ClassVar, Optional, Any, Iterator
@@ -84,27 +83,27 @@ class ModelManager(ChatOllama):
         try:
             if cls._openai_integration is not None:
                 if settings.socket_con:
-                    settings.socket_con.send_error("🧹 Cleaning up OpenAI integration")
+                    settings.socket_con.send_error("≡ƒº╣ Cleaning up OpenAI integration")
                 OpenAIIntegration.cleanup()
                 cls._openai_integration = None
                 cls._is_openai_mode = False
                 if settings.socket_con:
-                    settings.socket_con.send_error("✅ OpenAI integration cleanup completed")
+                    settings.socket_con.send_error("Γ£à OpenAI integration cleanup completed")
                     return  # Exit early if OpenAI integration is cleaned up
         except Exception as e:
             if settings.socket_con:
-                settings.socket_con.send_error(f"❌ Error during OpenAI integration cleanup: {e}")
+                settings.socket_con.send_error(f"Γ¥î Error during OpenAI integration cleanup: {e}")
         try:
             if cls.current_model:
                 if settings.socket_con:
-                    settings.socket_con.send_error(f"🧹 Cleaning up model: {cls.current_model}")
+                    settings.socket_con.send_error(f"≡ƒº╣ Cleaning up model: {cls.current_model}")
                 cls._stop_model()
                 cls.current_model = None
                 if settings.socket_con:
-                    settings.socket_con.send_error("✅ Model cleanup completed")
+                    settings.socket_con.send_error("Γ£à Model cleanup completed")
         except Exception as e:
             if settings.socket_con:
-                settings.socket_con.send_error(f"❌ Error during model cleanup: {e}")
+                settings.socket_con.send_error(f"Γ¥î Error during model cleanup: {e}")
 
     @staticmethod
     def load_model(model_name: str):
@@ -239,26 +238,3 @@ class ModelManager(ChatOllama):
                 last_time = current_time
         if buffer:
             yield AIMessageChunk(content=buffer)
-
-if __name__ == '__main__':
-    # Example usage
-    manager = ModelManager(model=settings.DEFAULT_MODEL, temperature=0.7, format="json")
-    response = manager.invoke([settings.HumanMessage(content="Hello, how are you?")])
-    if settings.socket_con:
-        settings.socket_con.send_error(response.content if response else "No response received.")
-    else:
-        print(response.content if response else "No response received.", type(manager))
-
-    manager2 = ModelManager(model=settings.CLASSIFIER_MODEL, temperature=0.5, format="json")
-    response = manager2.invoke([settings.HumanMessage(content="What is the capital of France?")])
-    if settings.socket_con:
-        settings.socket_con.send_error(response.content if response else "No response received.")
-    else:
-        print(response.content if response else "No response received.", type(manager2))
-
-    manager2 = ModelManager(model=settings.CLASSIFIER_MODEL, temperature=0.5, format="json")
-    response = manager2.invoke([settings.HumanMessage(content="What is the capital of France?")])
-    if settings.socket_con:
-        settings.socket_con.send_error(response.content if response else "No response received.")
-    else:
-        print(response.content if response else "No response received.", type(manager2))
