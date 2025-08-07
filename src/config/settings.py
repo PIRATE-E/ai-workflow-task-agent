@@ -2,7 +2,10 @@
 Configuration settings for AI LLM project.
 """
 import os
+import dotenv
+# Load environment variables from .env file
 from pathlib import Path
+dotenv.load_dotenv(Path(__file__).resolve().parent.parent.parent  /  '.env', override=True)
 
 # Base directory
 BASE_DIR = Path(__file__).resolve().parent.parent  # src directory
@@ -15,6 +18,8 @@ SOCKET_PORT = int(os.getenv("SOCKET_PORT", 5390))
 DEFAULT_MODEL = os.getenv("DEFAULT_MODEL", "llava-llama3:latest")
 CYPHER_MODEL = os.getenv("CYPHER_MODEL", "deepseek-r1:8b")
 CLASSIFIER_MODEL = os.getenv("CLASSIFIER_MODEL", "llama3.1:8b")
+GPT_MODEL = os.getenv("GPT_MODEL", "openai/gpt-oss-120b")
+OPEN_AI_API_KEY = os.getenv("OPENAI_API_KEY", "your_openai_api_key_here")
 
 # API endpoints
 TRANSLATION_API_URL = os.getenv("TRANSLATION_API_URL", "http://localhost:5560/translate")
@@ -41,6 +46,11 @@ LOG_DISPLAY_MODE = os.getenv("LOG_DISPLAY_MODE", "file")
 
 # Development/Production mode
 DEBUG = os.getenv("DEBUG", "false").lower() == "true"
+
+# NEO4J settings
+NEO4J_URI=os.getenv("NEO4J_URI", "bolt://localhost:7687")
+NEO4J_USER=os.getenv("NEO4J_USER", "neo4j")
+NEO4J_PASSWORD=os.getenv("NEO4J_PASSWORD","your_password_here")
 
 # SEMAPHORE SETTINGS
 SEMAPHORE_CLI = int(os.getenv("SEMAPHORE_LIMIT_CLI", 15))

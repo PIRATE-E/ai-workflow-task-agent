@@ -61,7 +61,7 @@ class SocketManager:
             print(f"🚀 Starting log server subprocess: {error_transfer_path}")
 
             # Start the subprocess - choose method based on settings
-            log_display_mode = getattr(settings, 'LOG_DISPLAY_MODE', 'separate_window')
+            log_display_mode = settings.LOG_DISPLAY_MODE
 
             if log_display_mode == 'separate_window':
                 # Option 1: Separate console window (recommended)
