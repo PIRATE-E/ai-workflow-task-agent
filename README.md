@@ -1,6 +1,6 @@
-# 🤖 AI Agent Workflow - Consumer Desktop AI Assistant
+# 🤖 AI-Agent-Workflow Project
 
-> **A production-ready consumer desktop AI assistant featuring LangGraph multi-agent architecture, fundamental tools (GoogleSearch, RAGSearch, Translate), MCP filesystem integration, and enterprise-grade development practices.**
+> **A production-ready, enterprise-grade consumer desktop AI assistant featuring LangGraph multi-agent architecture, OpenAI integration with NVIDIA API, dynamic tool registry (17 total tools: 3 fundamental + 14 dynamic MCP tools), advanced JSON-RPC MCP integration, and robust development practices.**
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![LangGraph](https://img.shields.io/badge/LangGraph-Latest-green.svg)](https://langchain-ai.github.io/langgraph/)
@@ -9,17 +9,16 @@
 
 ---
 
-## 🌟 **What Makes This Special?**
+## 🌟 What Makes This Special?
 
-This is a **consumer desktop AI assistant** with fundamental tools (GoogleSearch, RAGSearch, Translate) and MCP filesystem integration. Built with enterprise-grade LangGraph architecture and professional development practices.
-
-### 🎯 **Key Achievements**
-- **🔧 Fundamental Tool System**: GoogleSearch, RAGSearch, Translate tools integrated
-- **🏗️ LangGraph Architecture**: Multi-agent system with StateAccessor singleton
-- **📊 Production Monitoring**: Sentry integration with socket logging infrastructure
-- **🔒 Privacy-First Design**: Local processing, no cloud dependency, user-controlled data
-- **⚡ MCP Integration**: Filesystem MCP server with JSON-RPC communication
-- **🎯 Professional Git Workflow**: Clean branch hierarchy with v1.4.0 stable release
+This project is a **consumer desktop AI assistant** with:
+- **OpenAI Integration**: Seamless switching between local Ollama and OpenAI/NVIDIA API models
+- **17-Tool Dynamic System**: 3 fundamental tools (GoogleSearch, RAGSearch, Translate) + 14 dynamic MCP filesystem tools
+- **Advanced JSON-RPC MCP Integration**: Full protocol implementation with dynamic tool discovery
+- **Enterprise-grade LangGraph multi-agent architecture** with StateAccessor singleton pattern
+- **Production-ready streaming**: Optimized OpenAI streaming with reasoning-first output
+- **Local-first, privacy-focused design** with optional cloud model integration
+- **Professional monitoring and logging infrastructure** with Sentry and socket logging
 
 ---
 
@@ -185,6 +184,108 @@ ai-workflow-task-agent/                 🏗️ Enterprise-Grade Organization
 │   └── requirements.txt              └─ Log Server Dependencies
 └── screenshots/                       📸 Documentation Assets
 ```
+
+---
+
+## � O*penAI Integration
+
+### Seamless Model Switching
+The system features **ModelManager.py** that provides seamless switching between local Ollama models and OpenAI/NVIDIA API:
+
+```python
+# Automatic model detection and routing
+if model in api_model_list:
+    # Route to OpenAI/NVIDIA API
+    return openai_integration.generate_text(prompt, stream=True)
+else:
+    # Route to local Ollama
+    return ollama_client.generate(model, prompt)
+```
+
+### OpenAI Configuration
+```bash
+# Add to your .env file
+OPENAI_API_KEY="nvapi-your-nvidia-api-key-here"
+GPT_MODEL="openai/gpt-oss-120b"
+```
+
+### OpenAI Integration Implementation
+The **OpenAIIntegration** class (`src/utils/open_ai_integration.py`) provides enterprise-grade OpenAI API integration:
+
+```python
+class OpenAIIntegration:
+    """Singleton OpenAI integration with NVIDIA API support"""
+    
+    def __init__(self, api_key=None, model=None):
+        self.client = OpenAI(
+            base_url="https://integrate.api.nvidia.com/v1",
+            api_key=api_key or OPEN_AI_API_KEY
+        )
+        self.model = model or "openai/gpt-oss-120b"
+    
+    def generate_text(self, prompt: str, stream: bool = False):
+        """Generate text with streaming/non-streaming support"""
+        # Comprehensive implementation with error handling
+```
+
+**Key Implementation Features:**
+- **Singleton Pattern**: Ensures single instance across application
+- **NVIDIA API Endpoint**: Direct integration with NVIDIA's OpenAI-compatible API
+- **Dual Response Modes**: Both streaming (`Iterator[str]`) and non-streaming (`str`) support
+- **Error Handling**: Comprehensive validation and exception management
+- **Resource Management**: Proper cleanup with `client.close()` and garbage collection
+
+### Production-Ready Streaming
+- **Reasoning-First Output**: Streams reasoning before content for each chunk
+- **Optimized Pipeline**: Direct streaming bypass for reduced latency
+- **Error Handling**: Comprehensive validation and retry logic
+- **Resource Management**: Singleton pattern with proper cleanup
+
+### Technical Architecture
+```
+chat_llm.py → ModelManager → OpenAIIntegration → NVIDIA API
+     ↓              ↓              ↓              ↓
+StateAccessor → Model Detection → Streaming Handler → AIMessageChunk
+```
+
+---
+
+## 🛠️ Dynamic Tool Registry System
+
+### 17-Tool Architecture
+The system features a sophisticated **17-tool dynamic registry**:
+
+**🔧 Fundamental Tools (3):**
+- **GoogleSearch**: Web search with result filtering
+- **RAGSearch**: Document knowledge retrieval  
+- **Translate**: Multi-language translation
+
+**🔌 Dynamic MCP Tools (14):**
+- **Filesystem Operations**: read_file, write_file, create_directory, list_directory
+- **File Management**: move_file, search_files, get_file_info
+- **Advanced Operations**: read_multiple_files, directory_tree, file_search
+- **And more**: Automatically discovered from MCP servers
+
+### Dynamic Registration Process
+```python
+# 1. MCP Server Startup & Handshake
+MCP_Manager.start_server() → handshake_protocol()
+
+# 2. Tool Discovery
+tool_discovery() → extract_tool_schemas()
+
+# 3. Dynamic Registration  
+DynamicToolRegister.register_tool() → ToolAssign.append(_tool_list)
+
+# 4. Runtime Availability
+All 17 tools available for intelligent selection
+```
+
+### JSON-RPC Protocol Implementation
+- **Full Protocol Support**: Complete JSON-RPC 2.0 implementation
+- **Schema Enhancement**: Automatic tool_name parameter injection
+- **Error Recovery**: Structured response parsing with fallbacks
+- **Subprocess Management**: MCP server lifecycle with proper cleanup
 
 ---
 
