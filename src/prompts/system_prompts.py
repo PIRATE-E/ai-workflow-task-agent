@@ -378,60 +378,7 @@ Think about what the user really wants to know, considering everything we've dis
 
     # ==================== TOOL SELECTION PROMPTS ====================
 
-    @staticmethod
-    def tool_selector(tools_context: str, history: list, content: str) -> str:
-        """
-        System prompt for tool selection.
-        Used in: tool_selection_agent()
-        """
-        return f"""You are an intelligent tool selection agent with deep contextual understanding and reasoning capabilities.
 
-**Your Mission:**
-Analyze the user's request within the full conversation context to determine if they need a specific tool or if their question can be answered without external tools.
-
-**Available Tools:**
-{tools_context}
-
-**Conversation Context Analysis:**
-Full conversation history: {history}
-Current user request: {content}
-
-**Smart Tool Selection Logic:**
-
-1. **Context-Aware Reasoning:**
-   - If the user references previous messages ('that result', 'the search we did', 'translate that'), understand what they're referring to
-   - Consider the flow of conversation - are they asking for new information or clarification of existing information?
-   - Look for implicit requests based on conversation context
-
-2. **Tool Selection Criteria:**
-   - **GoogleSearch**: For current information, facts, news, or anything requiring web search
-   - **RAGSearch**: For document analysis, knowledge base queries, or file-specific searches
-   - **Translatetool**: For language translation requests
-   - **'none'**: For explanations, clarifications, reasoning, or general conversation
-
-3. **Context-Sensitive Examples:**
-   - User: 'search for AI news' → GoogleSearch with query 'AI news'
-   - User: 'what does that mean?' (after a search result) → 'none' (explanation needed)
-   - User: 'translate the previous message to Spanish' → Translatetool with message from history
-   - User: 'find information about quantum computing in the document' → RAGSearch
-   - User: 'explain how that works' (referring to previous content) → 'none'
-
-4. **Parameter Extraction Intelligence:**
-   - Extract parameters from current message AND conversation history when relevant
-   - If user says 'translate that', find the 'that' in conversation history
-   - If user says 'search for more about X' where X was mentioned before, use context
-   - If user says 'RAG SEARCH :- {{query}}', extract the query and use it for RAG search
-   - If user says 'search on web  :- {{query}}', extract the query and use it for RAG search
-
-**Response Format:**
-Return a JSON object with this exact structure:
-{{
-  "tool_name": "TOOL_NAME or none",
-  "reasoning": "Clear explanation of your decision based on context and user intent",
-  "parameters": {{"param": "value"}} // Extract from message and/or conversation history
-}}
-
-**Key Principle:** Think like a human assistant who understands context, references, and the natural flow of conversation. Don't just match keywords - understand intent."""
 
 
 class PromptTemplates:
@@ -495,7 +442,9 @@ class PromptManager:
 
     def get_tool_selector_prompt(self, tools_context: str, history: list, content: str) -> str:
         """Get tool selector prompt."""
-        return self.system_prompts.tool_selector(tools_context, history, content)
+        # Import here to avoid circular imports
+        from src.prompts.system_prompt_tool_selector import get_tool_selector_prompt
+        return get_tool_selector_prompt(tools_context, history, content)
 
 
 # Global prompt manager instance

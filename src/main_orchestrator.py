@@ -19,6 +19,7 @@ from src.models.state import State
 from src.ui.print_banner import print_banner
 from src.utils.model_manager import ModelManager
 from src.mcp.manager import MCP_Manager
+from src.utils.argument_schema_util import get_tool_argument_schema
 
 
 def run_chat(destructor: ChatDestructor):
@@ -35,6 +36,22 @@ def run_chat(destructor: ChatDestructor):
     console = settings.console
     console.print(Align.center("[bold blue]Welcome to the LangGraph Chatbot![/bold blue]"))
     console.print(Align.center("Type '[bold red]exit[/bold red]' to end the conversation.\n"))
+
+    # Display tools in a table
+    from rich.table import Table
+
+    table = Table(title="Registered Tools", border_style="blue", show_lines=True)
+    table.add_column("Name", style="cyan", no_wrap=True)
+    table.add_column("Description", style="magenta")
+    table.add_column("Arguments", style="green")
+
+    for tool in chat.tools:
+        name = getattr(tool, "name", "N/A")
+        desc = getattr(tool, "description", "N/A")
+        args = get_tool_argument_schema(tool)
+        table.add_row(str(name), str(desc), str(args))
+
+    console.print(table)
 
     try:
         while not chat.break_loop:

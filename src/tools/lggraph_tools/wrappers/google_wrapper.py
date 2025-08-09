@@ -1,3 +1,5 @@
+import json
+
 from src.config import settings
 from src.tools.lggraph_tools.tool_response_manager import ToolResponseManager
 from src.tools.lggraph_tools.tools.google_search_tool import search_google_tool
@@ -29,8 +31,25 @@ class GoogleSearchToolWrapper:
             # ✅ Use centralized prompt management
             from src.prompts.system_prompts import prompt_manager
             system_prompt = prompt_manager.get_web_search_prompt()
-            response = ModelManager(model=settings.CLASSIFIER_MODEL, temperature=0.7, format="json").invoke(
-                [settings.HumanMessage(content=system_prompt), settings.HumanMessage(content=snippets)])
+            
+            # Add JSON format instruction to the prompt
+            enhanced_prompt = system_prompt + """
+
+**IMPORTANT:** Respond with valid JSON in this exact format:
+{
+    "summary": "Your summary of the search results",
+    "key_points": ["point1", "point2", "point3"],
+    "sources": ["url1", "url2"]
+}"""
+            
+            llm = ModelManager(model=settings.GPT_MODEL, temperature=0.7)
+            response = llm.invoke([settings.HumanMessage(content=enhanced_prompt), settings.HumanMessage(content=snippets)])
+            
+            # Use the new JSON conversion method and create a proper response
+            json_result = ModelManager.convert_to_json(response)
+            
+            # Create a response with the JSON content
+            response.content = json.dumps(json_result) if isinstance(json_result, dict) else str(json_result)
         else:
             response = None
         return response

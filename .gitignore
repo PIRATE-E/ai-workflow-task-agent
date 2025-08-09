@@ -96,6 +96,11 @@ celerybeat.pid
 *~
 .vs/
 CopilotSnapshots/
+AI_llm.pyproj
+AI_llm.pyproj.user
+AI_llm_langgraph.vbproj
+obj/
+src/src.pyproj
 
 # OS files
 .DS_Store*
@@ -160,6 +165,11 @@ lggraphOLD_MAIN.py
 
 # Ignore specific files and directories.
 .kiro
-copilot_instructions/
+copilot_instructions
+AI_llm.sln
+reports
+# Node.js/MCP config (if not needed in root)
+package.json
 
 # End of file
+/.mcp.json

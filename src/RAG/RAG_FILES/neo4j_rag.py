@@ -11,11 +11,14 @@ from langchain_ollama import ChatOllama
 from neo4j import GraphDatabase
 
 from src.config import settings
+from src.utils.open_ai_integration import OpenAIIntegration
 # Socket connection now centralized in settings
-from src.utils.structured_triple_prompt import create_structured_prompt
+from src.utils.structured_triple_prompt import Prompt
 
 SYSTEM_PROMPT_GENERATE_TRIPLE_ENHANCED = """
 You are an intelligent knowledge graph extraction system that identifies meaningful relationships between entities in text.
+
+**CRITICAL: Respond with JSON array only. No reasoning, explanation, or additional text.**
 
 **Your Mission:**
 Extract clear, factual relationships from the provided text to build a comprehensive knowledge graph that captures how different entities connect to each other.
@@ -44,16 +47,22 @@ Extract clear, factual relationships from the provided text to build a comprehen
    - Ensure each triple adds meaningful information
 
 **Output Format:**
-Return a JSON array where each triple has exactly these keys:
+Return ONLY a JSON array where each triple has exactly these keys:
 - "subject": the main entity (string)
 - "predicate": the relationship type (string)
 - "object": the connected entity (string)
+
+**CRITICAL REQUIREMENTS:**
+- Return ONLY the JSON OBJECT, no additional text
+- No reasoning or explanation text
+- No "thinking" or "let me think" phrases
+- Format: [{"subject": "entity1", "predicate": "relationship", "object": "entity2"}]
 
 **Examples:**
 
 Input: "Microsoft developed Azure to provide cloud computing services. Many enterprises use Azure for their digital transformation initiatives."
 
-Output:
+Output as JSON array:
 [
   {"subject": "Microsoft", "predicate": "developed", "object": "Azure"},
   {"subject": "Azure", "predicate": "provides", "object": "cloud computing services"},
@@ -71,16 +80,18 @@ Output:
 """
 
 # neo4j
-NEO4J_URI = "neo4j+s://9e90598a.databases.neo4j.io"
-NEO4J_USERNAME = "neo4j"
-NEO4J_PASSWORD = "Jdu5IQ0F8FbYRfs6qHA7gdXhtnOHqfUNqVumVx7cBpE"
-NEO4J_DATABASE = "neo4j"
-
-# Create a Neo4j driver instance to manage connections and execute Cypher queries using sessions.
-driver = GraphDatabase.driver(
-    NEO4J_URI,
-    auth=(NEO4J_USERNAME, NEO4J_PASSWORD),
-)
+try:
+    if settings.neo4j_driver is None:
+        driver = GraphDatabase.driver(
+            settings.NEO4J_URI,
+            auth=(settings.NEO4J_USER, settings.NEO4J_PASSWORD),
+        )
+    else:
+        driver = settings.neo4j_driver
+except Exception as e:
+    if settings.socket_con:
+        settings.socket_con.send_error(f"Error connecting to Neo4j database: {e}")
+    raise RuntimeError(f"Failed to connect to Neo4j database: {e}")
 
 GEMINI_CLI_PATH = "C:\\Users\\pirat\\AppData\\Roaming\\npm\\gemini.cmd"
 SUBPROCESS_TIMEOUT = 120  # 2 minutes timeout per request
@@ -103,7 +114,7 @@ async def prompt_gemini_for_triples_cli(chunk: Document) -> dict[str, Document |
         # Use structured data prompt
         schema_headers = chunk.metadata.get('schema', [])
         record_data = chunk.metadata.get('structured_data', {})
-        prompt = create_structured_prompt(schema_headers, record_data)
+        prompt=Prompt.create_structured_prompt(schema_headers, record_data)
     else:
         # Use original unstructured text prompt
         prompt = SYSTEM_PROMPT_GENERATE_TRIPLE_ENHANCED + f"""\n
@@ -125,6 +136,7 @@ async def prompt_gemini_for_triples_cli(chunk: Document) -> dict[str, Document |
     )
 
     try:
+        prompt = f"{prompt[0] + "\n" + prompt[1]}"  # Unpack the tuple if needed
         stdout, stderr = await asyncio.wait_for(
             process.communicate(input=prompt.encode("utf-8")),
             timeout=SUBPROCESS_TIMEOUT
@@ -138,7 +150,8 @@ async def prompt_gemini_for_triples_cli(chunk: Document) -> dict[str, Document |
     except asyncio.TimeoutError:
         process.kill()
         stdout, stderr = await process.communicate()
-        raise FileNotFoundError(f"Gemini CLI call timed out after {SUBPROCESS_TIMEOUT} seconds, error:-{stderr.decode('utf-8')}")
+        raise FileNotFoundError(
+            f"Gemini CLI call timed out after {SUBPROCESS_TIMEOUT} seconds, error:-{stderr.decode('utf-8')}")
 
     triples = None
     try:
@@ -209,7 +222,7 @@ async def prompt_gemini_for_triples_api(chunk: Document) -> None | dict[str, Doc
         # Use structured data prompt
         schema_headers = chunk.metadata.get('schema', [])
         record_data = chunk.metadata.get('structured_data', {})
-        prompt = create_structured_prompt(schema_headers, record_data)
+        prompt = Prompt.create_structured_prompt(schema_headers, record_data)
     else:
         # Use original unstructured text prompt
         prompt = SYSTEM_PROMPT_GENERATE_TRIPLE_ENHANCED + f"""\n
@@ -273,6 +286,98 @@ async def prompt_gemini_for_triples_api(chunk: Document) -> None | dict[str, Doc
             return {"chunk": chunk, "triples": []}
 
 
+async def prompt_openai_for_triples(chunk: Document) -> dict[str, Document | list[Any]] | dict[str, Document | str]:
+    """
+    🔧 FIXED: Enhanced async version with proper response type handling and reasoning content suppression
+    """
+    from src.utils.model_manager import ModelManager
+    
+    # 🔧 FIX 1: Initialize system prompt with global default value FIRST
+    # This ensures the variable is always defined regardless of code path
+    system_prompt = SYSTEM_PROMPT_GENERATE_TRIPLE_ENHANCED
+    user_prompt = ""
+    
+    is_structured = chunk.metadata.get("source") == "google_sheets" if hasattr(chunk, 'metadata') else False
+    
+    if is_structured and hasattr(chunk, 'metadata') and 'structured_data' in chunk.metadata:
+        # Use structured data prompt
+        schema_headers = chunk.metadata.get('schema', [])
+        record_data = chunk.metadata.get('structured_data', {})
+        prompt_tuple = Prompt.create_structured_prompt(schema_headers, record_data)
+        
+        # 🔧 FIX 2: Handle tuple structure properly
+        system_prompt = prompt_tuple[0]  # Structured system prompt
+        user_prompt = prompt_tuple[1]    # Structured user prompt
+    else:
+        # Use enhanced system prompt with reasoning suppression
+        # 🔧 FIX 3: Keep system prompt as global, create user prompt for unstructured data
+        user_prompt = f"""
+        **Your Task:**
+        Extract clear, factual relationships between entities in the text below.
+        Focus on concrete entities (people, companies, products, technologies) and their connections.
+        MOST IMPORTANT INSTRUCTIONS: ***Do not include any reasoning or explanation text in your response.
+                                        RESPOND WITH VALID JSON ARRAY OF TRIPLES AS MENTIONED***
+        **Text to Analyze:**      
+        {chunk.page_content}    
+        """
+
+    try:
+        # 🔧 FIX 4: Use properly scoped variables
+        client = OpenAIIntegration()
+        response = await client.generate_text_async(messages=[
+            {'role': 'system', 'content': system_prompt},
+            {'role': 'user', 'content': user_prompt}
+        ])
+
+        if not response or response.strip() == "" or response.strip() == "[]":
+            if settings.socket_con:
+                settings.socket_con.send_error("[WARNING] No response or empty response from OpenAI API.")
+            return {"chunk": chunk, "triples": []}
+
+        # 🔧 FIX: Handle different response types properly with priority-based extraction
+        parsed_response = ModelManager.convert_to_json(response)
+        
+        # Check if convert_to_json already returned a list/dict (no need for additional JSON parsing)
+        if isinstance(parsed_response, list):
+            # Response is already a list of triples
+            return {"chunk": chunk, "triples": parsed_response}
+        elif isinstance(parsed_response, dict):
+            # Response is a dict, check if it contains triples or is wrapped content
+            if 'content' in parsed_response and isinstance(parsed_response['content'], str):
+                # This is wrapped content from fallback, try to extract JSON
+                try:
+                    content_json = json.loads(parsed_response['content'])
+                    if isinstance(content_json, list):
+                        return {"chunk": chunk, "triples": content_json}
+                except json.JSONDecodeError:
+                    # Try to extract JSON array from the content string
+                    content_str = parsed_response['content']
+                    json_start = content_str.find("[")
+                    json_end = content_str.rfind("]") + 1
+                    if json_start != -1 and json_end > json_start:
+                        try:
+                            json_part = content_str[json_start:json_end]
+                            extracted_json = json.loads(json_part)
+                            if isinstance(extracted_json, list):
+                                return {"chunk": chunk, "triples": extracted_json}
+                        except json.JSONDecodeError:
+                            pass
+                return {"chunk": chunk, "triples": []}
+            else:
+                # Response is a dict that might be a single triple or error
+                return {"chunk": chunk, "triples": [parsed_response] if parsed_response else []}
+        else:
+            # Response is still a string, should not happen with convert_to_json but handle it
+            if settings.socket_con:
+                settings.socket_con.send_error(f"[WARNING] Unexpected response type from convert_to_json: {type(parsed_response)}")
+            return {"chunk": chunk, "triples": []}
+
+    except Exception as api_error:
+        if settings.socket_con:
+            settings.socket_con.send_error(f"[ERROR] OpenAI API call failed: {api_error}")
+        return {"chunk": chunk, "triples": [], "error": str(api_error)}
+
+
 def prompt_local_llm_for_triples(chunk: Document) -> list:
     """
     Existing function - no changes needed for this issue.
@@ -291,7 +396,7 @@ def prompt_local_llm_for_triples(chunk: Document) -> list:
         Focus on concrete entities (people, companies, products, technologies) and their connections.
         
         **Text to Analyze:**
-        \"\"\"{chunk.page_content}\"\"\"
+        \"\"\"{chunk.page_content}\"""
         
         **Output Format:**
         Return a JSON array where each relationship is represented as:
@@ -341,8 +446,14 @@ def clear_database():
     This function connects to the Neo4j database and runs a Cypher query to remove every node and relationship,
     effectively resetting the database to an empty state.
     """
-    with driver.session() as session:
-        session.run("MATCH (n) DETACH DELETE n")
+    try:
+        with settings.neo4j_driver.session() as session:
+            session.run("MATCH (n) DETACH DELETE n")
+    except Exception as e:
+        if settings.socket_con:
+            settings.socket_con.send_error(f"Error clearing Neo4j database: {e}")
+        else:
+            print(f"Error clearing Neo4j database: {e}")
     print("Database cleared successfully.")
 
 

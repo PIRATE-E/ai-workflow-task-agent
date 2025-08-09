@@ -44,9 +44,7 @@ def classify_message_type(state) -> dict:
         history_parts.append(f"{msg.type}: {msg.content}")
     history = "\n".join(history_parts)
 
-    llm = ModelManager(model=settings.CLASSIFIER_MODEL, temperature=0.5, format="json")
-
-    classified_llm = llm.with_structured_output(message_classifier)
+    llm = ModelManager(model=settings.GPT_MODEL, temperature=0.5)
 
     system_prompt = F"""You are an intelligent conversation analyzer that understands context and user intent.
 
@@ -84,10 +82,31 @@ def classify_message_type(state) -> dict:
 
 **Key Insight:** If the user is asking about or referencing something already discussed or provided in the conversation, they likely want explanation/reasoning (llm), not new information (tool).
 
+**IMPORTANT:** Respond with valid JSON in this exact format:
+{{"message_type": "llm", "reasoning": "Your reasoning here"}}
+OR
+{{"message_type": "tool", "reasoning": "Your reasoning here"}}
+
 Classify thoughtfully based on true user intent, not just keywords."""
-    result = classified_llm.invoke([
+    
+    response = llm.invoke([
         settings.HumanMessage(content=system_prompt),
         settings.HumanMessage(content=content)
     ])
+    
+    # Use the new JSON conversion method
+    result_json = ModelManager.convert_to_json(response)
+    
+    # Create message_classifier object from JSON
+    from dataclasses import dataclass
+    @dataclass
+    class MessageClassifier:
+        message_type: str
+        reasoning: str = ""
+    
+    result = MessageClassifier(
+        message_type=result_json.get("message_type", "llm"),
+        reasoning=result_json.get("reasoning", "")
+    )
     console.print(f"[u][red]Message classified as[/u][/red]: {result.message_type}")
     return {"message_type": result.message_type}

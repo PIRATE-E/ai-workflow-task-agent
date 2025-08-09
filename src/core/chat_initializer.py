@@ -3,6 +3,8 @@ import json
 import platform
 from threading import Thread
 
+from neo4j import GraphDatabase
+
 from src.config import settings
 from langgraph.graph.state import CompiledStateGraph
 from rich import console, prompt, inspect
@@ -12,6 +14,8 @@ from src.models.state import StateAccessor, State
 from src.ui.print_message_style import print_message
 from src.utils.socket_manager import SocketManager
 
+# mcp servers integration
+from src.tools.lggraph_tools.wrappers.mcp_wrapper.filesystem_wrapper import FileSystemWrapper
 
 class ChatInitializer:
     def __init__(self):
@@ -25,6 +29,10 @@ class ChatInitializer:
         self.state_accessor = StateAccessor()
         self.graph = None  # graph.compile() will be called later
         self.tools = None
+
+        # mcp servers integration
+        self.initialize_mcp_servers()
+        self.initialize_neo4j()
 
 
     def _set_core_classes(self):
@@ -107,6 +115,40 @@ class ChatInitializer:
             os.startfile(path)
         return self
 
+    def initialize_mcp_servers(self):
+        """
+        Initialize MCP servers if they are not already running.
+        This method can be extended to initialize any required MCP servers.
+        """
+        from src.mcp.manager import MCP_Manager
+        # Add and start MCP servers if needed with allowed path of AI_llm folder
+        MCP_Manager.add_server("filesystem", "npx", "@modelcontextprotocol/server-filesystem", [f"{settings.BASE_DIR.parent}"], FileSystemWrapper)
+
+        # Start all servers
+        for server in MCP_Manager.mcp_servers:
+            if not MCP_Manager.start_server(server):
+                self.console.print(f"[bold red]Failed to start MCP server: {server}[/bold red]")
+            else:
+                self.console.print(f"[bold green]MCP server '{server}' started successfully.[/bold green]")
+
+    def initialize_neo4j(self):
+        """
+        Initialize Neo4j connection if not already initialized.
+        This method can be extended to initialize any required Neo4j settings.
+        """
+        try:
+            settings.neo4j_driver = GraphDatabase.driver(
+                settings.NEO4J_URI,
+                auth=(settings.NEO4J_USER, settings.NEO4J_PASSWORD),
+            )
+            if settings.neo4j_driver is None:
+                raise RuntimeError("Failed to create Neo4j driver. Please check your NEO4J_URI, NEO4J_USER, and NEO4J_PASSWORD settings.")
+            settings.socket_con.send_error("[LOG]Neo4j connection initialized successfully.")
+        except Exception as e:
+            if settings.socket_con:
+                settings.socket_con.send_error(f"Error connecting to Neo4j database: {e}")
+            raise RuntimeError(f"Failed to connect to Neo4j database: {e}")
+
     def tools_register(self):
         """
         Register tools for the chat application.
@@ -116,10 +158,12 @@ class ChatInitializer:
         from src.tools.lggraph_tools.wrappers.google_wrapper import GoogleSearchToolWrapper
         from src.tools.lggraph_tools.wrappers.translate_wrapper import TranslateToolWrapper
         from src.tools.lggraph_tools.wrappers.rag_search_classifier_wrapper import RagSearchClassifierWrapper
-        from src.tools.lggraph_tools.wrappers.mcp_wrapper.filesystem_wrapper import FileSystemWrapper
         # schema
         from src.tools.lggraph_tools.tool_schemas.tools_structured_classes import google_search, rag_search_message, \
-            TranslationMessage, mcp_tool_filesystem
+            TranslationMessage
+
+        # dynamically register tools
+        from src.mcp.dynamically_tool_register import DynamicToolRegister
         tools = [
             # google search tool assigning
             ToolAssign(func=GoogleSearchToolWrapper,
@@ -136,11 +180,13 @@ class ChatInitializer:
                        name="Translatetool",
                        description="For translating messages into different languages.",
                        args_schema=TranslationMessage, ),
-            ToolAssign(func=FileSystemWrapper,
-                       name="FileSystemTool",
-                       description="For performing file system operations (read, write, delete).",
-                       args_schema=mcp_tool_filesystem)
+            # ToolAssign(func=FileSystemWrapper,
+            #            name="FileSystemTool",
+            #            description="For performing file system operations (read, write, delete).",
+            #            args_schema=mcp_tool_filesystem)
         ]
+        tools.extend(DynamicToolRegister.tool_list)  # Add dynamically registered tools
+        # log the tools for debugging
         ToolAssign.set_tools_list(tools)
         self.tools = ToolAssign.get_tools_list()
         return self

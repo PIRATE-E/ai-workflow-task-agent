@@ -61,20 +61,32 @@ def retrieve_knowledge_graph(query: str) -> str:
         try:
             llm = ModelManager(
                 model=model_name,
-                temperature=temperature,
-                format="json"
+                temperature=temperature
             )
-            result = llm.invoke([settings.HumanMessage(content=SYSTEM_PROMPT_CYPHER_GENERATION)])
+            
+            # Add JSON format instruction to the prompt
+            enhanced_prompt = """
+
+**IMPORTANT:** Respond with valid JSON in this exact format:
+{
+    "cypher_query": "MATCH (n) RETURN n LIMIT 10",
+    "reasoning": "Your reasoning for this cypher query"
+}"""
+            
+            result = llm.invoke([settings.HumanMessage(content=SYSTEM_PROMPT_CYPHER_GENERATION)] + [settings.HumanMessage(content=enhanced_prompt)])
             # ✅ FIX 1: Use correct method name
             ToolResponseManager().set_response_base([result])
-            return result.content
+            
+            # Use the new JSON conversion method
+            json_result = ModelManager.convert_to_json(result)
+            return json.dumps(json_result)  # Return as JSON string for compatibility
         except Exception as e:
             if settings.socket_con:
                 settings.socket_con.send_error(f"[ERROR] Failed to invoke model {model_name}: {e}")
             return None
 
     # ✅ FIX 2: Actually call the function to generate cypher
-    cypher_content = try_generate_cypher(settings.CLASSIFIER_MODEL)
+    cypher_content = try_generate_cypher(settings.GPT_MODEL)
     
     # ✅ FIX 3: Add proper null checking and error handling
     try:
@@ -118,17 +130,26 @@ def retrieve_knowledge_graph(query: str) -> str:
         settings.socket_con.send_error(f"[LOG] TRIPLES TEXT: {triples_text}")
 
     # Create a comprehensive, user-friendly explanation prompt (HYBRID APPROACH)
-    explanation_prompt = src.prompts.rag_search_classifier_prompts.Prompts.get_system_prompt_classifier(StateAccessor, triples_text, query)
+    from src.prompts.rag_search_classifier_prompts import Prompts
+    explanation_prompt = f"""
+    **What the user asked:** "{StateAccessor().get_last_message()}
+    **What we searched for:** "{query}"
+    
+    **Here's the information I found from our knowledge base:**
+    {triples_text}
+    **Now, please explain this information in a natural, conversational way:**
+    """
 
     # Use a conversational LLM for natural language responses
     explanation_llm = ModelManager(
-        model=settings.CLASSIFIER_MODEL,
+        model=settings.GPT_MODEL,
         temperature=0.7,  # Slightly higher for more natural responses
         # No format specified - allows natural language output
     )
 
     with console.status("[bold green]Generating explanation...[/bold green]", spinner="dots"):
-        explanation_result = explanation_llm.invoke([settings.HumanMessage(content=explanation_prompt)])
+        explanation_result = explanation_llm.invoke([settings.HumanMessage(content=Prompts.get_system_prompt_classifier()),
+                                                     settings.HumanMessage(content=explanation_prompt)])
 
     # Clean up the response and return just the explanation
     explanation = explanation_result.content.strip()
@@ -179,7 +200,7 @@ def rag_search_classifier_tool(query: str) -> str:
        - Narrative information: stories, procedures, descriptions
        - Unstructured text content
 
-    **Smart Decision Making:**
+    **Decision Making:**
     - If the user previously mentioned a specific RAG type, respect their preference
     - Consider the document structure - does it contain entities and relationships, or is it narrative text?
     - Think about what would give the user the most useful answer
@@ -209,9 +230,8 @@ def rag_search_classifier_tool(query: str) -> str:
 """
 
     llm = ModelManager(
-        model=settings.CLASSIFIER_MODEL,
+        model=settings.GPT_MODEL,
         temperature=0.7,
-        format="json",
     )
     prompt_list = [settings.HumanMessage(content=system_prompt),
                    settings.HumanMessage(content=prompt)]
@@ -224,13 +244,14 @@ def rag_search_classifier_tool(query: str) -> str:
         if not llm_response or not llm_response.content:
             return "[ERROR] LLM returned empty response. Please try again."
         
-        response_json = json.loads(llm_response.content)
+        # Use the new JSON conversion method
+        response_json = ModelManager.convert_to_json(llm_response)
         
         # ✅ VALIDATE JSON STRUCTURE
         if not isinstance(response_json, dict):
             return f"[ERROR] LLM response is not a valid JSON object: {llm_response.content}"
             
-    except json.JSONDecodeError as e:
+    except Exception as e:
         return f"[ERROR] Failed to parse LLM response as JSON: {llm_response.content}. Error: {str(e)}"
 
     selected_rag_type = response_json.get("selected_rag_type")
@@ -246,7 +267,7 @@ def rag_search_classifier_tool(query: str) -> str:
         if Prompt.ask("LLm selected knowledge graph RAG type", choices=["yes", "no"], default="no") == "no":
             exit()
         # clear the knowledge graph and save the new one
-        rag.save_knowledge_graph_gemini_api(file_path)
+        rag.save_knowledge_graph_open_ai(file_path)
         result = retrieve_knowledge_graph(query)
         return f"Knowledge Graph Search Results for '{query}':\n\n{result}"
     elif selected_rag_type == "text":

@@ -1,4 +1,4 @@
-from langchain_core.messages import HumanMessage, AIMessage
+﻿from langchain_core.messages import HumanMessage, AIMessage
 
 from src.config import settings
 from src.tools.lggraph_tools.tool_assign import ToolAssign
@@ -20,14 +20,12 @@ def generate_llm_response(state) -> dict:
     )
     latest_message_content = messages[-1].content if messages else ""
 
-
     tools = ToolAssign.get_tools_list()
 
     tools_context = "\n\n".join([
         f"Tool: {tool.name}\nDescription: {tool.description}"
         for tool in tools
     ]) if tools else "No tools available."
-
 
     system_prompt = (
         "You are an intelligent AI assistant with deep reasoning capabilities and full conversation awareness.\n\n"
@@ -65,7 +63,7 @@ def generate_llm_response(state) -> dict:
         "Think about what the user really wants to know, considering everything we've discussed together."
     )
     messages_with_system_prompt = [HumanMessage(content=system_prompt)]
-    llm = ModelManager(model=settings.DEFAULT_MODEL, temperature=0.7, format="json")
+    llm = ModelManager(model=settings.GPT_MODEL, temperature=0.7, format="json")
 
     with console.status("[bold green]Thinking...[/bold green]", spinner="dots"):
         stream = llm.stream(messages_with_system_prompt)
@@ -74,5 +72,5 @@ def generate_llm_response(state) -> dict:
             chunk = part.content if part.content is not None else ""
             content += chunk
     # Print AI message in modern style
-    print_message(content, sender="ai")
-    return {"messages": [AIMessage(content=content)]}
+    print_message(content.strip(), sender="ai")
+    return {"messages": [AIMessage(content=content.strip())]}
