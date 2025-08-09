@@ -3,8 +3,13 @@ import os
 import signal
 import socket
 import sys
+from pathlib import Path
 
 import winsound
+
+# Add project root to Python path
+project_root = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(project_root))
 
 from src.config import settings
 
@@ -24,7 +29,7 @@ class SocketCon:
             # Send the error message
             else:
                 # print("Sending error message: ", error_message, flush=True, file=sys.stderr)
-                winsound.Beep(7933, 500)  # Beep sound for error notification
+                # winsound.Beep(7933, 500)  # Beep sound for error notification
                 self.client_socket.sendall(error_message.encode('utf-8'))
             # self.client_socket.sendall(error_message.encode('utf-8'))
         except socket.error as e:
@@ -80,7 +85,7 @@ def signal_handler(signum, frame):
 
 def cleanup_lock_file():
     """Remove lock file on exit"""
-    lock_file = os.path.join(os.path.dirname(__file__), '..', '..', 'basic_logs', 'server.lock')
+    lock_file = settings.BASE_DIR / 'basic_logs' / 'server.lock'
     try:
         if os.path.exists(lock_file):
             os.remove(lock_file)
@@ -171,6 +176,7 @@ if __name__ == '__main__':
                             print("No data received, closing connection.", flush=True, file=sys.stderr)
                             break  # Client disconnected or error occurred
                         print(f"{received_error}", flush=True, file=sys.stderr)
+                        winsound.Beep(7933, 500)  # Beep sound for error notification
                     listening = False  # Exit the loop after handling the connection
                 finally:
                     client_socket.close()

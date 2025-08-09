@@ -14,7 +14,7 @@ from langchain_core.documents import Document
 # ✅ LOCAL IMPORTS (lightweight)
 from src.RAG.RAG_FILES import neo4j_rag
 from src.config import settings
-from src.utils.socket_manager import SocketManager
+from src.utils.model_manager import ModelManager
 
 
 # ✅ LAZY LOADING: Heavy imports moved to function level
@@ -92,9 +92,29 @@ def split_into_unique_chunks(documents: list, chunking_size: int, remove_duplica
         print(f"DEBUG: First document metadata: {documents[0].metadata}")
         print(f"DEBUG: data_type exists: {'data_type' in documents[0].metadata}")
         print(f"DEBUG: data_type value: '{documents[0].metadata.get('data_type')}'")
+
+        # Check if this is structured data that shouldn't be chunked
+        if documents[0].metadata.get('data_type') == 'structured_spreadsheet':
+            print("Structured data detected - returning documents without chunking")
+            return documents
+
+    # If chunking_size is 0 or negative, return original documents
+    if chunking_size <= 0:
+        print("Invalid chunking size - returning original documents")
         return documents
+
+    # Calculate total content length for validation
+    total_content_length = sum(len(doc.page_content) for doc in documents)
+    print(f"DEBUG: Total content length: {total_content_length}, Chunking size: {chunking_size}")
+
+    # If chunking size is larger than total content, return original documents
+    if chunking_size >= total_content_length:
+        print("Chunking size larger than content - returning original documents")
+        return documents
+
     splitter = RecursiveCharacterTextSplitter(
-        chunk_size=chunking_size, chunk_overlap=chunking_size // 10
+        chunk_size=chunking_size,
+        chunk_overlap=max(50, chunking_size // 10)  # Ensure minimum overlap
     )
     doc_splits = splitter.split_documents(documents)
 
@@ -108,8 +128,9 @@ def split_into_unique_chunks(documents: list, chunking_size: int, remove_duplica
     duplicate_count = 0
 
     for doc in doc_splits:
-        if doc.page_content not in seen:
-            seen.add(doc.page_content)
+        content_hash = doc.page_content.strip()
+        if content_hash not in seen and len(content_hash) > 10:  # Ignore very short chunks
+            seen.add(content_hash)
             unique_chunks.append(doc)
         else:
             duplicate_count += 1
@@ -140,7 +161,7 @@ def find_similar_documents(query: str, file_path: str) -> list:
         from langchain_ollama import OllamaEmbeddings
     except ImportError as e:
         raise ImportError(f"Required libraries not installed for vector search: {e}")
-    
+
     documents = load_pdf_document(file_path)
     chunks = split_into_unique_chunks(documents)
     vector_store = Chroma.from_documents(
@@ -170,7 +191,7 @@ def get_genai_embedding(texts: list[str], task: str = "RETRIEVAL_QUERY") -> list
         import google.generativeai as genai
     except ImportError as e:
         raise ImportError(f"Google Generative AI library not installed: {e}")
-    
+
     dotenv.load_dotenv()
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
@@ -197,7 +218,7 @@ def search_similar_chunks_genai(query: str, chunks: list[Document], top_k=5) -> 
         from torch import cosine_similarity
     except ImportError as e:
         raise ImportError(f"PyTorch not installed. Required for similarity search: {e}")
-    
+
     chunks = [doc.page_content for doc in chunks]  # Extract text content from Document objects
     query_embedding = get_genai_embedding([query], task="RETRIEVAL_QUERY")
     chunk_embeddings = get_genai_embedding(chunks, task="RETRIEVAL_DOCUMENT")
@@ -239,7 +260,8 @@ async def save_knowledge_graph_local_llm(file_path: str):
     # Ask user if they want to keep duplicates for better coverage
     keep_duplicates = _get_user_input("Keep duplicate chunks for better coverage? (y/n)", default="n") == "y"
 
-    chunks = split_into_unique_chunks([Document(page_content=all_text_doc.strip())], chunking_size, remove_duplicates=not keep_duplicates)
+    chunks = split_into_unique_chunks([Document(page_content=all_text_doc.strip())], chunking_size,
+                                      remove_duplicates=not keep_duplicates)
     print(f"📊 Final chunk count for processing: {len(chunks)}")
     print(f"Total processed chunks: {len(processed_chunks)}")
     if _get_user_input(f"do you want to over write the processed chunks? (y/n)", default="n") == "y":
@@ -254,7 +276,7 @@ async def save_knowledge_graph_local_llm(file_path: str):
     except ImportError:
         # Fallback to simple iteration if rich not available
         rich = None
-    
+
     chunks_iter = rich.progress.track(chunks) if rich else chunks
     for chunk in chunks_iter:
         if not hashlib.sha256(chunk.page_content.encode()).hexdigest() in processed_chunks:
@@ -313,12 +335,19 @@ def save_knowledge_graph_gemini_cli(file_path: str):
         # Ask user if they want to keep duplicates for better coverage
         keep_duplicates = _get_user_input("Keep duplicate chunks for better coverage? (y/n)", default="n") == "y"
 
-        chunks = split_into_unique_chunks([Document(page_content=all_text_doc.strip())], chunking_size, remove_duplicates=not keep_duplicates)
+        chunks = split_into_unique_chunks([Document(page_content=all_text_doc.strip())], chunking_size,
+                                          remove_duplicates=not keep_duplicates)
         print(f"📊 Final chunk count for processing: {len(chunks)}")
 
         # remove the processed chunks from the chunks list (this is unique chunk that has to be processed)
         chunks_to_process = [chunk for chunk in chunks if
                              hashlib.sha256(chunk.page_content.encode()).hexdigest() not in processed_chunks]
+
+        if len(chunks) != len(chunks_to_process):
+            print(f"📊 {len(chunks) - len(chunks_to_process)} chunks already processed, skipping them.")
+            # if the chunks are not processed then we will clear the database
+            print("All chunks processed")
+            neo4j_rag.clear_database()
 
     print(f"Total processed chunks: {len(processed_chunks)}")
     if _get_user_input("Do you want to overwrite the processed chunks? (y/n)", default="n") == "y":
@@ -327,7 +356,7 @@ def save_knowledge_graph_gemini_cli(file_path: str):
         with open(settings.DEFAULT_RAG_FILES_PROCESSED_TRIPLES_PATH, "w") as file:
             file.write("[]")
 
-    asyncio.run(process_chunks_with_immediate_saving(chunks_to_process, neo4j_rag.prompt_gemini_for_triples_cli))
+        asyncio.run(process_chunks_with_immediate_saving(chunks_to_process, neo4j_rag.prompt_gemini_for_triples_cli))
 
 
 async def process_chunks_with_immediate_saving(chunks_to_process: list[Document],
@@ -338,14 +367,16 @@ async def process_chunks_with_immediate_saving(chunks_to_process: list[Document]
     print(f"\n🚀 CHUNK PROCESSING STARTED")
     print(f"📊 Chunks to process: {len(chunks_to_process)}")
     print(f"🔧 Using function: {function.__name__}")
-    print(f"⚡ Max concurrent tasks: {settings.SEMAPHORE_API if function == neo4j_rag.prompt_gemini_for_triples_api else settings.SEMAPHORE_CLI}")
+    print(
+        f"⚡ Max concurrent tasks: {settings.SEMAPHORE_API if function == neo4j_rag.prompt_gemini_for_triples_api else settings.SEMAPHORE_CLI}")
     print("-" * 50)
 
     # Create semaphore with correct limit of 10
     lock = asyncio.Lock()
     active_task = 0
     # --------- FIXED: Enhanced semaphore with better resource management ---------
-    semaphore = (Semaphore(settings.SEMAPHORE_API if function == neo4j_rag.prompt_gemini_for_triples_api else settings.SEMAPHORE_CLI))  # Set limit based on function  # Reduced from 5 to 3 for better stability
+    semaphore = (Semaphore(
+        settings.SEMAPHORE_API if function == neo4j_rag.prompt_gemini_for_triples_api else settings.SEMAPHORE_CLI))  # Set limit based on function  # Reduced from 5 to 3 for better stability
 
     async def using_semaphore(chunk: Document):
         """Process a single chunk within semaphore limit"""
@@ -411,8 +442,9 @@ async def process_chunks_with_immediate_saving(chunks_to_process: list[Document]
 
     # save triples to Neo4j immediately (this is taking long time going to it async in future)
     if len(saved_results) == len(chunks_to_process):
-        print("All chunks processed, saving triples to Neo4j database...")
-        neo4j_rag.clear_database()
+        # we are not clearing the database here, because even though chunks are got no change this use to run every time
+        # print("All chunks processed, saving triples to Neo4j database...")
+        # neo4j_rag.clear_database()
         for triples in get_all_triples_from_file():
             subject = triples.get("subject") or triples.get("Subject")
             predicate = (
@@ -426,7 +458,7 @@ async def process_chunks_with_immediate_saving(chunks_to_process: list[Document]
                 except Exception as e:
                     if settings.socket_con:
                         settings.socket_con.send_error(f"❌ Error inserting triples to Neo4j:"
-                                              f" {e} \n subject: {subject}, predicate: {predicate}, object: {object_val}")
+                                                       f" {e} \n subject: {subject}, predicate: {predicate}, object: {object_val}")
                     else:
                         print(f"❌ Error inserting triples to Neo4j:"
                               f" {e} \n subject: {subject}, predicate: {predicate}, object: {object_val}")
@@ -445,7 +477,6 @@ def save_knowledge_graph_gemini_api(filepath: str):
     print(f"Total words: {sum(len(doc.page_content.split()) for doc in documents)}")
     print(f"Total characters: {sum(len(doc.page_content.strip()) for doc in documents)}")
     print(f"recommended chunk size: {len(documents)}")
-    print(f"processed chunks: {len(processed_chunks)}")
 
     if documents[0].metadata.get("data_type") == "structured_spreadsheet":
         print("Structured spreadsheet data detected. Please use the structured processing function.")
@@ -464,12 +495,20 @@ def save_knowledge_graph_gemini_api(filepath: str):
         # Ask user if they want to keep duplicates for better coverage
         keep_duplicates = _get_user_input("Keep duplicate chunks for better coverage? (y/n)", default="n") == "y"
 
-        chunks = split_into_unique_chunks([Document(page_content=all_text_doc.strip())], chunking_size, remove_duplicates=not keep_duplicates)
+        chunks = split_into_unique_chunks([Document(page_content=all_text_doc.strip())], chunking_size,
+                                          remove_duplicates=not keep_duplicates)
         print(f"📊 Final chunk count for processing: {len(chunks)}")
 
         # remove the processed chunks from the chunks list (this is unique chunk that has to be processed)
         chunks_to_process = [chunk for chunk in chunks if
                              hashlib.sha256(chunk.page_content.encode()).hexdigest() not in processed_chunks]
+
+        if len(chunks) != len(chunks_to_process):
+            print(f"📊 {len(chunks) - len(chunks_to_process)} chunks already processed, skipping them.")
+            # if the chunks are not processed then we will clear the database
+            print("All chunks processed")
+            neo4j_rag.clear_database()
+
     print(f"Total processed chunks: {len(processed_chunks)}")
     # # Ask user if they want to overwrite the processed chunks if they have already processed the chunks
     if _get_user_input("Do you want to overwrite the processed chunks? (y/n)", default="n") == "y":
@@ -477,23 +516,70 @@ def save_knowledge_graph_gemini_api(filepath: str):
             file.write("")
         with open(settings.DEFAULT_RAG_FILES_PROCESSED_TRIPLES_PATH, "w") as file:
             file.write("[]")
-        process_chunks = True
-    else:
-        if len(chunks_to_process) == 0:
-            print("All chunks have already been processed. No new chunks to process.")
-            process_chunks = False
-        else:
-            print("Keeping existing processed chunks. Only new chunks will be processed.")
-            process_chunks = True
 
-    if process_chunks and len(chunks_to_process) > 0:
-        asyncio.run(process_chunks_with_immediate_saving(chunks_to_process))
+        asyncio.run(process_chunks_with_immediate_saving(chunks_to_process, neo4j_rag.prompt_openai_for_triples))
+
+
+def save_knowledge_graph_open_ai(filepath: str):
+    """
+    Save the knowledge graph to the neo4j database using OpenAI API.
+    Get the triple, save it to the json file, then mark the chunk as processed.
+    If all the chunks are processed then save the knowledge graph to the neo4j database.
+    :param filepath: str: Path to the PDF file.
+    """
+    documents = load_pdf_document(filepath)
+    processed_chunks = get_processed_chunks()
+
+    print(f"Total words: {sum(len(doc.page_content.split()) for doc in documents)}")
+    print(f"Total characters: {sum(len(doc.page_content.strip()) for doc in documents)}")
+    print(f"recommended chunk size: {len(documents)}")
+
+    if documents[0].metadata.get("data_type") == "structured_spreadsheet":
+        print("Structured spreadsheet data detected. Please use the structured processing function.")
+        chunks_to_process = [chunk for chunk in documents if
+                             hashlib.sha256(chunk.page_content.encode()).hexdigest() not in processed_chunks]
     else:
-        if _get_user_input("if you still wanted to process the chunks, press y to continue or n to skip", default="n") == "y":
-            asyncio.run(process_chunks_with_immediate_saving(chunks_to_process))
-            return
-        if settings.socket_con:
-            settings.socket_con.send_error("Skipping database update since no new chunks were processed.")
+        # If the document is not structured, we can proceed with chunking
+        if _get_user_input("Do you want chunking? (y/n)", default="y") == "y":
+            no_of_chunks = int(_get_user_input("Enter how many chunks you want", default="10"))
+            # Calculate total characters across all documents
+            total_chars = sum(len(doc.page_content.strip()) for doc in documents)
+            chunking_size = total_chars // no_of_chunks
+
+            # Ensure minimum chunk size
+            min_chunk_size = 100  # Minimum 100 characters per chunk
+            if chunking_size < min_chunk_size:
+                chunking_size = min_chunk_size
+                actual_chunks = total_chars // chunking_size
+                print(f"Adjusted to {actual_chunks} chunks due to minimum size requirement")
+        else:
+            # No chunking - calculate total size for validation
+            chunking_size = sum(len(doc.page_content.strip()) for doc in documents)
+
+        # Ask user if they want to keep duplicates for better coverage
+        keep_duplicates = _get_user_input("Keep duplicate chunks for better coverage? (y/n)", default="n") == "y"
+
+        # FIXED: Pass original documents instead of concatenated string
+        chunks = split_into_unique_chunks(documents, chunking_size, remove_duplicates=not keep_duplicates)
+        print(f"📊 Final chunk count for processing: {len(chunks)}")
+
+        # remove the processed chunks from the chunks list (this is unique chunk that has to be processed)
+        chunks_to_process = [chunk for chunk in chunks if
+                             hashlib.sha256(chunk.page_content.encode()).hexdigest() not in processed_chunks]
+        if len(chunks) != len(chunks_to_process):
+            print(f"📊 {len(chunks) - len(chunks_to_process)} chunks already processed, skipping them.")
+            # if the chunks are not processed then we will clear the database
+            print("All chunks processed")
+            neo4j_rag.clear_database()
+
+    print(f"Total processed chunks: {len(processed_chunks)}")
+    if _get_user_input("Do you want to overwrite the processed chunks? (y/n)", default="n") == "y":
+        with open(settings.DEFAULT_RAG_FILES_HASH_TXT_PATH, "w") as file:
+            file.write("")
+        with open(settings.DEFAULT_RAG_FILES_PROCESSED_TRIPLES_PATH, "w") as file:
+            file.write("[]")
+        asyncio.run(process_chunks_with_immediate_saving(chunks_to_process, neo4j_rag.prompt_openai_for_triples))
+
 
 def extract_triples_process_query():
     """
@@ -573,12 +659,7 @@ def text_rag_search_using_llm(query: str, chunks: list[Document]) -> dict:
     :param chunks: List of Document objects representing the PDF content.
     """
     try:
-        # ✅ LAZY LOADING: Import ChatOllama only when this function is called
-        try:
-            from langchain_ollama import ChatOllama
-        except ImportError as e:
-            raise ImportError(f"Ollama library not installed: {e}")
-        
+
         similar = search_similar_chunks_genai(query, chunks)
         system_prompt = (
             "You are an intelligent document analysis assistant that helps users find and understand information from text documents.\n\n"
@@ -625,9 +706,7 @@ def text_rag_search_using_llm(query: str, chunks: list[Document]) -> dict:
                 + "\n".join([f"{i + 1} : {chunk.page_content}" for i, chunk in enumerate(similar)])
         )
 
-
-
-        llm = ChatOllama(model="llama3.1:8B", temperature=0.1, format="json")
+        llm = ModelManager(model=settings.GPT_MODEL)
         response = llm.invoke([settings.HumanMessage(content=system_prompt), prompt])
         result = json.loads(response.content)
         if "answer" not in result or "source_chunks" not in result:

@@ -61,7 +61,7 @@ class SocketManager:
             print(f"🚀 Starting log server subprocess: {error_transfer_path}")
 
             # Start the subprocess - choose method based on settings
-            log_display_mode = getattr(settings, 'LOG_DISPLAY_MODE', 'separate_window')
+            log_display_mode = settings.LOG_DISPLAY_MODE
 
             if log_display_mode == 'separate_window':
                 # Option 1: Separate console window (recommended)
@@ -254,7 +254,7 @@ class SocketManager:
         socket_con = self.get_socket_connection()
         if socket_con:
             try:
-                socket_con.send_error(message)
+                socket_con.send_error(message + "\n")
             except Exception as e:
                 print(f"Failed to send error through socket: {e}")
                 print(f"Original error message: {message}")

@@ -16,7 +16,6 @@ Author: PIRATE-E
 License: MIT
 """
 
-import requests
 from bs4 import BeautifulSoup
 
 
@@ -29,11 +28,82 @@ class GoogleSheetsRAG:
         self.headers = []
         self.structured_data = []
 
+    class LoadWebContent:
+        """Load web content from the provided Google Sheets URL"""
+
+        def __init__(self, sheets_url):
+            self.sheets_url = sheets_url
+
+        def load_web_content(self) -> str:
+            """Production-ready Google Sheets loading with multiple fallback strategies"""
+            from playwright.sync_api import sync_playwright
+
+            strategies = [
+                self._strategy_iframe_content,
+                self._strategy_direct_selectors,
+                self._strategy_basic_wait
+            ]
+
+            with sync_playwright() as p:
+                browser = p.chromium.launch(headless=True)
+                page = browser.new_page()
+
+                try:
+                    page.goto(self.sheets_url, timeout=30000)
+
+                    # Try each strategy until one succeeds
+                    for strategy in strategies:
+                        try:
+                            html_content = strategy(page)
+                            if self._validate_content(html_content):
+                                return html_content
+                        except Exception as e:
+                            print(f"Strategy failed: {strategy.__name__}: {e}")
+                            continue
+
+                    # If all strategies fail, return basic content
+                    return page.content()
+
+                finally:
+                    browser.close()
+
+        def _strategy_iframe_content(self, page):
+            """Strategy 1: Extract from iframe"""
+            iframe_element = page.wait_for_selector('iframe#pageswitcher-content', timeout=15000)
+            iframe = iframe_element.content_frame()
+            iframe.wait_for_selector('table td', timeout=15000)
+            return iframe.content()
+
+        def _strategy_direct_selectors(self, page):
+            """Strategy 2: Direct selector waiting"""
+            page.wait_for_selector('table td:not(:empty)', timeout=15000)
+            page.wait_for_load_state('networkidle', timeout=15000)
+            return page.content()
+
+        def _strategy_basic_wait(self, page):
+            """Strategy 3: Basic timeout fallback"""
+            page.wait_for_timeout(8000)
+            return page.content()
+
+        def _validate_content(self, html_content):
+            """Validate that HTML contains actual table data"""
+            from bs4 import BeautifulSoup
+            soup = BeautifulSoup(html_content, 'html.parser')
+            table = soup.find('table')
+            if not table:
+                return False
+
+            # Check for actual data (more than just headers)
+            rows = table.find_all('tr')
+            return len(rows) > 1 and any(td.get_text(strip=True) for row in rows for td in row.find_all('td'))
+
     def _parse_html_table(self):
         """Enhanced parsing with schema awareness and structured data preservation"""
-        response = requests.get(self.sheets_url, timeout=5)
-        response.raise_for_status()
-        soup = BeautifulSoup(response.text, 'html.parser')
+
+        html = GoogleSheetsRAG.LoadWebContent(self.sheets_url).load_web_content()
+        if not html:
+            raise ValueError("Failed to load content from the provided Google Sheets URL.")
+        soup = BeautifulSoup(html, 'html.parser')
         table = soup.find('table')
         if not table:
             raise ValueError("No table found in the provided Google Sheets URL.")
@@ -188,6 +258,6 @@ if __name__ == '__main__':
     url = 'https://docs.google.com/spreadsheets/d/1OOfUsC8sQmXNiHs2NQR03Tq6qVO5vJxrvLfeZAY0U4Q/edit?gid=0#gid=0'
     print(url.split("https://docs.google.com/spreadsheets/")[0].lower() == "")
     g = GoogleSheetsRAG(url)
-    [print(f"{"-"*50}\n{row}\n{"-"*80}") for row in g.get_structured_documents_for_kg()[0:2]]
+    [print(f"{"-" * 50}\n{row}\n{"-" * 80}") for row in g.get_structured_documents_for_kg()[0:2]]
     # ex = timeit.timeit(g.parse_html_table, number=100)
     # print(f"Execution time: {ex} seconds")
