@@ -3,6 +3,8 @@ import json
 import platform
 from threading import Thread
 
+from neo4j import GraphDatabase
+
 from src.config import settings
 from langgraph.graph.state import CompiledStateGraph
 from rich import console, prompt, inspect
@@ -30,6 +32,7 @@ class ChatInitializer:
 
         # mcp servers integration
         self.initialize_mcp_servers()
+        self.initialize_neo4j()
 
 
     def _set_core_classes(self):
@@ -118,8 +121,8 @@ class ChatInitializer:
         This method can be extended to initialize any required MCP servers.
         """
         from src.mcp.manager import MCP_Manager
-        # Add and start MCP servers if needed
-        MCP_Manager.add_server("filesystem", "npx", "@modelcontextprotocol/server-filesystem", [f"{settings.BASE_DIR}"], FileSystemWrapper)
+        # Add and start MCP servers if needed with allowed path of AI_llm folder
+        MCP_Manager.add_server("filesystem", "npx", "@modelcontextprotocol/server-filesystem", [f"{settings.BASE_DIR.parent}"], FileSystemWrapper)
 
         # Start all servers
         for server in MCP_Manager.mcp_servers:
@@ -127,6 +130,24 @@ class ChatInitializer:
                 self.console.print(f"[bold red]Failed to start MCP server: {server}[/bold red]")
             else:
                 self.console.print(f"[bold green]MCP server '{server}' started successfully.[/bold green]")
+
+    def initialize_neo4j(self):
+        """
+        Initialize Neo4j connection if not already initialized.
+        This method can be extended to initialize any required Neo4j settings.
+        """
+        try:
+            settings.neo4j_driver = GraphDatabase.driver(
+                settings.NEO4J_URI,
+                auth=(settings.NEO4J_USER, settings.NEO4J_PASSWORD),
+            )
+            if settings.neo4j_driver is None:
+                raise RuntimeError("Failed to create Neo4j driver. Please check your NEO4J_URI, NEO4J_USER, and NEO4J_PASSWORD settings.")
+            settings.socket_con.send_error("[LOG]Neo4j connection initialized successfully.")
+        except Exception as e:
+            if settings.socket_con:
+                settings.socket_con.send_error(f"Error connecting to Neo4j database: {e}")
+            raise RuntimeError(f"Failed to connect to Neo4j database: {e}")
 
     def tools_register(self):
         """
@@ -166,13 +187,6 @@ class ChatInitializer:
         ]
         tools.extend(DynamicToolRegister.tool_list)  # Add dynamically registered tools
         # log the tools for debugging
-        if settings.socket_con:
-            from src.utils.argument_schema_util import get_tool_argument_schema
-            tools_info = "\n\n".join([
-                f"Tool: {tool.name}\nDescription: {tool.description}\nParameters: {get_tool_argument_schema(tool)}"
-                for tool in tools
-            ])
-            settings.socket_con.send_error(f"[DEBUG] Registering tools: {(tools_info)}")
         ToolAssign.set_tools_list(tools)
         self.tools = ToolAssign.get_tools_list()
         return self

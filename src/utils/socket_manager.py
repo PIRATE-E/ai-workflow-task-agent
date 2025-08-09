@@ -254,7 +254,7 @@ class SocketManager:
         socket_con = self.get_socket_connection()
         if socket_con:
             try:
-                socket_con.send_error(message)
+                socket_con.send_error(message + "\n")
             except Exception as e:
                 print(f"Failed to send error through socket: {e}")
                 print(f"Original error message: {message}")

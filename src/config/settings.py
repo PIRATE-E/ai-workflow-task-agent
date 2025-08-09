@@ -51,6 +51,7 @@ DEBUG = os.getenv("DEBUG", "false").lower() == "true"
 NEO4J_URI=os.getenv("NEO4J_URI", "bolt://localhost:7687")
 NEO4J_USER=os.getenv("NEO4J_USER", "neo4j")
 NEO4J_PASSWORD=os.getenv("NEO4J_PASSWORD","your_password_here")
+neo4j_driver = None  # Placeholder for Neo4j driver, to be initialized in main_orchestrator.py
 
 # SEMAPHORE SETTINGS
 SEMAPHORE_CLI = int(os.getenv("SEMAPHORE_LIMIT_CLI", 15))

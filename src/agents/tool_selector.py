@@ -35,19 +35,54 @@ def tool_selection_agent(state) -> dict:
     )
 
     try:
-        structured_llm = ModelManager(
-            model=settings.CLASSIFIER_MODEL,
-            format="json",
+        llm = ModelManager(
+            model=settings.GPT_MODEL,
             temperature=0.3, # Lower temperature for more consistent tool selection
             stream=False,
             max_tokens=1000,  # Allow enough tokens for reasoning and parameters
             top_p=1.0,        # Focus on most likely tokens for better accuracy
-        ).with_structured_output(ToolSelection)
+        )
+        
+        # Add JSON format instruction to system prompt
+        enhanced_system_prompt = system_prompt + """
+
+**IMPORTANT:** Respond with valid JSON in this exact format:
+{
+    "tool_name": "selected_tool_name_or_none",
+    "reasoning": "Your reasoning for this selection",
+    "parameters": {"param1": "value1", "param2": "value2"}
+}
+
+If no tool is needed, use "none" as the tool_name and empty object {} for parameters."""
+
         with console.status("[bold green]Thinking...[/bold green]", spinner="dots"):
-            selection = structured_llm.invoke([
-                settings.HumanMessage(content=system_prompt),
+            response = llm.invoke([
+                settings.HumanMessage(content=enhanced_system_prompt),
                 settings.HumanMessage(content=content)
             ])
+            
+        # Use the new JSON conversion method
+        selection_json = ModelManager.convert_to_json(response)
+        
+        # Create ToolSelection object from JSON
+        from dataclasses import dataclass
+        from typing import Dict, Any
+        @dataclass
+        class ToolSelection:
+            tool_name: str
+            reasoning: str = ""
+            parameters: Dict[str, Any] = None
+            
+            def __post_init__(self):
+                if self.parameters is None:
+                    self.parameters = {}
+        
+        selection = ToolSelection(
+            tool_name=selection_json.get("tool_name", "none"),
+            reasoning=selection_json.get("reasoning", ""),
+            parameters=selection_json.get("parameters", {})
+        )
+        
         print("Tool selected:", selection.tool_name)
         print("Reasoning:", selection.reasoning)
         print("Parameters:", selection.parameters)
@@ -60,7 +95,7 @@ def tool_selection_agent(state) -> dict:
     parameters = selection.parameters
     if isinstance(parameters, str):
         try:
-            parameters = json.loads(parameters)
+            parameters = ModelManager.convert_to_json(parameters)
         except Exception as e:
             if settings.socket_con:
                 settings.socket_con.send_error(f"[ERROR] Could not parse parameters: {e}")

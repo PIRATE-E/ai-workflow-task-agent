@@ -29,7 +29,7 @@ class SocketCon:
             # Send the error message
             else:
                 # print("Sending error message: ", error_message, flush=True, file=sys.stderr)
-                winsound.Beep(7933, 500)  # Beep sound for error notification
+                # winsound.Beep(7933, 500)  # Beep sound for error notification
                 self.client_socket.sendall(error_message.encode('utf-8'))
             # self.client_socket.sendall(error_message.encode('utf-8'))
         except socket.error as e:
@@ -176,6 +176,7 @@ if __name__ == '__main__':
                             print("No data received, closing connection.", flush=True, file=sys.stderr)
                             break  # Client disconnected or error occurred
                         print(f"{received_error}", flush=True, file=sys.stderr)
+                        winsound.Beep(7933, 500)  # Beep sound for error notification
                     listening = False  # Exit the loop after handling the connection
                 finally:
                     client_socket.close()

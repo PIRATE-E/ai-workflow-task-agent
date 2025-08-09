@@ -1,7 +1,8 @@
-﻿import os
+﻿import json
+import os
 import subprocess
 import time
-from typing import ClassVar, Optional, Any, Iterator
+from typing import ClassVar, Optional, Any, Iterator, Union
 
 from langchain_core.language_models import LanguageModelInput
 from langchain_core.messages import BaseMessageChunk, BaseMessage, AIMessageChunk
@@ -175,12 +176,18 @@ class ModelManager(ChatOllama):
         """
         if ModelManager._is_openai_mode and ModelManager._openai_integration is not None:
             # If using OpenAIIntegration, delegate to it
-            open_ai_response = ModelManager._openai_integration.generate_text(
-                prompt=input[0].content if isinstance(input, list) else input.content,
-                stream=False,
-                format=kwargs.get('format', 'text')  # Default to 'text' if not specified
-            )
-            # Only set content, do not set reasoning (OpenAIIntegration does not return reasoning)
+            # if input is a list, treat the first element as system message then the rest as user messages
+            if isinstance(input, list) and len(input) > 0:
+                system_message = input[0].content if hasattr(input[0], 'content') else str(input[0])
+                user_messages = [msg.content if hasattr(msg, 'content') else str(msg) for msg in input[1:]]
+                messages = ([{"role": "system", "content": system_message}] +
+                            [{"role": "user", "content": msg} for msg in user_messages])
+                open_ai_response = ModelManager._openai_integration.generate_text(messages=messages)
+            else:
+                # If input is not a list, treat it as a single user message
+                open_ai_response = ModelManager._openai_integration.generate_text(
+                    prompt=getattr(input, 'content', str(input))
+                )
             return settings.AIMessage(content=str(open_ai_response))
         else:
             return super().invoke(input=input, config=config, stop=stop, **kwargs)
@@ -238,3 +245,95 @@ class ModelManager(ChatOllama):
                 last_time = current_time
         if buffer:
             yield AIMessageChunk(content=buffer)
+
+    @classmethod
+    def convert_to_json(cls, response: Union[str, dict, list, BaseMessage]) -> Union[dict, list]:
+        """
+        🔧 ENHANCED: JSON extraction with proper type handling for async responses and reasoning content
+        
+        Args:
+            response: Response to convert (can be string, dict, list, or BaseMessage)
+
+        Returns:
+            dict or list: The extracted JSON object or fallback structure
+        """
+        # Handle already parsed objects (most common case for async responses)
+        if isinstance(response, (dict, list)):
+            return response
+        
+        # Handle BaseMessage objects with priority-based content extraction
+        if isinstance(response, BaseMessage):
+            content = response.content
+        else:
+            content = str(response)
+
+        # Handle empty or None responses
+        if not content or content.strip() == "":
+            return {"content": "empty_response"}
+
+        # Try 1: Direct JSON parsing
+        try:
+            return json.loads(content)
+        except (json.JSONDecodeError, TypeError):
+            pass
+
+        # Try 2: Extract from markdown code blocks
+        import re
+        markdown_pattern = r'```(?:json)?\s*(\{.*?\}|\[.*?\])\s*```'
+        markdown_match = re.search(markdown_pattern, content, re.DOTALL)
+        if markdown_match:
+            try:
+                return json.loads(markdown_match.group(1))
+            except json.JSONDecodeError:
+                pass
+
+        # Try 3: Find JSON objects or arrays with proper brace/bracket matching
+        json_objects = []
+        
+        # Look for JSON arrays first (priority for RAG triple extraction)
+        bracket_count = 0
+        start_pos = -1
+        for i, char in enumerate(content):
+            if char == '[':
+                if bracket_count == 0:
+                    start_pos = i
+                bracket_count += 1
+            elif char == ']':
+                bracket_count -= 1
+                if bracket_count == 0 and start_pos != -1:
+                    try:
+                        json_str = content[start_pos:i + 1]
+                        parsed = json.loads(json_str)
+                        json_objects.append(parsed)
+                    except json.JSONDecodeError:
+                        pass
+                    start_pos = -1
+
+        # If no arrays found, look for JSON objects
+        if not json_objects:
+            brace_count = 0
+            start_pos = -1
+            for i, char in enumerate(content):
+                if char == '{':
+                    if brace_count == 0:
+                        start_pos = i
+                    brace_count += 1
+                elif char == '}':
+                    brace_count -= 1
+                    if brace_count == 0 and start_pos != -1:
+                        try:
+                            json_str = content[start_pos:i + 1]
+                            parsed = json.loads(json_str)
+                            json_objects.append(parsed)
+                        except json.JSONDecodeError:
+                            pass
+                        start_pos = -1
+
+        # Return first valid JSON object found (prefer arrays for RAG)
+        if json_objects:
+            return json_objects[0]
+
+        # Fallback: wrap content
+        if settings.socket_con:
+            settings.socket_con.send_error("[warning] json conversion failed, returning content as fallback : " + content[:100])
+        return {"content": content}
