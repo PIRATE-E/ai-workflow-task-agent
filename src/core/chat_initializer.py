@@ -14,15 +14,20 @@ from src.models.state import StateAccessor, State
 from src.ui.print_message_style import print_message
 from src.utils.socket_manager import SocketManager
 
+# 🎨 Rich Traceback Integration
+from src.utils.rich_traceback_manager import RichTracebackManager, rich_exception_handler, safe_execute
+
 # mcp servers integration
 from src.tools.lggraph_tools.wrappers.mcp_wrapper.filesystem_wrapper import FileSystemWrapper
 
 class ChatInitializer:
+    @rich_exception_handler("ChatInitializer Initialization")
     def __init__(self):
         self.break_loop = None  # This will be used to break the chat loop
         self._exit_function = None
         self.os = platform.system()
         self.console = console.Console()
+        # Rich traceback is already initialized in main_orchestrator.py
         self._set_core_classes()  # set core classes for messages
         # Initialize state with empty messages and no message type
         self._state: State = {"messages": [], "message_type": None}
@@ -34,27 +39,44 @@ class ChatInitializer:
         self.initialize_mcp_servers()
         self.initialize_neo4j()
 
+        self.ToolResponseManager = None  # Initialize ToolResponseManager later
 
+
+    @rich_exception_handler("Core Classes Setup")
     def _set_core_classes(self):
-        # Import here to avoid circular imports
-        from langchain_core.messages import HumanMessage, AIMessage, BaseMessage
-        import sentry_sdk
-        sentry_sdk.init(
-            dsn="https://1df631d527493b6f96c55ffe9d42cc32@o4509761254981632.ingest.us.sentry.io/4509761281458176",
-            # Add data like request headers and IP for users,
-            # see https://docs.sentry.io/platforms/python/data-management/data-collected/ for more info
-            send_default_pii=True,
-        )
+        try:
+            # Import here to avoid circular imports
+            from langchain_core.messages import HumanMessage, AIMessage, BaseMessage
+            import sentry_sdk
+            sentry_sdk.init(
+                dsn="https://1df631d527493b6f96c55ffe9d42cc32@o4509761254981632.ingest.us.sentry.io/4509761281458176",
+                # Add data like request headers and IP for users,
+                # see https://docs.sentry.io/platforms/python/data-management/data-collected/ for more info
+                send_default_pii=True,
+            )
 
-        # we must set the console for rich console to use it in different classes to the settings
-        settings.console = self.console
-        
-        # Set message classes for centralized access
-        settings.HumanMessage = HumanMessage
-        settings.AIMessage = AIMessage
-        settings.BaseMessage = BaseMessage
-        # Set the socket connection for logging
-        settings.socket_con = SocketManager.get_socket_con()
+            # we must set the console for rich console to use it in different classes to the settings
+            settings.console = self.console
+            
+            # Set message classes for centralized access
+            settings.HumanMessage = HumanMessage
+            settings.AIMessage = AIMessage
+            settings.BaseMessage = BaseMessage
+            
+            # now import the ToolResponseManager to set the response
+            from src.tools.lggraph_tools.tool_response_manager import ToolResponseManager
+            self.ToolResponseManager = ToolResponseManager()
+            
+            # Set the socket connection for logging
+            settings.socket_con = SocketManager.get_socket_con()
+            
+        except Exception as e:
+            RichTracebackManager.handle_exception(
+                e, 
+                context="Core Classes Setup",
+                extra_context={"phase": "message_classes_initialization"}
+            )
+            raise
 
     def set_graph(self, graph):
         if not isinstance(graph, CompiledStateGraph):
@@ -115,22 +137,40 @@ class ChatInitializer:
             os.startfile(path)
         return self
 
+    @rich_exception_handler("MCP Server Initialization")
     def initialize_mcp_servers(self):
         """
         Initialize MCP servers if they are not already running.
         This method can be extended to initialize any required MCP servers.
         """
-        from src.mcp.manager import MCP_Manager
-        # Add and start MCP servers if needed with allowed path of AI_llm folder
-        MCP_Manager.add_server("filesystem", "npx", "@modelcontextprotocol/server-filesystem", [f"{settings.BASE_DIR.parent}"], FileSystemWrapper)
+        try:
+            from src.mcp.manager import MCP_Manager
+            # Add and start MCP servers if needed with allowed path of AI_llm folder
+            MCP_Manager.add_server("filesystem", "npx", "@modelcontextprotocol/server-filesystem", [f"{settings.BASE_DIR.parent}"], FileSystemWrapper)
 
-        # Start all servers
-        for server in MCP_Manager.mcp_servers:
-            if not MCP_Manager.start_server(server):
-                self.console.print(f"[bold red]Failed to start MCP server: {server}[/bold red]")
-            else:
-                self.console.print(f"[bold green]MCP server '{server}' started successfully.[/bold green]")
+            # Start all servers
+            for server in MCP_Manager.mcp_servers:
+                try:
+                    if not MCP_Manager.start_server(server):
+                        self.console.print(f"[bold red]Failed to start MCP server: {server}[/bold red]")
+                    else:
+                        self.console.print(f"[bold green]MCP server '{server}' started successfully.[/bold green]")
+                except Exception as server_error:
+                    RichTracebackManager.handle_exception(
+                        server_error,
+                        context=f"MCP Server Startup - {server}",
+                        extra_context={"server_name": server}
+                    )
+                    self.console.print(f"[bold red]Error starting MCP server {server}: {server_error}[/bold red]")
+        except Exception as e:
+            RichTracebackManager.handle_exception(
+                e,
+                context="MCP Server Initialization",
+                extra_context={"phase": "mcp_manager_import_and_setup"}
+            )
+            raise
 
+    @rich_exception_handler("Neo4j Database Initialization")
     def initialize_neo4j(self):
         """
         Initialize Neo4j connection if not already initialized.
@@ -145,65 +185,181 @@ class ChatInitializer:
                 raise RuntimeError("Failed to create Neo4j driver. Please check your NEO4J_URI, NEO4J_USER, and NEO4J_PASSWORD settings.")
             settings.socket_con.send_error("[LOG]Neo4j connection initialized successfully.")
         except Exception as e:
+            RichTracebackManager.handle_exception(
+                e,
+                context="Neo4j Database Connection",
+                extra_context={
+                    "neo4j_uri": settings.NEO4J_URI,
+                    "neo4j_user": settings.NEO4J_USER,
+                    "driver_status": "failed_to_create"
+                }
+            )
             if settings.socket_con:
                 settings.socket_con.send_error(f"Error connecting to Neo4j database: {e}")
             raise RuntimeError(f"Failed to connect to Neo4j database: {e}")
 
+    @rich_exception_handler("Tool Registration")
     def tools_register(self):
         """
         Register tools for the chat application.
         This method can be extended to register any tools needed for the chat.
         """
-        from src.tools.lggraph_tools.tool_assign import ToolAssign
-        from src.tools.lggraph_tools.wrappers.google_wrapper import GoogleSearchToolWrapper
-        from src.tools.lggraph_tools.wrappers.translate_wrapper import TranslateToolWrapper
-        from src.tools.lggraph_tools.wrappers.rag_search_classifier_wrapper import RagSearchClassifierWrapper
-        # schema
-        from src.tools.lggraph_tools.tool_schemas.tools_structured_classes import google_search, rag_search_message, \
-            TranslationMessage
+        try:
+            from src.tools.lggraph_tools.tool_assign import ToolAssign
+            from src.tools.lggraph_tools.wrappers.google_wrapper import GoogleSearchToolWrapper
+            from src.tools.lggraph_tools.wrappers.translate_wrapper import TranslateToolWrapper
+            from src.tools.lggraph_tools.wrappers.rag_search_classifier_wrapper import RagSearchClassifierWrapper
+            # schema
+            from src.tools.lggraph_tools.tool_schemas.tools_structured_classes import google_search, rag_search_message, \
+                TranslationMessage
 
-        # dynamically register tools
-        from src.mcp.dynamically_tool_register import DynamicToolRegister
-        tools = [
-            # google search tool assigning
-            ToolAssign(func=GoogleSearchToolWrapper,
-                       name="GoogleSearch",
-                       description="For general web searches (recent info, facts, news).",
-                       args_schema=google_search, ),
-            # rag search tool assigning
-            ToolAssign(func=RagSearchClassifierWrapper,
-                       name="RAGSearch",
-                       description="For searching the knowledge base (RAG search).",
-                       args_schema=rag_search_message, ),
-            # translate tool assigning
-            ToolAssign(func=TranslateToolWrapper,
-                       name="Translatetool",
-                       description="For translating messages into different languages.",
-                       args_schema=TranslationMessage, ),
-            # ToolAssign(func=FileSystemWrapper,
-            #            name="FileSystemTool",
-            #            description="For performing file system operations (read, write, delete).",
-            #            args_schema=mcp_tool_filesystem)
-        ]
-        tools.extend(DynamicToolRegister.tool_list)  # Add dynamically registered tools
-        # log the tools for debugging
-        ToolAssign.set_tools_list(tools)
-        self.tools = ToolAssign.get_tools_list()
-        return self
+            # dynamically register tools
+            from src.mcp.dynamically_tool_register import DynamicToolRegister
+            
+            tools = []
+            
+            # Register each tool with individual error handling
+            tool_configs = [
+                ("GoogleSearch", GoogleSearchToolWrapper, "For general web searches (recent info, facts, news).", google_search),
+                ("RAGSearch", RagSearchClassifierWrapper, "For searching the knowledge base (RAG search).", rag_search_message),
+                ("Translatetool", TranslateToolWrapper, "For translating messages into different languages.", TranslationMessage)
+            ]
+            
+            for name, func, description, schema in tool_configs:
+                try:
+                    tool = ToolAssign(func=func, name=name, description=description, args_schema=schema)
+                    tools.append(tool)
+                except Exception as tool_error:
+                    RichTracebackManager.handle_exception(
+                        tool_error,
+                        context=f"Tool Registration - {name}",
+                        extra_context={"tool_name": name, "tool_function": str(func)}
+                    )
+                    # Continue with other tools even if one fails
+                    continue
+            
+            # Add dynamically registered tools with error handling
+            try:
+                dynamic_tools = DynamicToolRegister.tool_list
+                tools.extend(dynamic_tools)
+            except Exception as dynamic_error:
+                RichTracebackManager.handle_exception(
+                    dynamic_error,
+                    context="Dynamic Tool Registration",
+                    extra_context={"dynamic_tools_count": len(getattr(DynamicToolRegister, 'tool_list', []))}
+                )
+            
+            # Set tools list
+            ToolAssign.set_tools_list(tools)
+            self.tools = ToolAssign.get_tools_list()
+            
+            # Log successful registration
+            if settings.socket_con:
+                settings.socket_con.send_error(f"[LOG] Successfully registered {len(tools)} tools")
+            
+            return self
+            
+        except Exception as e:
+            RichTracebackManager.handle_exception(
+                e,
+                context="Tool Registration System",
+                extra_context={"phase": "tool_registration_setup"}
+            )
+            raise
 
+    @rich_exception_handler("Chat Execution Loop")
     def run_chat(self):
-        # make sure all the fields are initialized
-        if not self._state or not self.graph or not self.tools:
-            raise ValueError("Chat is not properly initialized. Please ensure all components are set up.")
+        try:
+            # make sure all the fields are initialized
+            if not self._state or not self.graph or not self.tools:
+                raise ValueError("Chat is not properly initialized. Please ensure all components are set up.")
 
-        user_input = prompt.Prompt.ask("[bold cyan]You[/bold cyan]", default="", show_default=False)
-        if user_input.lower() == "exit":
-            self.console.print("[bold red]Exiting the chat...[/bold red]")
-            self.on_exit()
-            self.break_loop = True
-        else:
-            self._state["messages"].append(settings.HumanMessage(content=user_input))
-            print_message(user_input, sender="user")
-            self._state = self.graph.invoke(self._state)
-            self.state_accessor.sync_with_langgraph(self._state)
-        gc.collect()
+            user_input = prompt.Prompt.ask("[bold cyan]You[/bold cyan]", default="", show_default=False)
+            if user_input.lower() == "exit":
+                self.console.print("[bold red]Exiting the chat...[/bold red]")
+                try:
+                    self.on_exit()
+                except Exception as exit_error:
+                    RichTracebackManager.handle_exception(
+                        exit_error,
+                        context="Chat Exit Process",
+                        extra_context={"user_input": user_input}
+                    )
+                self.break_loop = True
+            else:
+                try:
+                    # Add user message to state
+                    self._state["messages"].append(settings.HumanMessage(content=user_input))
+                    
+                    # # Set response in ToolResponseManager with error handling
+                    # try:
+                    #     # Import when needed to avoid circular import issues
+                    #     from src.tools.lggraph_tools.tool_response_manager import ToolResponseManager
+                    #     ToolResponseManager().set_response([settings.HumanMessage(content=user_input)])
+                    # except Exception as tool_manager_error:
+                    #     RichTracebackManager.handle_exception(
+                    #         tool_manager_error,
+                    #         context="ToolResponseManager Setup",
+                    #         extra_context={"user_input_length": len(user_input)}
+                    #     )
+                    #     # Continue without tool response manager if it fails
+                    
+                    # Print user message
+                    print_message(user_input, sender="user")
+                    
+                    # Invoke graph with error handling
+                    try:
+                        self._state = self.graph.invoke(self._state)
+                    except Exception as graph_error:
+                        RichTracebackManager.handle_exception(
+                            graph_error,
+                            context="LangGraph Invocation",
+                            extra_context={
+                                "user_input": user_input[:100],
+                                "state_messages_count": len(self._state.get("messages", [])),
+                                "message_type": self._state.get("message_type")
+                            }
+                        )
+                        # Re-raise graph errors as they're critical
+                        raise
+                    
+                    # Sync state accessor
+                    try:
+                        self.state_accessor.sync_with_langgraph(self._state)
+                    except Exception as sync_error:
+                        RichTracebackManager.handle_exception(
+                            sync_error,
+                            context="State Accessor Sync",
+                            extra_context={"state_keys": list(self._state.keys())}
+                        )
+                        # Continue even if sync fails
+                        
+                except Exception as chat_processing_error:
+                    RichTracebackManager.handle_exception(
+                        chat_processing_error,
+                        context="Chat Message Processing",
+                        extra_context={
+                            "user_input": user_input[:100],
+                            "processing_phase": "message_handling"
+                        }
+                    )
+                    # Continue the chat loop even if one message fails
+                    self.console.print("[bold red]Error processing message. Please try again.[/bold red]")
+            
+            # Garbage collection with error handling
+            try:
+                gc.collect()
+            except Exception as gc_error:
+                RichTracebackManager.handle_exception(
+                    gc_error,
+                    context="Garbage Collection",
+                    extra_context={"phase": "post_chat_cleanup"}
+                )
+                
+        except Exception as e:
+            RichTracebackManager.handle_exception(
+                e,
+                context="Chat Execution Loop",
+                extra_context={"phase": "main_chat_loop"}
+            )
+            raise
