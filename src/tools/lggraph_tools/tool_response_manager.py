@@ -81,3 +81,33 @@ class ToolResponseManager:
         Clear the current response from the tool.
         """
         self._tool_response = None
+
+    def get_last_human_message(self) -> Optional[settings.HumanMessage]:
+        """
+        Get the last human message from the tool response.
+
+        :return: The last human message or None if no human messages exist.
+        """
+        if self._tool_response:
+            for msg in reversed(self._tool_response):
+                if isinstance(msg, settings.HumanMessage):
+                    return msg
+                else:
+                    # If we encounter an AIMessage, we skip it
+                    continue
+        return None
+
+    def get_last_ai_message(self) -> Optional[settings.AIMessage]:
+        """
+        Get the last AI message from the tool response.
+
+        :return: The last AI message or None if no AI messages exist.
+        """
+        if self._tool_response:
+            for msg in reversed(self._tool_response):
+                if isinstance(msg, settings.AIMessage):
+                    return msg
+                else:
+                    # If we encounter a HumanMessage, we skip it
+                    continue
+        return None
