@@ -335,14 +335,14 @@ class OpenAIIntegration:
         content = getattr(msg, "content", None)
         if content and content.strip():
             if settings.socket_con:
-                settings.socket_con.send_error(f"[DEBUG] Content found via standard method.\n")
+                settings.socket_con.send_error(f"[DEBUG] Content found via standard method. //{content}//\n")
             return content
 
         # Method 2: NVIDIA API specific - Check reasoning_content field
         reasoning_content = getattr(msg, "reasoning_content", None)
         if reasoning_content and reasoning_content.strip():
             if settings.socket_con:
-                settings.socket_con.send_error(f"[DEBUG] Content found via reasoning_content now the message is [: {completion.choices[0].message}]...\n")
+                settings.socket_con.send_error(f"[DEBUG] Content found via reasoning_content now the message is [: {completion.choices[0]}]...\n")
             return reasoning_content
 
         # Method 3: Alternative field names for NVIDIA API
