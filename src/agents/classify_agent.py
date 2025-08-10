@@ -1,5 +1,6 @@
-from src.agents.agents_schema.agents_schema import message_classifier
+
 from src.config import settings
+from src.tools.lggraph_tools.tool_assign import ToolAssign
 from src.utils.model_manager import ModelManager
 
 
@@ -52,11 +53,6 @@ def classify_message_type(state) -> dict:
 - 'llm': Direct conversation, reasoning, or explanation
 - 'tool': External information or specific actions
 
-**Conversation Context:**
-{history}
-
-**Current Message:**
-{content}
 
 **Smart Classification Rules:**
 
@@ -70,24 +66,57 @@ def classify_message_type(state) -> dict:
    - Need for current/external information: "latest news", "recent updates", "current price"
    - Document analysis: "search in the document", "find in the knowledge base"
 
-3. **LLM Response Indicators:**
+3. **LLM Usage Indicators:**
    - Explanations of previous results: "explain that", "what does this mean", "clarify"
    - Reasoning about conversation: "why did you say", "how does this relate"
    - General conversation: greetings, opinions, analysis of provided information
    - Follow-up questions about tool results
+   
+4. **Agent Usage Indicators:**
+    - Explicit requests: agent, tool chain, agent mode
+    - Need for complex reasoning or multi-step tasks: "perform web search", "write content in the text file", "analyze data"
+    - General agent tasks that require combining multiple tools or reasoning steps
+    - User asks for agent to perform a task that requires multiple steps or tools
+    
 
 4. **Override Rules:**
    - User explicitly says "use AI/assistant/LLM" → always 'llm'
    - User explicitly says "search/tool" → always 'tool'
+    - User explicitly says "agent" → always 'agent'
 
 **Key Insight:** If the user is asking about or referencing something already discussed or provided in the conversation, they likely want explanation/reasoning (llm), not new information (tool).
+**Key Insight:** USER WILL BE PROVIDE THE (LAST MESSAGE), (CONVERSATION HISTORY) AND (TOOL CONTEXT), SO YOU CAN MAKE A DECISION BASED ON THE LAST MESSAGE AND TOOL CONTEXT.
 
 **IMPORTANT:** Respond with valid JSON in this exact format:
 {{"message_type": "llm", "reasoning": "Your reasoning here"}}
 OR
 {{"message_type": "tool", "reasoning": "Your reasoning here"}}
+OR
+{{""message_type": "agent", "reasoning": "your reasoning here"}}
 
 Classify thoughtfully based on true user intent, not just keywords."""
+    # modify the content and provide the history and tool context
+    if not history:
+        history = "No previous messages in this conversation."
+    if not content:
+        content = "No current message provided."
+    # Add conversation context and tool context to the content
+    tool_context = "No tools available" if not ToolAssign.get_tools_list() else "\n".join([
+        f"Tool: {tool.name}\nDescription: {tool.description}\nParameters: {tool.args_schema}"
+        for tool in ToolAssign.get_tools_list()
+    ])
+
+    content = f"""
+
+        **Conversation Context:**
+        {history}
+
+        **Current Message:**
+        {content}
+        
+        **Tool Context:**
+        {tool_context}
+    """
     
     response = llm.invoke([
         settings.HumanMessage(content=system_prompt),
