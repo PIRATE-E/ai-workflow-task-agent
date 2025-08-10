@@ -68,3 +68,14 @@ class StateAccessor:
         """
         messages = self.get_messages()
         return messages[-1] if messages else None
+
+    def get_last_human_message(self) -> HumanMessage | None:
+        """
+        Get the last human message from the current state.
+        :return: The last human message or None if no human messages exist.
+        """
+        messages = self.get_messages()
+        for msg in reversed(messages):
+            if isinstance(msg, HumanMessage):
+                return msg
+        return None

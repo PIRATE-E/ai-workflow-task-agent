@@ -4,6 +4,7 @@ from src.agents.chat_llm import generate_llm_response
 from src.agents.classify_agent import classify_message_type
 from src.agents.router import route_message
 from src.agents.tool_selector import tool_selection_agent
+from src.agents.agent_mode_node import agent_node
 
 
 class GraphBuilder:
@@ -22,6 +23,7 @@ class GraphBuilder:
         self.graph.add_node("router", route_message)
         self.graph.add_node("chatBot", generate_llm_response)
         self.graph.add_node("tool_agent", tool_selection_agent)
+        self.graph.add_node("agent_node", agent_node)
         return self
 
     def _assign_edges(self):
@@ -34,10 +36,11 @@ class GraphBuilder:
         self.graph.add_conditional_edges(
             "router",
             route_by_message_type,
-            {"llm": "chatBot", "tool": "tool_agent"}
+            {"llm": "chatBot", "tool": "tool_agent", "agent": "agent_node"},
         )
         self.graph.add_edge("chatBot", END)
         self.graph.add_edge("tool_agent", END)
+        self.graph.add_edge("agent_node", END)
         return self
 
     def compile_graph(self):

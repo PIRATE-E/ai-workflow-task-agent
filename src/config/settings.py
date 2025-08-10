@@ -42,7 +42,7 @@ ENABLE_SOUND_NOTIFICATIONS = os.getenv("ENABLE_SOUND_NOTIFICATIONS", "true").low
 # 'background' - Runs log server in background (logs not visible)
 # 'file' - Logs to file (socket_server.log)
 # 'console' - Shows logs in same console (can be messy)
-LOG_DISPLAY_MODE = os.getenv("LOG_DISPLAY_MODE", "file")
+LOG_DISPLAY_MODE = os.getenv("LOG_DISPLAY_MODE", "separate_window").lower()
 
 # Development/Production mode
 DEBUG = os.getenv("DEBUG", "false").lower() == "true"

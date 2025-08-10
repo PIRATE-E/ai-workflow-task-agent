@@ -5,6 +5,9 @@ from typing import Any, Literal, Callable
 from src.config import settings
 from src.mcp.dynamically_tool_register import DynamicToolRegister
 
+# 🎨 Rich Traceback Integration
+from src.utils.rich_traceback_manager import RichTracebackManager, rich_exception_handler, safe_execute
+
 
 class MCP_Manager:
     instance = None
@@ -114,69 +117,121 @@ class MCP_Manager:
         return response_line_json
 
     @classmethod
+    @rich_exception_handler("MCP Server Startup")
     def start_server(cls, name: str):
         """
         Start a server by its name.
         :param name: Name of the server to start.
         """
+        try:
+            if name in MCP_Manager.mcp_servers:
+                server_info = MCP_Manager.mcp_servers[name]
+                runner = server_info["runner"]
+                package = server_info["package"]
+                args = server_info["args"] if "args" in server_info else []
 
-        if name in MCP_Manager.mcp_servers:
-            server_info = MCP_Manager.mcp_servers[name]
-            runner = server_info["runner"]
-            package = server_info["package"]
-            args = server_info["args"] if "args" in server_info else []
-
-            # actual command to run the server
-            command = [runner, package] + args
-            try:
-                # Here you would implement the logic to start the server
-                server_process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE,
-                                                  stderr=subprocess.PIPE, stdin=subprocess.PIPE, text=True, bufsize=1)
-                MCP_Manager.running_servers[name] = server_process
-                server_info["status"] = "running"
-                # ######## Initialize MCP server with handshake ########
+                # actual command to run the server
+                command = [runner, package] + args
                 try:
-                    init_request = {
-                        "jsonrpc": "2.0",
-                        "id": MCP_Manager.generate_response_id(),
-                        "method": "initialize",
-                        "params": {
-                            "protocolVersion": "2024-11-05",
-                            "capabilities": {},
-                            "clientInfo": {"name": "langgraph-mcp-client", "version": "1.0.0"}
+                    # Here you would implement the logic to start the server
+                    server_process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE,
+                                                      stderr=subprocess.PIPE, stdin=subprocess.PIPE, text=True, bufsize=1)
+                    MCP_Manager.running_servers[name] = server_process
+                    server_info["status"] = "running"
+                    
+                    # ######## Initialize MCP server with handshake ########
+                    try:
+                        init_request = {
+                            "jsonrpc": "2.0",
+                            "id": MCP_Manager.generate_response_id(),
+                            "method": "initialize",
+                            "params": {
+                                "protocolVersion": "2024-11-05",
+                                "capabilities": {},
+                                "clientInfo": {"name": "langgraph-mcp-client", "version": "1.0.0"}
+                            }
                         }
-                    }
-                    init_json = json.dumps(init_request) + "\n"
-                    server_process.stdin.write(init_json)
-                    server_process.stdin.flush()
+                        init_json = json.dumps(init_request) + "\n"
+                        server_process.stdin.write(init_json)
+                        server_process.stdin.flush()
 
-                    # Read initialization response (but don't process it for now)
-                    init_response = server_process.stdout.readline()
+                        # Read initialization response (but don't process it for now)
+                        init_response = server_process.stdout.readline()
+                        settings.socket_con.send_error(
+                            f"[LOG] MCP server '{name}' initialized the response is :- {init_response}")
+
+                        ######## now get the tools from the server ############
+                        try:
+                            tools = cls.tool_discovery(name)
+                            if tools:
+                                settings.socket_con.send_error(
+                                    f"[LOG] Discovered tools from server {name} ")
+                            else:
+                                settings.socket_con.send_error(
+                                    f"[WARNING] No tools discovered from server '{name}'. This might be expected if the server has no tools registered.")
+                        except Exception as tool_discovery_error:
+                            RichTracebackManager.handle_exception(
+                                tool_discovery_error,
+                                context=f"MCP Tool Discovery - {name}",
+                                extra_context={"server_name": name, "init_response": str(init_response)[:100]}
+                            )
+                            settings.socket_con.send_error(f"[ERROR] Tool discovery failed for '{name}': {tool_discovery_error}")
+                            
+                    except Exception as init_error:
+                        RichTracebackManager.handle_exception(
+                            init_error,
+                            context=f"MCP Server Initialization - {name}",
+                            extra_context={
+                                "server_name": name,
+                                "command": str(command),
+                                "process_id": server_process.pid if server_process else "N/A"
+                            }
+                        )
+                        settings.socket_con.send_error(f"[WARNING] MCP initialization failed for '{name}': {init_error}")
+                        
                     settings.socket_con.send_error(
-                        f"[LOG] MCP server '{name}' initialized the response is :- {init_response}")
-
-                    ######## now get the tools from the server ############
-                    tools = cls.tool_discovery(name)
-                    if tools:
-                        settings.socket_con.send_error(
-                            f"[LOG] Discovered tools from server {name} ")
-                    else:
-                        settings.socket_con.send_error(
-                            f"[WARNING] No tools discovered from server '{name}'. This might be expected if the server has no tools registered.")
+                        f"[LOG] started server '{name}' with package '{package}' and args {args}.")
+                    return True
+                    
+                except subprocess.CalledProcessError as process_error:
+                    RichTracebackManager.handle_exception(
+                        process_error,
+                        context=f"MCP Server Process Creation - {name}",
+                        extra_context={
+                            "command": str(command),
+                            "server_name": name,
+                            "runner": runner,
+                            "package": package
+                        }
+                    )
+                    settings.socket_con.send_error(
+                        f"[ERROR] Command '{command}' failed to execute. Process error: {process_error}")
+                    return False
+                    
                 except Exception as e:
-                    settings.socket_con.send_error(f"[WARNING] MCP initialization failed for '{name}': {e} server err: {server_process.stderr}")
-                settings.socket_con.send_error(
-                    f"[LOG] started server '{name}' with package '{package}' and args {args}.")
-                return True
-            except Exception as e:
-                settings.socket_con.send_error(f"[ERROR] Failed to start server '{name}': {e}")
+                    RichTracebackManager.handle_exception(
+                        e,
+                        context=f"MCP Server Startup - {name}",
+                        extra_context={
+                            "server_name": name,
+                            "command": str(command),
+                            "runner": runner,
+                            "package": package
+                        }
+                    )
+                    settings.socket_con.send_error(f"[ERROR] Failed to start server '{name}': {e}")
+                    return False
+            else:
+                settings.socket_con.send_error(f"[ERROR] Server '{name}' not found.")
                 return False
-            except subprocess.CalledProcessError:
-                settings.socket_con.send_error(
-                    f"[ERROR] Command '{command}' failed to execute. {MCP_Manager.running_servers[name].stderr}")
-                return False
-        else:
-            settings.socket_con.send_error(f"[ERROR] Server '{name}' not found.")
+                
+        except Exception as e:
+            RichTracebackManager.handle_exception(
+                e,
+                context=f"MCP Server Startup Wrapper - {name}",
+                extra_context={"server_name": name}
+            )
+            settings.socket_con.send_error(f"[ERROR] Critical error starting server '{name}': {e}")
             return False
 
     def _initialize(self):
