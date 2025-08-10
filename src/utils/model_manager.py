@@ -12,6 +12,9 @@ from langchain_ollama import ChatOllama
 from src.config import settings
 from src.utils.open_ai_integration import OpenAIIntegration
 
+# 🎨 Rich Traceback Integration
+from src.utils.rich_traceback_manager import RichTracebackManager, rich_exception_handler, safe_execute
+
 
 class ModelManager(ChatOllama):
     """
@@ -39,6 +42,7 @@ class ModelManager(ChatOllama):
             cls.instance = super(ModelManager, cls).__new__(cls)
         return cls.instance
 
+    @rich_exception_handler("ModelManager Initialization")
     def __init__(self, *args, **kwargs):
         """
         Initializes the ModelManager and loads the specified model.
@@ -47,28 +51,62 @@ class ModelManager(ChatOllama):
             model (str): The model to load (default is config.DEFAULT_MODEL).
             Other keyword arguments are passed to the parent ChatOllama class.
         """
-        if getattr(self, "_initialized", False):
-            # If instance already exists, skip re-initialization
-            return
+        try:
+            if getattr(self, "_initialized", False):
+                # If instance already exists, skip re-initialization
+                return
 
-        self._initialized = True
+            self._initialized = True
 
-        # Check if this should use OpenAI integration
-        if kwargs.get("model") in ModelManager.api_model_list:
-            # For OpenAI models, create integration and mark as OpenAI mode
-            ModelManager._openai_integration = OpenAIIntegration(
-                api_key=kwargs.get("api_key", settings.OPEN_AI_API_KEY),
-                model=kwargs.get("model", settings.GPT_MODEL)
+            # Check if this should use OpenAI integration
+            if kwargs.get("model") in ModelManager.api_model_list:
+                try:
+                    # For OpenAI models, create integration and mark as OpenAI mode
+                    ModelManager._openai_integration = OpenAIIntegration(
+                        api_key=kwargs.get("api_key", settings.OPEN_AI_API_KEY),
+                        model=kwargs.get("model", settings.GPT_MODEL)
+                    )
+                    ModelManager._is_openai_mode = True
+                    # Still initialize ChatOllama with a default model to avoid issues
+                    super().__init__(model=settings.DEFAULT_MODEL, **{k: v for k, v in kwargs.items() if k != 'model'})
+                except Exception as openai_error:
+                    RichTracebackManager.handle_exception(
+                        openai_error,
+                        context="OpenAI Integration Setup",
+                        extra_context={
+                            "model": kwargs.get("model", "Unknown"),
+                            "api_key_available": bool(kwargs.get("api_key", settings.OPEN_AI_API_KEY))
+                        }
+                    )
+                    raise
+            else:
+                try:
+                    # Initialize as regular ChatOllama instance
+                    ModelManager._openai_integration = None
+                    ModelManager._is_openai_mode = False
+                    super().__init__(*args, **kwargs)
+                    ModelManager.load_model(kwargs.get('model', settings.DEFAULT_MODEL))
+                except Exception as ollama_error:
+                    RichTracebackManager.handle_exception(
+                        ollama_error,
+                        context="Ollama Model Setup",
+                        extra_context={
+                            "model": kwargs.get('model', settings.DEFAULT_MODEL),
+                            "args": str(args)[:100],
+                            "kwargs": str({k: v for k, v in kwargs.items() if k != 'api_key'})[:100]
+                        }
+                    )
+                    raise
+        except Exception as e:
+            RichTracebackManager.handle_exception(
+                e,
+                context="ModelManager Initialization",
+                extra_context={
+                    "initialization_phase": "main_init",
+                    "model_requested": kwargs.get("model", "Unknown")
+                }
             )
-            ModelManager._is_openai_mode = True
-            # Still initialize ChatOllama with a default model to avoid issues
-            super().__init__(model=settings.DEFAULT_MODEL, **{k: v for k, v in kwargs.items() if k != 'model'})
-        else:
-            # Initialize as regular ChatOllama instance
-            ModelManager._openai_integration = None
-            ModelManager._is_openai_mode = False
-            super().__init__(*args, **kwargs)
-            ModelManager.load_model(kwargs.get('model', settings.DEFAULT_MODEL))
+            raise
 
     @property
     def openai_chat(self) -> Optional[OpenAIIntegration]:
@@ -76,6 +114,7 @@ class ModelManager(ChatOllama):
         return ModelManager._openai_integration
 
     @classmethod
+    @rich_exception_handler("Model Cleanup")
     def cleanup_all_models(cls):
         """
         Public method to explicitly clean up all models.
@@ -83,28 +122,53 @@ class ModelManager(ChatOllama):
         """
         try:
             if cls._openai_integration is not None:
-                if settings.socket_con:
-                    settings.socket_con.send_error("≡ƒº╣ Cleaning up OpenAI integration")
-                OpenAIIntegration.cleanup()
-                cls._openai_integration = None
-                cls._is_openai_mode = False
-                if settings.socket_con:
-                    settings.socket_con.send_error("Γ£à OpenAI integration cleanup completed")
-                    return  # Exit early if OpenAI integration is cleaned up
+                try:
+                    if settings.socket_con:
+                        settings.socket_con.send_error("🧹 Cleaning up OpenAI integration")
+                    OpenAIIntegration.cleanup()
+                    cls._openai_integration = None
+                    cls._is_openai_mode = False
+                    if settings.socket_con:
+                        settings.socket_con.send_error("✅ OpenAI integration cleanup completed")
+                        return  # Exit early if OpenAI integration is cleaned up
+                except Exception as openai_cleanup_error:
+                    RichTracebackManager.handle_exception(
+                        openai_cleanup_error,
+                        context="OpenAI Integration Cleanup",
+                        extra_context={"integration_status": "cleanup_failed"}
+                    )
+                    if settings.socket_con:
+                        settings.socket_con.send_error(f"❌ Error during OpenAI integration cleanup: {openai_cleanup_error}")
         except Exception as e:
-            if settings.socket_con:
-                settings.socket_con.send_error(f"Γ¥î Error during OpenAI integration cleanup: {e}")
+            RichTracebackManager.handle_exception(
+                e,
+                context="OpenAI Integration Cleanup Wrapper",
+                extra_context={"cleanup_phase": "openai_integration"}
+            )
+            
         try:
             if cls.current_model:
-                if settings.socket_con:
-                    settings.socket_con.send_error(f"≡ƒº╣ Cleaning up model: {cls.current_model}")
-                cls._stop_model()
-                cls.current_model = None
-                if settings.socket_con:
-                    settings.socket_con.send_error("Γ£à Model cleanup completed")
+                try:
+                    if settings.socket_con:
+                        settings.socket_con.send_error(f"🧹 Cleaning up model: {cls.current_model}")
+                    cls._stop_model()
+                    cls.current_model = None
+                    if settings.socket_con:
+                        settings.socket_con.send_error("✅ Model cleanup completed")
+                except Exception as model_cleanup_error:
+                    RichTracebackManager.handle_exception(
+                        model_cleanup_error,
+                        context="Ollama Model Cleanup",
+                        extra_context={"current_model": cls.current_model}
+                    )
+                    if settings.socket_con:
+                        settings.socket_con.send_error(f"❌ Error during model cleanup: {model_cleanup_error}")
         except Exception as e:
-            if settings.socket_con:
-                settings.socket_con.send_error(f"Γ¥î Error during model cleanup: {e}")
+            RichTracebackManager.handle_exception(
+                e,
+                context="Ollama Model Cleanup Wrapper",
+                extra_context={"cleanup_phase": "ollama_model"}
+            )
 
     @staticmethod
     def load_model(model_name: str):
