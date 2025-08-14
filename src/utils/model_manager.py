@@ -12,8 +12,8 @@ from langchain_ollama import ChatOllama
 from src.config import settings
 from src.utils.open_ai_integration import OpenAIIntegration
 
-# 🎨 Rich Traceback Integration
-from src.utils.rich_traceback_manager import RichTracebackManager, rich_exception_handler, safe_execute
+# 🎨 Rich Traceback Integration (updated path after refactor)
+from src.ui.diagnostics.rich_traceback_manager import RichTracebackManager, rich_exception_handler, safe_execute
 
 
 class ModelManager(ChatOllama):
@@ -120,55 +120,63 @@ class ModelManager(ChatOllama):
         Public method to explicitly clean up all models.
         Can be called manually or by signal handlers.
         """
-        try:
-            if cls._openai_integration is not None:
-                try:
-                    if settings.socket_con:
-                        settings.socket_con.send_error("🧹 Cleaning up OpenAI integration")
-                    OpenAIIntegration.cleanup()
-                    cls._openai_integration = None
-                    cls._is_openai_mode = False
-                    if settings.socket_con:
-                        settings.socket_con.send_error("✅ OpenAI integration cleanup completed")
-                        return  # Exit early if OpenAI integration is cleaned up
-                except Exception as openai_cleanup_error:
-                    RichTracebackManager.handle_exception(
-                        openai_cleanup_error,
-                        context="OpenAI Integration Cleanup",
-                        extra_context={"integration_status": "cleanup_failed"}
-                    )
-                    if settings.socket_con:
-                        settings.socket_con.send_error(f"❌ Error during OpenAI integration cleanup: {openai_cleanup_error}")
-        except Exception as e:
-            RichTracebackManager.handle_exception(
-                e,
-                context="OpenAI Integration Cleanup Wrapper",
-                extra_context={"cleanup_phase": "openai_integration"}
-            )
+        # Import debug functions once at the top
+        from src.utils.debug_helpers import debug_info, debug_error
+        
+        # OpenAI Integration Cleanup
+        if cls._openai_integration is not None:
+            try:
+                debug_info(
+                    heading="MODEL_MANAGER • CLEANUP",
+                    body="Cleaning up OpenAI integration",
+                    metadata={"cleanup_type": "openai_integration"}
+                )
+                OpenAIIntegration.cleanup()
+                cls._openai_integration = None
+                cls._is_openai_mode = False
+                debug_info(
+                    heading="MODEL_MANAGER • CLEANUP_SUCCESS",
+                    body="OpenAI integration cleanup completed",
+                    metadata={"cleanup_type": "openai_integration", "status": "completed"}
+                )
+            except Exception as openai_cleanup_error:
+                RichTracebackManager.handle_exception(
+                    openai_cleanup_error,
+                    context="OpenAI Integration Cleanup",
+                    extra_context={"integration_status": "cleanup_failed"}
+                )
+                debug_error(
+                    heading="MODEL_MANAGER • CLEANUP_ERROR",
+                    body=f"Error during OpenAI integration cleanup: {openai_cleanup_error}",
+                    metadata={"cleanup_type": "openai_integration", "error_type": type(openai_cleanup_error).__name__}
+                )
             
-        try:
-            if cls.current_model:
-                try:
-                    if settings.socket_con:
-                        settings.socket_con.send_error(f"🧹 Cleaning up model: {cls.current_model}")
-                    cls._stop_model()
-                    cls.current_model = None
-                    if settings.socket_con:
-                        settings.socket_con.send_error("✅ Model cleanup completed")
-                except Exception as model_cleanup_error:
-                    RichTracebackManager.handle_exception(
-                        model_cleanup_error,
-                        context="Ollama Model Cleanup",
-                        extra_context={"current_model": cls.current_model}
-                    )
-                    if settings.socket_con:
-                        settings.socket_con.send_error(f"❌ Error during model cleanup: {model_cleanup_error}")
-        except Exception as e:
-            RichTracebackManager.handle_exception(
-                e,
-                context="Ollama Model Cleanup Wrapper",
-                extra_context={"cleanup_phase": "ollama_model"}
-            )
+        # Ollama Model Cleanup
+        if cls.current_model:
+            try:
+                debug_info(
+                    heading="MODEL_MANAGER • MODEL_CLEANUP",
+                    body=f"Cleaning up model: {cls.current_model}",
+                    metadata={"cleanup_type": "model", "model_name": cls.current_model}
+                )
+                cls._stop_model()
+                cls.current_model = None
+                debug_info(
+                    heading="MODEL_MANAGER • MODEL_CLEANUP_SUCCESS",
+                    body="Model cleanup completed",
+                    metadata={"cleanup_type": "model", "status": "completed"}
+                )
+            except Exception as model_cleanup_error:
+                RichTracebackManager.handle_exception(
+                    model_cleanup_error,
+                    context="Ollama Model Cleanup",
+                    extra_context={"current_model": cls.current_model}
+                )
+                debug_error(
+                    heading="MODEL_MANAGER • MODEL_CLEANUP_ERROR",
+                    body=f"Error during model cleanup: {model_cleanup_error}",
+                    metadata={"cleanup_type": "model", "error_type": type(model_cleanup_error).__name__}
+                )
 
     @staticmethod
     def load_model(model_name: str):
@@ -190,22 +198,42 @@ class ModelManager(ChatOllama):
 
         if model_name not in ModelManager.model_list:
             raise ValueError(f"Model {model_name} is not available. Available models: {ModelManager.model_list}")
-        else:
-            if settings.socket_con:
-                settings.socket_con.send_error(
-                    f"\t[log]current model {ModelManager.current_model}, loading model {model_name}")
-            if not ModelManager.current_model is None:
-                if ModelManager.current_model == model_name:
-                    if settings.socket_con:
-                        settings.socket_con.send_error(f"\t[log]Model {model_name} is already loaded.")
-                else:
-                    ModelManager._stop_model()
-                    ModelManager.current_model = model_name
-                    # Here you would add the actual loading logic
+        
+        # Import debug functions once
+        from src.utils.debug_helpers import debug_info, debug_warning
+        
+        debug_info(
+            heading="MODEL_MANAGER • MODEL_LOADING",
+            body=f"Loading model {model_name}",
+            metadata={
+                "current_model": ModelManager.current_model,
+                "target_model": model_name,
+                "action": "model_loading"
+            }
+        )
+        
+        if ModelManager.current_model is not None:
+            if ModelManager.current_model == model_name:
+                debug_info(
+                    heading="MODEL_MANAGER • MODEL_ALREADY_LOADED",
+                    body=f"Model {model_name} is already loaded",
+                    metadata={"model": model_name, "status": "already_loaded"}
+                )
             else:
+                ModelManager._stop_model()
                 ModelManager.current_model = model_name
-                if settings.socket_con:
-                    settings.socket_con.send_error(f"Model {model_name} loaded successfully.")
+                debug_info(
+                    heading="MODEL_MANAGER • MODEL_SWITCHED",
+                    body=f"Switched to model {model_name}",
+                    metadata={"model": model_name, "status": "switched"}
+                )
+        else:
+            ModelManager.current_model = model_name
+            debug_info(
+                heading="MODEL_MANAGER • MODEL_LOADED",
+                body=f"Model {model_name} loaded successfully",
+                metadata={"model": model_name, "status": "loaded"}
+            )
 
     @classmethod
     def _stop_model(cls):
@@ -213,10 +241,13 @@ class ModelManager(ChatOllama):
         Stops the currently running model using the Ollama CLI.
         """
         if cls.current_model:
-            if settings.socket_con:
-                settings.socket_con.send_error(f"Stopping previous model: {cls.current_model}")
+            from src.utils.debug_helpers import debug_info
+            debug_info(
+                heading="MODEL_MANAGER • MODEL_STOPPING",
+                body=f"Stopping model: {cls.current_model}",
+                metadata={"model": cls.current_model, "action": "stopping"}
+            )
             os.system(f"ollama stop {cls.current_model}")
-        pass
 
     def invoke(
             self,
@@ -398,6 +429,14 @@ class ModelManager(ChatOllama):
             return json_objects[0]
 
         # Fallback: wrap content
-        if settings.socket_con:
-            settings.socket_con.send_error("[warning] json conversion failed, returning content as fallback : " + content[:100])
+        from src.utils.debug_helpers import debug_warning
+        debug_warning(
+            heading="MODEL_MANAGER • JSON_CONVERSION_FAILED",
+            body="JSON conversion failed, returning content as fallback",
+            metadata={
+                "content_preview": content[:100],
+                "content_length": len(content),
+                "fallback_action": "wrap_as_content"
+            }
+        )
         return {"content": content}

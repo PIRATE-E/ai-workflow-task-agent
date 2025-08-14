@@ -27,6 +27,7 @@ class SocketManager:
     _socket_con = None
     _log_server_process = None
     _cleanup_in_progress = False  # Flag to prevent new connections during cleanup
+    # Exposed safe wrapper placeholder (assigned after class definition)
 
     def __new__(cls):
         if cls.instance is None:
@@ -318,5 +319,43 @@ class SocketManager:
         print("✅ SocketManager cleanup completed")
 
 
-# Global instance
+# --- Safe Socket Wrapper (merged from former safe_socket_wrapper.py) ---
+class SafeSocketWrapper:
+    """Safe wrapper for socket connections that prevents NoneType errors"""
+    
+    @staticmethod
+    def send_error(message: str):
+        """Safely send error message, handles None socket_con gracefully"""
+        try:
+            if hasattr(settings, 'socket_con') and settings.socket_con is not None:
+                if hasattr(settings.socket_con, 'send_error'):
+                    settings.socket_con.send_error(message)
+                    return True
+                elif hasattr(settings.socket_con, '_is_connected') and settings.socket_con._is_connected():
+                    settings.socket_con.send_error(message)
+                    return True
+            # Fallback to console if no socket connection
+            print(f"[SOCKET_FALLBACK] {message}")
+            return False
+        except Exception as e:
+            # Ultimate fallback - just print to console
+            print(f"[SOCKET_ERROR] Failed to send: {message}")
+            print(f"[SOCKET_ERROR] Error: {e}")
+            return False
+
+    @staticmethod
+    def is_connected():
+        """Check if socket connection is available and connected"""
+        try:
+            if hasattr(settings, 'socket_con') and settings.socket_con is not None:
+                if hasattr(settings.socket_con, '_is_connected'):
+                    return settings.socket_con._is_connected()
+                else:
+                    return True  # Assume connected if no _is_connected method
+            return False
+        except Exception:
+            return False
+
+# Global instances
 socket_manager = SocketManager()
+safe_socket = SafeSocketWrapper()
