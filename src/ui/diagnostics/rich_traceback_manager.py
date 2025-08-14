@@ -54,6 +54,7 @@ class RichTracebackManager:
     _console: Optional[Console] = None
     _error_count = 0
     _error_categories: Dict[str, int] = {}
+    _handling_exception: bool = False  # re-entrancy guard
 
     @classmethod
     def initialize(cls,
@@ -193,106 +194,116 @@ class RichTracebackManager:
             show_locals: Whether to show local variables
             extra_context: Additional context information to display
         """
-        if not cls._initialized:
-            raise RuntimeError("RichTracebackManager not initialized. Call initialize() first.")
-
-        # Auto-detect exception info if not provided
-        if exc_type is None or exc_traceback is None:
-            exc_type, exc_value, exc_traceback = sys.exc_info()
-            if exc_value is None:
-                exc_value = exception
-
-        # Increment error tracking
-        cls._error_count += 1
-        error_category = exc_type.__name__ if exc_type else type(exception).__name__
-        cls._error_categories[error_category] = cls._error_categories.get(error_category, 0) + 1
-
-        # Create rich traceback with cleaner formatting
-        if exc_traceback:
-            rich_traceback = Traceback.from_exception(
-                exc_type,
-                exception,
-                exc_traceback,
-                show_locals=False,  # Always disabled for cleaner display
-                max_frames=8,       # Limit frames for readability
-                width=130           # Wider for better display
-            )
-        else:
-            # Fallback for cases where traceback is not available
-            rich_traceback = Traceback(
-                trace=traceback.extract_tb(sys.exc_info()[2]) if sys.exc_info()[2] else [],
-                exc_type=exc_type.__name__ if exc_type else type(exception).__name__,
-                exc_value=str(exception),
-                show_locals=False,  # Always disabled for cleaner display
-                max_frames=8,       # Limit frames for readability
-                width=130           # Wider for better display
-            )
-
-        # Create error panel with context
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-        # Build context information
-        context_info = [
-            f"🕒 Time: {timestamp}",
-            f"📍 Context: {context}",
-            f"🔢 Error #{cls._error_count}",
-            f"📊 Category: {error_category}"
-        ]
-
-        # Add extra context if provided
-        if extra_context:
-            context_info.append("📋 Additional Context:")
-            for key, value in extra_context.items():
-                context_info.append(f"   • {key}: {value}")
-
-        # Add caller information
-        caller_info = cls._get_caller_info()
-        if caller_info:
-            context_info.extend([
-                "📞 Called from:",
-                f"   • File: {caller_info['file']}",
-                f"   • Function: {caller_info['function']}",
-                f"   • Line: {caller_info['line']}"
-            ])
-
-        context_text = "\n".join(context_info)
-
-        # Create the error panel with better formatting
-        error_panel = Panel(
-            rich_traceback,
-            title=f"🚨 {error_category}: {str(exception)[:80]}{'...' if len(str(exception)) > 80 else ''}",
-            subtitle=context_text,
-            border_style="red",
-            padding=(1, 1),  # Less padding for cleaner display
-            width=135         # Wider panel for better readability
-        )
-
-        # Display the error - ONLY to debug console, never to user window
-        # Use safe debug helpers instead of direct socket_con access
-        try:
-            from src.ui.diagnostics.debug_helpers import debug_rich_panel, debug_error
-            
-            # Try to send the rich panel first
-            debug_rich_panel(error_panel)
-            
-        except Exception as debug_error_exception:
-            # Fallback to structured debug message if rich panel fails
+        # Re-entrancy guard to prevent infinite recursion
+        if getattr(cls, "_handling_exception", False):
             try:
-                from src.ui.diagnostics.debug_helpers import debug_error
-                debug_error(
-                    heading="RICH_TRACEBACK • ERROR",
-                    body=f"{error_category}: {str(exception)[:100]}",
-                    metadata={
-                        "context": context,
-                        "error_category": error_category,
-                        "error_count": cls._error_count,
-                        "panel_error": str(debug_error_exception)[:50]
-                    }
+                print(f"RICH_TRACEBACK_FALLBACK: {type(exception).__name__}: {str(exception)[:120]} ({context})")
+            except Exception:
+                pass
+            return
+        cls._handling_exception = True
+        try:
+            if not cls._initialized:
+                raise RuntimeError("RichTracebackManager not initialized. Call initialize() first.")
+
+            # Auto-detect exception info if not provided
+            if exc_type is None or exc_traceback is None:
+                exc_type, exc_value, exc_traceback = sys.exc_info()
+                if exc_value is None:
+                    exc_value = exception
+
+            # Increment error tracking
+            cls._error_count += 1
+            error_category = exc_type.__name__ if exc_type else type(exception).__name__
+            cls._error_categories[error_category] = cls._error_categories.get(error_category, 0) + 1
+
+            # Create rich traceback with cleaner formatting
+            if exc_traceback:
+                rich_traceback = Traceback.from_exception(
+                    exc_type,
+                    exception,
+                    exc_traceback,
+                    show_locals=False,  # Always disabled for cleaner display
+                    max_frames=8,       # Limit frames for readability
+                    width=130           # Wider for better display
                 )
-            except Exception as final_fallback:
-                # Ultimate fallback - just print to console
-                print(f"🚨 ERROR #{cls._error_count}: {error_category} in {context} - {str(exception)[:100]}")
-                print(f"Debug system error: {final_fallback}")
+            else:
+                # Fallback for cases where traceback is not available
+                rich_traceback = Traceback(
+                    trace=traceback.extract_tb(sys.exc_info()[2]) if sys.exc_info()[2] else [],
+                    exc_type=exc_type.__name__ if exc_type else type(exception).__name__,
+                    exc_value=str(exception),
+                    show_locals=False,  # Always disabled for cleaner display
+                    max_frames=8,       # Limit frames for readability
+                    width=130           # Wider for better display
+                )
+
+            # Create error panel with context
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+            # Build context information
+            context_info = [
+                f"🕒 Time: {timestamp}",
+                f"📍 Context: {context}",
+                f"🔢 Error #{cls._error_count}",
+                f"📊 Category: {error_category}"
+            ]
+
+            # Add extra context if provided
+            if extra_context:
+                context_info.append("📋 Additional Context:")
+                for key, value in extra_context.items():
+                    context_info.append(f"   • {key}: {value}")
+
+            # Add caller information
+            caller_info = cls._get_caller_info()
+            if caller_info:
+                context_info.extend([
+                    "📞 Called from:",
+                    f"   • File: {caller_info['file']}",
+                    f"   • Function: {caller_info['function']}",
+                    f"   • Line: {caller_info['line']}"
+                ])
+
+            context_text = "\n".join(context_info)
+
+            # Create the error panel with better formatting
+            error_panel = Panel(
+                rich_traceback,
+                title=f"🚨 {error_category}: {str(exception)[:80]}{'...' if len(str(exception)) > 80 else ''}",
+                subtitle=context_text,
+                border_style="red",
+                padding=(1, 1),  # Less padding for cleaner display
+                width=135         # Wider panel for better readability
+            )
+
+            # Display the error - ONLY to debug console, never to user window
+            # Use safe debug helpers instead of direct socket_con access
+            try:
+                from src.ui.diagnostics.debug_helpers import debug_rich_panel, debug_error
+                
+                # Try to send the rich panel first
+                debug_rich_panel(error_panel)
+                
+            except Exception as debug_error_exception:
+                # Fallback to structured debug message if rich panel fails
+                try:
+                    from src.ui.diagnostics.debug_helpers import debug_error
+                    debug_error(
+                        heading="RICH_TRACEBACK • ERROR",
+                        body=f"{error_category}: {str(exception)[:100]}",
+                        metadata={
+                            "context": context,
+                            "error_category": error_category,
+                            "error_count": cls._error_count,
+                            "panel_error": str(debug_error_exception)[:50]
+                        }
+                    )
+                except Exception:
+                    # Ultimate fallback - just print to console
+                    print(f"🚨 ERROR #{cls._error_count}: {error_category} in {context} - {str(exception)[:100]}")
+        finally:
+            cls._handling_exception = False
 
     @classmethod
     def _get_caller_info(cls) -> Optional[Dict[str, str]]:
