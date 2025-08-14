@@ -1,4 +1,3 @@
-import inspect
 import os
 import socket
 import subprocess
@@ -21,6 +20,27 @@ except ImportError:
 # Import settings - handle case where it might not be available
 from src.config import settings
 
+# Structured debug protocol imports (lazy fallback if unavailable)
+try:
+    from src.ui.diagnostics.debug_message_protocol import DebugMessageSender, LogLevel
+except ImportError:  # Minimal fallbacks so legacy still works
+    class DebugMessageSender:  # type: ignore
+        def __init__(self, socket_connection=None):
+            self.socket_connection = socket_connection
+        def send_plain_text(self, text: str):
+            if self.socket_connection and hasattr(self.socket_connection, 'send_error'):
+                self.socket_connection.send_error(text)
+            else:
+                print(text)
+        # Unified interface expected below
+        def send_debug_message(self, heading, body, level, metadata=None):
+            self.send_plain_text(f"[{level}] {heading} - {body} :: {metadata or {}}")
+    class LogLevel:  # type: ignore
+        INFO = 'INFO'
+        WARNING = 'WARNING'
+        ERROR = 'ERROR'
+        CRITICAL = 'CRITICAL'
+
 
 class SocketManager:
     instance = None
@@ -38,6 +58,10 @@ class SocketManager:
     def get_socket_con():
         """Get socket connection only when needed"""
         return SocketManager().get_socket_connection() if settings.ENABLE_SOCKET_LOGGING else None
+
+    def _build_debug_sender(self):
+        """Internal helper to always return a DebugMessageSender bound to current connection"""
+        return DebugMessageSender(self._socket_con)
 
     def start_log_server(self):
         """Start the log server as a subprocess"""
@@ -192,75 +216,85 @@ class SocketManager:
             return None
 
         # === STEP 1: HEALTH CHECK EXISTING CONNECTION ===
-        # Your brilliant insight: Check if connection is HEALTHY, not just exists
         if self._socket_con is not None:
-            if self._socket_con._is_connected():
-                # Connection exists and is healthy - reuse it
+            if hasattr(self._socket_con, '_is_connected') and self._socket_con._is_connected():
                 return self._socket_con
             else:
-                # Connection exists but is dead - clear it for reconnection
                 print("🔄 Detected dead connection, clearing for reconnection...")
                 try:
-                    self._socket_con.client_socket.close()
+                    if hasattr(self._socket_con, 'client_socket'):
+                        self._socket_con.client_socket.close()
                 except Exception as e:
                     print(f"❌ Error closing dead socket: {e}")
                 self._socket_con = None
 
-
-
         if self._socket_con is None:
             try:
-                if not settings.ENABLE_SOCKET_LOGGING:
+                if not getattr(settings, 'ENABLE_SOCKET_LOGGING', False):
                     print("Socket logging is disabled in settings")
                     return None
 
                 # First, try to connect to existing server
                 socket_req = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                socket_req.settimeout(0.5)  # Short timeout for initial connection attempt
-
+                socket_req.settimeout(0.5)
                 try:
                     socket_req.connect((settings.SOCKET_HOST, settings.SOCKET_PORT))
                     self._socket_con = SocketCon(socket_req)
                     print("✅ Connected to existing log server")
+                    settings.socket_con = self._socket_con  # expose raw connection
                     return self._socket_con
-
                 except (ConnectionRefusedError, socket.timeout):
                     print("📡 No log server found, starting new one...")
                     socket_req.close()
-
-                    # Start the log server
                     if self.start_log_server():
-                        # Wait a bit more for server to be ready
                         time.sleep(1)
-
-                        # Try to connect again
                         socket_req = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                        socket_req.settimeout(2)  # Longer timeout for new server
+                        socket_req.settimeout(2)
                         socket_req.connect((settings.SOCKET_HOST, settings.SOCKET_PORT))
                         self._socket_con = SocketCon(socket_req)
+                        settings.socket_con = self._socket_con
                         print("✅ Connected to newly started log server")
                         return self._socket_con
                     else:
                         print("❌ Failed to start log server")
                         return None
-
             except Exception as e:
                 print(f"❌ Error establishing socket connection: {e}")
                 self._socket_con = None
-
         return self._socket_con
 
     def send_error(self, message: str):
-        """Send error message through socket if available, otherwise print to console"""
+        """LEGACY: Send error (now bridged to structured protocol)."""
         socket_con = self.get_socket_connection()
-        if socket_con:
+        sender = self._build_debug_sender() if socket_con else None
+        if sender:
             try:
-                socket_con.send_error(message + "\n")
+                # Heuristic parsing for legacy level prefix like [ERROR]
+                level = LogLevel.INFO
+                heading = "LEGACY • MESSAGE"
+                body = message.strip()
+                if body.startswith('[') and ']' in body.split('\n', 1)[0]:
+                    prefix = body[1:body.find(']')].upper()
+                    body_no_prefix = body[body.find(']') + 1:].strip()
+                    heading = f"LEGACY • {prefix}"
+                    body = body_no_prefix or body
+                    level_map = {
+                        'DEBUG': LogLevel.DEBUG if hasattr(LogLevel, 'DEBUG') else LogLevel.INFO,
+                        'INFO': LogLevel.INFO,
+                        'WARNING': LogLevel.WARNING,
+                        'WARN': LogLevel.WARNING,
+                        'ERROR': LogLevel.ERROR,
+                        'CRITICAL': LogLevel.CRITICAL
+                    }
+                    level = level_map.get(prefix, LogLevel.INFO)
+                sender.send_debug_message(heading=heading, body=body, level=level, metadata={"origin": "legacy_send_error"})
             except Exception as e:
-                print(f"Failed to send error through socket: {e}")
-                print(f"Original error message: {message}")
-                # Reset connection on failure so it can be retried
-                self._socket_con = None
+                print(f"Failed structured send, falling back. Error: {e}")
+                if socket_con and hasattr(socket_con, 'send_error'):
+                    try:
+                        socket_con.send_error(message + '\n')
+                    except Exception as inner:
+                        print(f"Legacy fallback failed: {inner}\nOriginal: {message}")
         else:
             print(f"Socket not available - {message}")
 
@@ -272,7 +306,6 @@ class SocketManager:
 
     def close_connection(self):
         """Close the socket connection and optionally stop the log server"""
-        # Close socket connection first
         if self._socket_con and hasattr(self._socket_con, 'client_socket'):
             try:
                 self._socket_con.client_socket.close()
@@ -280,8 +313,6 @@ class SocketManager:
             except Exception as e:
                 print(f"Error closing socket: {e}")
         self._socket_con = None
-
-        # Stop the log server if we started it
         if self.is_log_server_running():
             print("🔄 Stopping log server subprocess...")
             self.stop_log_server()
@@ -290,72 +321,59 @@ class SocketManager:
     def cleanup(cls):
         """Simple cleanup - just kill the subprocess"""
         print("🧹 Cleaning up SocketManager...")
-
-        # Set flag to prevent new connections
         if hasattr(cls, 'instance') and cls.instance is not None:
             cls.instance._cleanup_in_progress = True
             instance = cls.instance
-
-            # Close socket first (optional, but good practice)
             if instance._socket_con:
                 try:
-                    instance._socket_con.client_socket.close()
-                    print("🔌 Socket closed")
-                except:
-                    pass  # Ignore errors
+                    if hasattr(instance._socket_con, 'client_socket'):
+                        instance._socket_con.client_socket.close()
+                        print("🔌 Socket closed")
+                except Exception:
+                    pass
                 instance._socket_con = None
-
-            # SIMPLE APPROACH: Just kill the subprocess immediately
             if instance._log_server_process is not None:
                 try:
                     print("🛑 Killing log server subprocess...")
-                    instance._log_server_process.kill()  # ✅ Direct kill, no waiting
+                    instance._log_server_process.kill()
                     print("✅ Log server killed")
                 except Exception as e:
                     print(e)
                 finally:
                     instance._log_server_process = None
-
         print("✅ SocketManager cleanup completed")
 
 
-# --- Safe Socket Wrapper (merged from former safe_socket_wrapper.py) ---
+# --- Safe Socket Wrapper (merged & enhanced) ---
 class SafeSocketWrapper:
-    """Safe wrapper for socket connections that prevents NoneType errors"""
-    
-    @staticmethod
-    def send_error(message: str):
-        """Safely send error message, handles None socket_con gracefully"""
-        try:
-            if hasattr(settings, 'socket_con') and settings.socket_con is not None:
-                if hasattr(settings.socket_con, 'send_error'):
-                    settings.socket_con.send_error(message)
-                    return True
-                elif hasattr(settings.socket_con, '_is_connected') and settings.socket_con._is_connected():
-                    settings.socket_con.send_error(message)
-                    return True
-            # Fallback to console if no socket connection
-            print(f"[SOCKET_FALLBACK] {message}")
-            return False
-        except Exception as e:
-            # Ultimate fallback - just print to console
-            print(f"[SOCKET_ERROR] Failed to send: {message}")
-            print(f"[SOCKET_ERROR] Error: {e}")
-            return False
+    """Safe wrapper for socket connections that prevents NoneType errors and bridges legacy calls."""
 
-    @staticmethod
-    def is_connected():
-        """Check if socket connection is available and connected"""
+    def __init__(self, manager: SocketManager):
+        self._manager = manager
+
+    def send_error(self, message: str):  # Legacy external API
+        return self._manager.send_error(message)
+
+    def _is_connected(self):
+        return self._manager.is_connected()
+
+    # Structured helpers for external callers wanting protocol level access
+    def send_debug(self, heading: str, body: str, level: str = 'INFO', metadata=None):
+        sender = self._manager._build_debug_sender()
         try:
-            if hasattr(settings, 'socket_con') and settings.socket_con is not None:
-                if hasattr(settings.socket_con, '_is_connected'):
-                    return settings.socket_con._is_connected()
-                else:
-                    return True  # Assume connected if no _is_connected method
-            return False
-        except Exception:
+            sender.send_debug_message(heading, body, level, metadata or {})
+            return True
+        except Exception as e:
+            print(f"[SAFE_SOCKET_FALLBACK] {heading}: {body} ({e})")
             return False
 
 # Global instances
 socket_manager = SocketManager()
-safe_socket = SafeSocketWrapper()
+safe_socket = SafeSocketWrapper(socket_manager)
+
+# Ensure settings.socket_con always has something usable for legacy code
+try:
+    if not hasattr(settings, 'socket_con') or settings.socket_con is None:
+        settings.socket_con = safe_socket  # Provide wrapper that emulates expected interface
+except Exception:
+    pass
