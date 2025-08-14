@@ -18,9 +18,17 @@ except Exception:
 try:
     _dmp_mod = import_module('src.ui.diagnostics.debug_message_protocol')
     debug_message_protocol = _dmp_mod  # type: ignore
-    # Register legacy module path so 'import src.utils.debug_message_protocol' works
     sys.modules.setdefault('src.utils.debug_message_protocol', _dmp_mod)
     __all__.append('debug_message_protocol')
+except Exception:
+    pass
+
+# Legacy alias for rich_traceback_manager
+try:
+    _rtm_mod = import_module('src.ui.diagnostics.rich_traceback_manager')
+    rich_traceback_manager = _rtm_mod  # type: ignore
+    sys.modules.setdefault('src.utils.rich_traceback_manager', _rtm_mod)
+    __all__.append('rich_traceback_manager')
 except Exception:
     pass
 
