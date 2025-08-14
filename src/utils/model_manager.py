@@ -21,16 +21,12 @@ except ImportError:  # Fallback (older path compatibility)
     rich_exception_handler = _rtm.rich_exception_handler  # type: ignore
     safe_execute = getattr(_rtm, 'safe_execute', lambda f, *a, **k: f(*a, **k))  # type: ignore
 
-# Helper to import debug utilities lazily (after relocation to ui.diagnostics)
-def _import_debug_helpers():
-    try:
-        from src.ui.diagnostics.debug_helpers import (  # type: ignore
-            debug_info, debug_error, debug_warning
-        )
-        return debug_info, debug_error, debug_warning
-    except ImportError:  # Fallback legacy path (if any tooling still expects old layout)
-        from src.ui.diagnostics import debug_helpers as _dh  # type: ignore
-        return _dh.debug_info, _dh.debug_error, _dh.debug_warning
+# ✅ Unified debug helpers (new diagnostics path)
+from src.ui.diagnostics.debug_helpers import (
+    debug_info,
+    debug_warning,
+    debug_error,
+)
 
 
 class ModelManager(ChatOllama):
@@ -137,7 +133,6 @@ class ModelManager(ChatOllama):
         Public method to explicitly clean up all models.
         Can be called manually or by signal handlers.
         """
-        debug_info, debug_error, _debug_warning = _import_debug_helpers()
         # OpenAI Integration Cleanup
         if cls._openai_integration is not None:
             try:
@@ -165,6 +160,7 @@ class ModelManager(ChatOllama):
                     body=f"Error during OpenAI integration cleanup: {openai_cleanup_error}",
                     metadata={"cleanup_type": "openai_integration", "error_type": type(openai_cleanup_error).__name__}
                 )
+            
         # Ollama Model Cleanup
         if cls.current_model:
             try:
@@ -213,7 +209,6 @@ class ModelManager(ChatOllama):
         if model_name not in ModelManager.model_list:
             raise ValueError(f"Model {model_name} is not available. Available models: {ModelManager.model_list}")
         
-        debug_info, _debug_error, debug_warning = _import_debug_helpers()
         debug_info(
             heading="MODEL_MANAGER • MODEL_LOADING",
             body=f"Loading model {model_name}",
@@ -253,7 +248,6 @@ class ModelManager(ChatOllama):
         Stops the currently running model using the Ollama CLI.
         """
         if cls.current_model:
-            debug_info, *_ = _import_debug_helpers()
             debug_info(
                 heading="MODEL_MANAGER • MODEL_STOPPING",
                 body=f"Stopping model: {cls.current_model}",
@@ -441,14 +435,12 @@ class ModelManager(ChatOllama):
             return json_objects[0]
 
         # Fallback: wrap content
-        debug_info, *_ = _import_debug_helpers()
-        debug_info(
+        debug_warning(
             heading="MODEL_MANAGER • JSON_CONVERSION_FAILED",
             body="JSON conversion failed, returning content as fallback",
             metadata={
-                "content_preview": content[:100],
-                "content_length": len(content),
+                "content_preview": str(response)[:100] if response else "",
                 "fallback_action": "wrap_as_content"
             }
         )
-        return {"content": content}
+        return {"content": str(response)}
