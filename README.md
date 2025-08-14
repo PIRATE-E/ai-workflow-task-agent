@@ -1,6 +1,6 @@
 # 🤖 AI-Agent-Workflow Project
 
-> **A production-ready, enterprise-grade consumer desktop AI assistant featuring LangGraph multi-agent architecture, OpenAI integration with NVIDIA API, dynamic tool registry (17 total tools: 3 fundamental + 14 dynamic MCP tools), advanced JSON-RPC MCP integration, and robust development practices.**
+> **A production-ready, enterprise-grade consumer desktop AI assistant featuring LangGraph multi-agent architecture, OpenAI integration with NVIDIA API, dynamic tool registry (17 total tools: 3 fundamental + 14 dynamic MCP tools), advanced JSON-RPC MCP integration, structured diagnostics logging, and robust development practices.**
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![LangGraph](https://img.shields.io/badge/LangGraph-Latest-green.svg)](https://langchain-ai.github.io/langgraph/)
@@ -122,68 +122,83 @@ StateAccessor → Context → Tool Registry → [GoogleSearch | RAGSearch | Tran
 ## 📁 **Project Structure**
 
 ```
-ai-workflow-task-agent/                 🏗️ Enterprise-Grade Organization
-├── src/                               📦 Main Source Code
-│   ├── main_orchestrator.py          🚀 Application Entry Point
-│   ├── agents/                        🤖 Intelligent Agent System
-│   │   ├── chat_llm.py               ├─ LLM Response Generation
-│   │   ├── classify_agent.py         ├─ Message Classification
-│   │   ├── router.py                 ├─ Conversation Routing
-│   │   ├── tool_selector.py          ├─ Dynamic Tool Selection
-│   │   └── agents_schema/            └─ Pydantic Schemas & Validation
-│   ├── core/                          🔧 Core System Components
-│   │   ├── chat_initializer.py       ├─ System Bootstrap & Configuration
-│   │   ├── chat_destructor.py        ├─ Resource Cleanup & Shutdown
-│   │   └── graphs/                   └─ LangGraph Workflow Definition
-│   │       └── node_assign.py        
-│   ├── models/                        📊 Data Models & State Management
-│   │   └── state.py                  └─ LangGraph State & Accessor Pattern
-│   ├── RAG/                           🧠 Retrieval-Augmented Generation
-│   │   └── RAG_FILES/                
-│   │       ├── rag.py                ├─ Document Processing & Vector Search
-│   │       ├── neo4j_rag.py          ├─ Knowledge Graph Operations
-│   │       └── sheets_rag.py         └─ Structured Data Integration
-│   ├── tools/                         🛠️ External Tool Integration
-│   │   └── lggraph_tools/            
-│   │       ├── tool_assign.py        ├─ Tool Registry & Management
-│   │       ├── tool_response_manager.py ├─ Response Handling
-│   │       ├── tools/                ├─ Individual Tool Implementations
-│   │       ├── wrappers/             ├─ Tool Wrapper Classes
-│   │       └── tool_schemas/         └─ Tool Parameter Schemas
-│   ├── prompts/                       📝 Centralized Prompt Management
-│   │   ├── system_prompts.py         ├─ Core System Prompts
-│   │   ├── rag_prompts.py            ├─ RAG-Specific Prompts
-│   │   └── web_search_prompts.py     └─ Search & Classification Prompts
-│   ├── config/                        ⚙️ Configuration Management
-│   │   ├── settings.py               ├─ Environment Variables & Defaults
-│   │   └── configure_logging.py      └─ Logging Configuration Utility
-│   ├── utils/                         🔧 Utility Functions & Helpers
-│   │   ├── socket_manager.py         ├─ Network Logging & Process Management
-│   │   ├── model_manager.py          ├─ AI Model Lifecycle Management
-│   │   ├── error_transfer.py         ├─ Network Error Reporting
-│   │   └── structured_triple_prompt.py └─ Knowledge Graph Utilities
-│   └── ui/                            🎨 User Interface Components
-│       ├── print_banner.py           ├─ ASCII Art & Branding
-│       ├── print_message_style.py    ├─ Rich Console Formatting
-│       └── print_history.py          └─ Conversation History Display
-├── examples/                          📚 Demo Applications & Tutorials
-│   ├── demo_complete_system.py       ├─ Full System Demonstration
-│   ├── demo_subprocess_logging.py    ├─ Logging System Demo
-│   ├── log_viewer_demo.py            └─ Log Visualization Example
-├── tests/                             🧪 Comprehensive Test Suite
-│   ├── integration/                  ├─ Integration & E2E Tests
-│   ├── error_handling/               ├─ Error Handling Tests
-│   ├── model_manager_tests/          ├─ Model Management Tests
-│   └── unit/                         └─ Unit Tests
-├── experimental/                      🔬 Research & Development
-│   ├── chunk_debugger.py             ├─ RAG Chunk Analysis Tools
-│   └── gemini_style_cli/             └─ Advanced CLI Interface Experiments
-├── basic_logs/                        📊 Logging & Monitoring
-│   ├── error_log.txt                 ├─ Application Logs
-│   ├── graph.png                     ├─ Workflow Visualization
-│   └── requirements.txt              └─ Log Server Dependencies
-└── screenshots/                       📸 Documentation Assets
+ai-workflow-task-agent/
+├── src/
+│   ├── main_orchestrator.py              # Application entry point & startup flow
+│   ├── agents/                           # Multi-agent orchestration layer
+│   │   ├── chat_llm.py                   # Core LLM response agent
+│   │   ├── classify_agent.py             # Message intent classification
+│   │   ├── router.py                     # Graph routing logic
+│   │   ├── tool_selector.py              # Intelligent tool selection
+│   │   ├── agent_mode_node.py            # Mode-aware agent node logic
+│   │   └── agents_schema/                # Pydantic schemas & validation
+│   ├── core/
+│   │   ├── chat_initializer.py           # System bootstrap & tool/model setup
+│   │   ├── chat_destructor.py            # Graceful shutdown & cleanup
+│   │   └── graphs/node_assign.py         # LangGraph workflow definition
+│   ├── mcp/                              # MCP protocol integration layer
+│   │   ├── manager.py                    # Server lifecycle + tool discovery (structured logging API)
+│   │   └── dynamically_tool_register.py  # Registers MCP tools dynamically at runtime
+│   ├── models/state.py                   # Global conversation state accessor
+│   ├── RAG/RAG_FILES/                    # Retrieval Augmented Generation assets
+│   │   ├── rag.py                        # Base RAG engine
+│   │   ├── neo4j_rag.py                  # Graph-based retrieval via Neo4j
+│   │   ├── sheets_rag.py                 # Structured sheet ingestion
+│   │   ├── processed_triple.json         # Cached extracted knowledge triples
+│   │   └── processed_hash_chunks.txt     # Deduplication hash registry
+│   ├── tools/lggraph_tools/              # Fundamental & integrated tool layer
+│   │   ├── tool_assign.py                # Aggregates fundamental + MCP tools
+│   │   ├── tool_response_manager.py      # Standardizes tool output handling
+│   │   ├── tools/                        # Tool implementations (search, translate, etc.)
+│   │   ├── wrappers/                     # Tool adaptation layer (filesystem, search, etc.)
+│   │   └── tool_schemas/                 # Typed parameter schemas
+│   ├── prompts/                          # Prompt orchestration bundle
+│   │   ├── system_prompts.py             # Core system control prompts
+│   │   ├── rag_prompts.py                # Retrieval formatting prompts
+│   │   ├── web_search_prompts.py         # Web search strategy prompts
+│   │   ├── agent_mode_prompts.py         # Mode switching guidance
+│   │   └── structured_triple_prompt.py   # Knowledge extraction patterns
+│   ├── config/                           # Configuration & runtime settings
+│   │   ├── settings.py                   # Environment-driven settings model
+│   │   └── configure_logging.py          # Helper to configure display/log modes
+│   ├── ui/                               # Presentation & diagnostics layer
+│   │   ├── print_banner.py               # Launch banner & branding
+│   │   ├── print_history.py              # Conversation history rendering
+│   │   ├── print_message_style.py        # Styled message formatting
+│   │   └── diagnostics/                  # NEW: Structured diagnostics framework
+│   │       ├── debug_helpers.py          # High-level logging API (info/warn/error/tool/api/panel)
+│   │       ├── debug_message_protocol.py # JSON transport + rich object serialization
+│   │       ├── rich_traceback_manager.py # Central exception capture & guarded tracebacks
+│   │       └── __init__.py
+│   ├── utils/                            # Supporting infrastructure utilities
+│   │   ├── socket_manager.py             # Subprocess log server + legacy bridge
+│   │   ├── error_transfer.py             # Raw socket server (receiving side)
+│   │   ├── model_manager.py              # Local/OpenAI model multiplexing
+│   │   ├── open_ai_integration.py        # NVIDIA-compatible OpenAI adapter
+│   │   ├── argument_schema_util.py       # Tool argument schema extraction
+│   │   └── listeners/                    # Event & status listening utilities
+│   │       ├── event_listener.py         # Generic event propagation
+│   │       └── rich_status_listen.py     # Rich UI status listener
+│   └── ui/rich_error_print.py            # Rich terminal error rendering (server side)
+├── tests/                                # Automated test suites
+├── examples/                             # Demonstrations and integration samples
+├── experimental/                         # Research and prototype modules
+├── basic_logs/                           # Generated graphs & file logging fallback
+└── screenshots/                          # Documentation imagery
 ```
+
+### 🆕 Diagnostics Refactor (Structured Logging)
+Legacy `settings.socket_con.send_error()` calls have been migrated to a structured, transport-agnostic diagnostics layer:
+- `debug_helpers.py` exposes semantic logging functions (`debug_info`, `debug_warning`, `debug_error`, `debug_tool_response`, `debug_api_call`, `debug_rich_panel`).
+- `debug_message_protocol.py` normalizes messages into typed JSON envelopes and handles Rich renderable (Panel) pickling/base64 transport.
+- `rich_traceback_manager.py` centralizes exception capture with a recursion guard to prevent infinite logging loops.
+- `socket_manager.py` now bridges legacy calls while promoting new helpers (adapter pattern).
+- `manager.py` (MCP) fully migrated to the structured API (no raw socket writes remain).
+
+Benefits:
+- Consistent metadata-rich events across subsystems.
+- Safer error handling (re-entrancy guarded) and reduced recursion failures.
+- Future transport flexibility (websocket, file aggregation, etc.).
 
 ---
 
