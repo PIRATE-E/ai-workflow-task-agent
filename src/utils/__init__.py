@@ -2,23 +2,29 @@
 # Provide backward-compatible re-exports to new diagnostics package when available
 
 from importlib import import_module
+import sys
 
 __all__ = []
 
 # Backward compatibility: expose debug_helpers & debug_message_protocol from new path
 try:
-    debug_helpers = import_module('src.ui.diagnostics.debug_helpers')
+    _dh_mod = import_module('src.ui.diagnostics.debug_helpers')
+    debug_helpers = _dh_mod  # type: ignore
+    sys.modules.setdefault('src.utils.debug_helpers', _dh_mod)
     __all__.append('debug_helpers')
 except Exception:
     pass
 
 try:
-    debug_message_protocol = import_module('src.ui.diagnostics.debug_message_protocol')
+    _dmp_mod = import_module('src.ui.diagnostics.debug_message_protocol')
+    debug_message_protocol = _dmp_mod  # type: ignore
+    # Register legacy module path so 'import src.utils.debug_message_protocol' works
+    sys.modules.setdefault('src.utils.debug_message_protocol', _dmp_mod)
     __all__.append('debug_message_protocol')
 except Exception:
     pass
 
-# Other optional utility modules
+# Other optional utility modules (kept lightweight)
 for _mod_name in [
     'open_ai_integration',
     'model_manager',
@@ -26,7 +32,8 @@ for _mod_name in [
     'structured_triple_prompt',
 ]:
     try:
-        globals()[_mod_name] = import_module(f'src.utils.{_mod_name}')
+        _mod = import_module(f'src.utils.{_mod_name}')
+        globals()[_mod_name] = _mod  # type: ignore
         __all__.append(_mod_name)
     except Exception:
         continue
