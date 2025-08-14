@@ -22,7 +22,6 @@ Usage:
     except Exception as e:
         RichTracebackManager.handle_exception(e, context="Operation description")
 """
-import base64
 import inspect
 import os
 import sys
@@ -33,11 +32,9 @@ from typing import Optional, Dict, Any, Callable
 from rich.console import Console
 from rich.panel import Panel
 from rich.traceback import install, Traceback
-import pickle
-import json
+
 
 # Import settings for socket integration
-from src.config import settings
 
 
 class RichTracebackManager:
@@ -151,7 +148,7 @@ class RichTracebackManager:
         if issubclass(exc_type, UnicodeDecodeError):
             # These are usually from Sentry SDK subprocess monitoring
             # Log to debug console but don't crash the application
-            from src.utils.debug_helpers import debug_warning
+            from src.ui.diagnostics.debug_helpers import debug_warning
             debug_warning(
                 heading="SYSTEM • UNICODE_ERROR",
                 body=f"Unicode Encoding Error in subprocess: {str(exc_value)[:100]}...",
@@ -162,7 +159,7 @@ class RichTracebackManager:
         # ✅ Handle thread exceptions gracefully
         if 'Thread-' in str(exc_traceback) or '_readerthread' in str(exc_traceback):
             # These are background thread errors, usually from Sentry monitoring
-            from src.utils.debug_helpers import debug_warning
+            from src.ui.diagnostics.debug_helpers import debug_warning
             debug_warning(
                 heading="SYSTEM • THREAD_ERROR",
                 body=f"Background Thread Error: {exc_type.__name__}: {str(exc_value)[:100]}...",
@@ -273,7 +270,7 @@ class RichTracebackManager:
         # Display the error - ONLY to debug console, never to user window
         # Use safe debug helpers instead of direct socket_con access
         try:
-            from src.utils.debug_helpers import debug_rich_panel, debug_error
+            from src.ui.diagnostics.debug_helpers import debug_rich_panel, debug_error
             
             # Try to send the rich panel first
             debug_rich_panel(error_panel)
@@ -281,7 +278,7 @@ class RichTracebackManager:
         except Exception as debug_error_exception:
             # Fallback to structured debug message if rich panel fails
             try:
-                from src.utils.debug_helpers import debug_error
+                from src.ui.diagnostics.debug_helpers import debug_error
                 debug_error(
                     heading="RICH_TRACEBACK • ERROR",
                     body=f"{error_category}: {str(exception)[:100]}",
@@ -391,7 +388,7 @@ class RichTracebackManager:
                 f"(threshold: {threshold:.2f}s, exceeded by: {duration - threshold:.2f}s)"
             )
             
-            from src.utils.debug_helpers import debug_performance_warning
+            from src.ui.diagnostics.debug_helpers import debug_performance_warning
             debug_performance_warning(
                 operation="error_handling",
                 duration=duration,
@@ -424,7 +421,7 @@ class RichTracebackManager:
         cls._error_count = 0
         cls._error_categories.clear()
 
-        from src.utils.debug_helpers import debug_info
+        from src.ui.diagnostics.debug_helpers import debug_info
         debug_info(
             heading="SYSTEM • STATISTICS",
             body="Error statistics reset",
@@ -453,35 +450,36 @@ class RichTracebackManager:
         return safe_func
 
 
-# Convenience functions for common use cases
-def rich_exception_handler(context: str = "Unknown Context"):
-    """
-    Decorator for automatic rich exception handling.
-    
-    Usage:
-        @rich_exception_handler("Database Operation")
-        def risky_database_operation():
-            # Your code here
-            pass
-    """
-    return RichTracebackManager.create_context_decorator(context)
+# Ensure decorator and helper exist for external imports
 
+def rich_exception_handler(context_name: str):
+    """Decorator to wrap functions with RichTracebackManager error handling with added context."""
+    def decorator(func):
+        def wrapper(*args, **kwargs):
+            try:
+                return func(*args, **kwargs)
+            except Exception as e:
+                RichTracebackManager.handle_exception(
+                    e,
+                    context=context_name,
+                    extra_context={
+                        "wrapped_function": getattr(func, '__name__', 'unknown'),
+                        "module": getattr(func, '__module__', 'unknown')
+                    }
+                )
+                raise
+        wrapper.__name__ = getattr(func, '__name__', 'wrapped')
+        return wrapper
+    return decorator
 
-def safe_execute(func: Callable, context: str, default_return=None, *args, **kwargs):
-    """
-    Safely execute a function with rich error handling.
-    
-    Args:
-        func: Function to execute
-        context: Context description
-        default_return: Value to return on error
-        *args, **kwargs: Arguments to pass to function
-        
-    Returns:
-        Function result or default_return on error
-    """
+def safe_execute(callable_obj, *args, **kwargs):
+    """Execute a callable capturing and routing exceptions through RichTracebackManager."""
     try:
-        return func(*args, **kwargs)
+        return callable_obj(*args, **kwargs)
     except Exception as e:
-        RichTracebackManager.handle_exception(e, context=context)
-        return default_return
+        RichTracebackManager.handle_exception(
+            e,
+            context=f"safe_execute -> {getattr(callable_obj, '__name__', 'callable')}",
+            extra_context={"args_len": len(args), "kwargs_keys": list(kwargs.keys())}
+        )
+        raise
