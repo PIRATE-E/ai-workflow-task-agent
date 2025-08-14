@@ -13,7 +13,13 @@ from src.config import settings
 from src.utils.open_ai_integration import OpenAIIntegration
 
 # 🎨 Rich Traceback Integration (updated path after refactor)
-from src.ui.diagnostics.rich_traceback_manager import RichTracebackManager, rich_exception_handler, safe_execute
+try:  # Lazy-resilient import in case path shifts
+    from src.ui.diagnostics.rich_traceback_manager import RichTracebackManager, rich_exception_handler, safe_execute
+except ImportError:  # Fallback (older path compatibility)
+    from src.ui.diagnostics import rich_traceback_manager as _rtm  # type: ignore
+    RichTracebackManager = _rtm.RichTracebackManager  # type: ignore
+    rich_exception_handler = _rtm.rich_exception_handler  # type: ignore
+    safe_execute = getattr(_rtm, 'safe_execute', lambda f, *a, **k: f(*a, **k))  # type: ignore
 
 
 class ModelManager(ChatOllama):
