@@ -699,8 +699,7 @@ class OpenAIIntegration:
 
 if __name__ == '__main__':
     # Example usage - uses API key from .env file
-    openai_integration = OpenAIIntegration(
-        api_key="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")
+    openai_integration = OpenAIIntegration()
     print(openai_integration.generate_text("What is the capital of France?", False))  # Non-streaming response
 
     winsound.Beep(4234, 1000)  # Beep to indicate start of OpenAI API call
