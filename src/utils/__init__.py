@@ -1,47 +1,85 @@
-# Minimal exports; avoid importing deprecated debug modules from old location
-# Provide backward-compatible re-exports to new diagnostics package when available
+"""Unified utils package initializer.
+
+Provides a stable, minimal public API and defers heavy imports until
+first attribute access to reduce circular import risk and startup cost.
+
+Public API (lazy for heavy modules):
+    debug_helpers
+    debug_message_protocol
+    rich_traceback_manager
+    open_ai_integration (lazy)
+    model_manager (lazy)
+    socket_manager (lazy)
+
+Backward Compatibility:
+    Older code may attempt: `import src.utils.debug_message_protocol` or
+    `import src.utils.debug_helpers`. We register lightweight aliases in
+    sys.modules so those imports succeed without reintroducing the old
+    heavy eager import pattern.
+"""
+from __future__ import annotations
 
 from importlib import import_module
+from types import ModuleType
+from typing import Dict
 import sys
 
-__all__ = []
+__all__ = [
+    "debug_helpers",
+    "debug_message_protocol",
+    "rich_traceback_manager",
+    "open_ai_integration",
+    "model_manager",
+    "socket_manager",
+]
 
-# Backward compatibility: expose debug_helpers & debug_message_protocol from new path
-try:
-    _dh_mod = import_module('src.ui.diagnostics.debug_helpers')
-    debug_helpers = _dh_mod  # type: ignore
-    sys.modules.setdefault('src.utils.debug_helpers', _dh_mod)
-    __all__.append('debug_helpers')
-except Exception:
-    pass
+_LAZY_MODULES: Dict[str, str] = {
+    "open_ai_integration": "src.utils.open_ai_integration",
+    "model_manager": "src.utils.model_manager",
+    "socket_manager": "src.utils.socket_manager",
+}
 
-try:
-    _dmp_mod = import_module('src.ui.diagnostics.debug_message_protocol')
-    debug_message_protocol = _dmp_mod  # type: ignore
-    sys.modules.setdefault('src.utils.debug_message_protocol', _dmp_mod)
-    __all__.append('debug_message_protocol')
-except Exception:
-    pass
+# Lightweight eager imports (small & safe):
+try:  # debug helpers
+    debug_helpers = import_module("src.ui.diagnostics.debug_helpers")  # type: ignore
+except Exception:  # pragma: no cover
+    debug_helpers = None  # type: ignore
 
-# Legacy alias for rich_traceback_manager
-try:
-    _rtm_mod = import_module('src.ui.diagnostics.rich_traceback_manager')
-    rich_traceback_manager = _rtm_mod  # type: ignore
-    sys.modules.setdefault('src.utils.rich_traceback_manager', _rtm_mod)
-    __all__.append('rich_traceback_manager')
-except Exception:
-    pass
+try:  # message protocol
+    debug_message_protocol = import_module("src.ui.diagnostics.debug_message_protocol")  # type: ignore
+except Exception:  # pragma: no cover
+    debug_message_protocol = None  # type: ignore
 
-# Other optional utility modules (kept lightweight)
-for _mod_name in [
-    'open_ai_integration',
-    'model_manager',
-    'socket_manager',
-    'structured_triple_prompt',
-]:
-    try:
-        _mod = import_module(f'src.utils.{_mod_name}')
-        globals()[_mod_name] = _mod  # type: ignore
-        __all__.append(_mod_name)
-    except Exception:
-        continue
+try:  # traceback manager
+    rich_traceback_manager = import_module("src.ui.diagnostics.rich_traceback_manager")  # type: ignore
+except Exception:  # pragma: no cover
+    rich_traceback_manager = None  # type: ignore
+
+# Register backward-compatible aliases ONLY if available
+if debug_message_protocol is not None:
+    sys.modules.setdefault("src.utils.debug_message_protocol", debug_message_protocol)  # type: ignore
+if debug_helpers is not None:
+    sys.modules.setdefault("src.utils.debug_helpers", debug_helpers)  # type: ignore
+
+_LEGACY_ATTRIBUTE_MAP = {
+    # future: "old_name": "new_name"
+}
+
+
+def __getattr__(name: str) -> ModuleType:  # noqa: D401
+    """Lazily load registered heavy utility submodules."""
+    if name in _LEGACY_ATTRIBUTE_MAP:
+        name = _LEGACY_ATTRIBUTE_MAP[name]
+    if name in _LAZY_MODULES:
+        path = _LAZY_MODULES[name]
+        try:
+            mod = import_module(path)
+            globals()[name] = mod  # cache
+            return mod  # type: ignore
+        except Exception as e:  # pragma: no cover
+            raise AttributeError(f"Failed lazy import '{name}' ({path}): {e}") from e
+    raise AttributeError(f"module 'src.utils' has no attribute '{name}'")
+
+
+def __dir__():  # pragma: no cover
+    return sorted(set(__all__ + [k for k in globals().keys() if not k.startswith('_')]))
