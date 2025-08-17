@@ -11,7 +11,7 @@ It enhances error handling with beautiful, informative tracebacks that show:
 - Integration with socket logging system
 
 Usage:
-    from src.utils.rich_traceback_manager import RichTracebackManager
+    from src.ui.diagnostics.rich_traceback_manager import RichTracebackManager
     
     # Initialize at application start
     RichTracebackManager.initialize()
@@ -30,7 +30,6 @@ from datetime import datetime
 from typing import Optional, Dict, Any, Callable
 
 from rich.console import Console
-from rich.panel import Panel
 from rich.traceback import install, Traceback
 
 
@@ -86,8 +85,17 @@ class RichTracebackManager:
         
         cls._initialized = True
         
-        # Simple initialization log
-        print("🎨 Rich Traceback Manager initialized for main process (display via debug console)")
+        # Route initialization log to debug console
+        try:
+            from src.ui.diagnostics.debug_helpers import debug_info
+            debug_info(
+                heading="SYSTEM • RICH_TRACEBACK",
+                body="Rich Traceback Manager initialized for main process (display via debug console)",
+                metadata={"process_type": "main", "show_locals": show_locals, "max_frames": max_frames}
+            )
+        except Exception:
+            # Fallback only if debug_helpers not available during early initialization
+            pass
 
     @classmethod
     def initialize_debug_process(cls,
@@ -132,8 +140,17 @@ class RichTracebackManager:
         
         cls._initialized = True
         
-        # Debug process initialization log
-        print("🎨 Rich Traceback Manager initialized for debug process with visual display")
+        # Route debug process initialization log to debug console
+        try:
+            from src.ui.diagnostics.debug_helpers import debug_info
+            debug_info(
+                heading="SYSTEM • RICH_TRACEBACK",
+                body="Rich Traceback Manager initialized for debug process with visual display",
+                metadata={"process_type": "debug", "show_locals": show_locals, "max_frames": max_frames, "theme": theme}
+            )
+        except Exception:
+            # Fallback only if debug_helpers not available during early initialization
+            pass
 
     @classmethod
     def _global_exception_handler(cls, exc_type, exc_value, exc_traceback):
@@ -197,8 +214,15 @@ class RichTracebackManager:
         # Re-entrancy guard to prevent infinite recursion
         if getattr(cls, "_handling_exception", False):
             try:
-                print(f"RICH_TRACEBACK_FALLBACK: {type(exception).__name__}: {str(exception)[:120]} ({context})")
+                # Route recursion fallback to debug console
+                from src.ui.diagnostics.debug_helpers import debug_warning
+                debug_warning(
+                    heading="SYSTEM • RECURSION_GUARD",
+                    body=f"Rich Traceback recursion prevented: {type(exception).__name__}: {str(exception)[:120]}",
+                    metadata={"context": context, "recursion_guard": True}
+                )
             except Exception:
+                # Ultimate fallback - but this should rarely happen
                 pass
             return
         cls._handling_exception = True
@@ -267,23 +291,26 @@ class RichTracebackManager:
 
             context_text = "\n".join(context_info)
 
-            # Create the error panel with better formatting
-            error_panel = Panel(
-                rich_traceback,
-                title=f"🚨 {error_category}: {str(exception)[:80]}{'...' if len(str(exception)) > 80 else ''}",
-                subtitle=context_text,
-                border_style="red",
-                padding=(1, 1),  # Less padding for cleaner display
-                width=135         # Wider panel for better readability
-            )
-
             # Display the error - ONLY to debug console, never to user window
-            # Use safe debug helpers instead of direct socket_con access
+            # TODO currently we are not sending the panel to the debug window instead we are printing the error (this could be changed later)
+            # Use simple print instead of panel sending
             try:
-                from src.ui.diagnostics.debug_helpers import debug_rich_panel, debug_error
+                from src.ui.diagnostics.debug_helpers import debug_error
                 
-                # Try to send the rich panel first
-                debug_rich_panel(error_panel)
+                # Print error content directly instead of sending panel
+                error_content = f"🚨 {error_category}: {str(exception)}\n\nContext: {context_text}\n\nTraceback:\n{traceback.format_exc()}"
+                print(f"[RICH_TRACEBACK_ERROR] {error_content}")
+                # now send the error to the debug console
+                debug_error(
+                    heading=error_category,
+                    body=f"{str(exception)}\n\n{rich_traceback}",
+                    metadata={
+                        "context": context,
+                        "error_category": error_category,
+                        "error_count": cls._error_count,
+                        "caller_info": caller_info if caller_info else None
+                    }
+                )
                 
             except Exception as debug_error_exception:
                 # Fallback to structured debug message if rich panel fails
@@ -291,17 +318,27 @@ class RichTracebackManager:
                     from src.ui.diagnostics.debug_helpers import debug_error
                     debug_error(
                         heading="RICH_TRACEBACK • ERROR",
-                        body=f"{error_category}: {str(exception)[:100]}",
+                        body=f"{error_category}: {str(exception)}",
                         metadata={
                             "context": context,
                             "error_category": error_category,
                             "error_count": cls._error_count,
-                            "panel_error": str(debug_error_exception)[:50]
+                            "panel_error": str(debug_error_exception)
                         }
                     )
                 except Exception:
-                    # Ultimate fallback - just print to console
-                    print(f"🚨 ERROR #{cls._error_count}: {error_category} in {context} - {str(exception)[:100]}")
+                    # Ultimate fallback - route to debug console via socket if available
+                    try:
+                        from src.config import settings
+                        if hasattr(settings, 'socket_con') and settings.socket_con:
+                            fallback_msg = f"🚨 ERROR #{cls._error_count}: {error_category} in {context} - {str(exception)}"
+                            settings.socket_con.send_error(fallback_msg)
+                        else:
+                            # Only print to console if absolutely no other option
+                            pass  # Suppress console output to prevent user window spam
+                    except Exception:
+                        # Suppress all output to prevent user window spam
+                        pass
         finally:
             cls._handling_exception = False
 

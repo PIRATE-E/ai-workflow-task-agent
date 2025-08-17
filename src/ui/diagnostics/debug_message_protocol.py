@@ -31,12 +31,11 @@ Usage:
 import base64
 import json
 import pickle
+from dataclasses import dataclass, asdict
 from datetime import datetime
 from enum import Enum
 from typing import Dict, Any, Optional, Union
-from dataclasses import dataclass, asdict
 
-from rich.panel import Panel
 from rich.console import RenderableType
 
 
@@ -210,11 +209,14 @@ class DebugMessageSender:
                     fallback_msg = f"[ERROR] Failed to send structured message: {e}"
                     self.socket_connection.send_error(fallback_msg)
                 else:
-                    # Ultimate fallback to console if socket connection becomes None
-                    print(f"DEBUG_FALLBACK: Failed to send structured message: {e}")
+                    # Ultimate fallback - suppress console output to prevent user window spam
+                    # Debug messages should only go to debug window, never to user console
+                    pass
         else:
-            # No socket connection - print to console as fallback
-            print(f"DEBUG: {message.to_json()}")
+            # No socket connection - suppress console output to prevent user window spam
+            # print(f"[DEBUG] No socket connection available to send message: {message.to_json()}")
+            # Debug messages should only go to debug window, never to user console
+            pass
     
     def send_plain_text(self, text: str):
         """Send simple plain text message"""
