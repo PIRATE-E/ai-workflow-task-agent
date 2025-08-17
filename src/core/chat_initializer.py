@@ -3,8 +3,6 @@ import json
 import platform
 from threading import Thread
 
-from neo4j import GraphDatabase
-
 from src.config import settings
 from langgraph.graph.state import CompiledStateGraph
 from rich import console, prompt, inspect
@@ -15,7 +13,8 @@ from src.ui.print_message_style import print_message
 from src.utils.socket_manager import SocketManager
 
 # 🎨 Rich Traceback Integration
-from src.utils.rich_traceback_manager import RichTracebackManager, rich_exception_handler, safe_execute
+from src.ui.diagnostics.rich_traceback_manager import RichTracebackManager, rich_exception_handler
+from src.ui.diagnostics.debug_helpers import debug_warning, debug_info
 
 # mcp servers integration
 from src.tools.lggraph_tools.wrappers.mcp_wrapper.filesystem_wrapper import FileSystemWrapper
@@ -47,13 +46,11 @@ class ChatInitializer:
         try:
             # Import here to avoid circular imports
             from langchain_core.messages import HumanMessage, AIMessage, BaseMessage
-            import sentry_sdk
-            sentry_sdk.init(
-                dsn="https://1df631d527493b6f96c55ffe9d42cc32@o4509761254981632.ingest.us.sentry.io/4509761281458176",
-                # Add data like request headers and IP for users,
-                # see https://docs.sentry.io/platforms/python/data-management/data-collected/ for more info
-                send_default_pii=True,
-            )
+            try:
+                import sentry_sdk  # Optional; ignore if missing
+                sentry_sdk.init(send_default_pii=True)
+            except Exception:
+                pass
 
             # we must set the console for rich console to use it in different classes to the settings
             settings.console = self.console
@@ -168,35 +165,62 @@ class ChatInitializer:
                 context="MCP Server Initialization",
                 extra_context={"phase": "mcp_manager_import_and_setup"}
             )
-            raise
+            # Non-fatal
 
     @rich_exception_handler("Neo4j Database Initialization")
     def initialize_neo4j(self):
-        """
-        Initialize Neo4j connection if not already initialized.
-        This method can be extended to initialize any required Neo4j settings.
-        """
+        from src.ui.diagnostics.debug_helpers import debug_warning, debug_info
+        """Attempt to initialize Neo4j connection; skip silently if unavailable."""
         try:
+            try:
+                from neo4j import GraphDatabase  # type: ignore
+            except Exception:
+                # Neo4j not installed; log and return
+                debug_warning(heading="Neo4j Driver Not Found",
+                              body="Neo4j driver is not installed. Skipping Neo4j initialization.",
+                                metadata={
+                                    "neo4j_uri": settings.NEO4J_URI,
+                                    "neo4j_user": settings.NEO4J_USER,}
+                              )
+                return
+            # if neo4j driver is installed, try to create the driver
             settings.neo4j_driver = GraphDatabase.driver(
                 settings.NEO4J_URI,
                 auth=(settings.NEO4J_USER, settings.NEO4J_PASSWORD),
             )
             if settings.neo4j_driver is None:
-                raise RuntimeError("Failed to create Neo4j driver. Please check your NEO4J_URI, NEO4J_USER, and NEO4J_PASSWORD settings.")
-            settings.socket_con.send_error("[LOG]Neo4j connection initialized successfully.")
+                raise RuntimeError("Failed to create Neo4j driver.")
+            debug_info(
+                heading="Neo4j Driver Initialized",
+                body="Neo4j driver created successfully.",
+                metadata={
+                    "neo4j_uri": settings.NEO4J_URI,
+                    "neo4j_user": settings.NEO4J_USER,
+                    "driver_status": "created_successfully"
+                }
+            )
         except Exception as e:
+            # Log but DO NOT raise (make optional)
             RichTracebackManager.handle_exception(
                 e,
-                context="Neo4j Database Connection",
+                context="Neo4j Database Connection (optional)",
                 extra_context={
                     "neo4j_uri": settings.NEO4J_URI,
                     "neo4j_user": settings.NEO4J_USER,
-                    "driver_status": "failed_to_create"
+                    "driver_status": "failed_to_create_optional"
                 }
             )
             if settings.socket_con:
-                settings.socket_con.send_error(f"Error connecting to Neo4j database: {e}")
-            raise RuntimeError(f"Failed to connect to Neo4j database: {e}")
+                debug_warning(
+                    heading="Neo4j Driver Initialization Failed",
+                    body="Neo4j driver initialization failed. Continuing without Neo4j support.",
+                    metadata={
+                        "neo4j_uri": settings.NEO4J_URI,
+                        "neo4j_user": settings.NEO4J_USER,
+                        "error_message": str(e)
+                    }
+                )
+            settings.neo4j_driver = None
 
     @rich_exception_handler("Tool Registration")
     def tools_register(self):
@@ -209,9 +233,10 @@ class ChatInitializer:
             from src.tools.lggraph_tools.wrappers.google_wrapper import GoogleSearchToolWrapper
             from src.tools.lggraph_tools.wrappers.translate_wrapper import TranslateToolWrapper
             from src.tools.lggraph_tools.wrappers.rag_search_classifier_wrapper import RagSearchClassifierWrapper
+            from src.tools.lggraph_tools.wrappers.run_shell_comand_wrapper import ShellCommandWrapper
             # schema
             from src.tools.lggraph_tools.tool_schemas.tools_structured_classes import google_search, rag_search_message, \
-                TranslationMessage
+                TranslationMessage, run_shell_command_message
 
             # dynamically register tools
             from src.mcp.dynamically_tool_register import DynamicToolRegister
@@ -222,7 +247,8 @@ class ChatInitializer:
             tool_configs = [
                 ("GoogleSearch", GoogleSearchToolWrapper, "For general web searches (recent info, facts, news).", google_search),
                 ("RAGSearch", RagSearchClassifierWrapper, "For searching the knowledge base (RAG search).", rag_search_message),
-                ("Translatetool", TranslateToolWrapper, "For translating messages into different languages.", TranslationMessage)
+                ("Translatetool", TranslateToolWrapper, "For translating messages into different languages.", TranslationMessage),
+                ("RunShellCommand", ShellCommandWrapper, "For executing shell commands.", run_shell_command_message),
             ]
             
             for name, func, description, schema in tool_configs:
@@ -253,9 +279,13 @@ class ChatInitializer:
             ToolAssign.set_tools_list(tools)
             self.tools = ToolAssign.get_tools_list()
             
-            # Log successful registration
-            if settings.socket_con:
-                settings.socket_con.send_error(f"[LOG] Successfully registered {len(tools)} tools")
+            debug_info(
+                heading="Tools Registered",
+                body=f"Registered {len(self.tools)} tools successfully.",
+                metadata={
+                    "tools_count": len(self.tools),
+                }
+            )
             
             return self
             
@@ -288,26 +318,8 @@ class ChatInitializer:
                 self.break_loop = True
             else:
                 try:
-                    # Add user message to state
                     self._state["messages"].append(settings.HumanMessage(content=user_input))
-                    
-                    # # Set response in ToolResponseManager with error handling
-                    # try:
-                    #     # Import when needed to avoid circular import issues
-                    #     from src.tools.lggraph_tools.tool_response_manager import ToolResponseManager
-                    #     ToolResponseManager().set_response([settings.HumanMessage(content=user_input)])
-                    # except Exception as tool_manager_error:
-                    #     RichTracebackManager.handle_exception(
-                    #         tool_manager_error,
-                    #         context="ToolResponseManager Setup",
-                    #         extra_context={"user_input_length": len(user_input)}
-                    #     )
-                    #     # Continue without tool response manager if it fails
-                    
-                    # Print user message
                     print_message(user_input, sender="user")
-                    
-                    # Invoke graph with error handling
                     try:
                         self._state = self.graph.invoke(self._state)
                     except Exception as graph_error:
@@ -320,10 +332,7 @@ class ChatInitializer:
                                 "message_type": self._state.get("message_type")
                             }
                         )
-                        # Re-raise graph errors as they're critical
                         raise
-                    
-                    # Sync state accessor
                     try:
                         self.state_accessor.sync_with_langgraph(self._state)
                     except Exception as sync_error:
@@ -332,8 +341,6 @@ class ChatInitializer:
                             context="State Accessor Sync",
                             extra_context={"state_keys": list(self._state.keys())}
                         )
-                        # Continue even if sync fails
-                        
                 except Exception as chat_processing_error:
                     RichTracebackManager.handle_exception(
                         chat_processing_error,
@@ -343,10 +350,7 @@ class ChatInitializer:
                             "processing_phase": "message_handling"
                         }
                     )
-                    # Continue the chat loop even if one message fails
                     self.console.print("[bold red]Error processing message. Please try again.[/bold red]")
-            
-            # Garbage collection with error handling
             try:
                 gc.collect()
             except Exception as gc_error:
@@ -355,11 +359,10 @@ class ChatInitializer:
                     context="Garbage Collection",
                     extra_context={"phase": "post_chat_cleanup"}
                 )
-                
         except Exception as e:
             RichTracebackManager.handle_exception(
                 e,
                 context="Chat Execution Loop",
-                extra_context={"phase": "main_chat_loop"}
-            )
+                extra_context={"phase": "main_chat_loop"
+            })
             raise
