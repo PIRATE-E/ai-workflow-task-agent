@@ -424,158 +424,126 @@ class Prompt:
         return SYSTEM_PROMPT, prompt
 
     # ---------------------------------------------------------------------------
-    # 4. FINAL WORKFLOW EVALUATION PROMPT - CONTEXT-AWARE VERSION
+    # 4. SIMPLIFIED FINAL WORKFLOW EVALUATION PROMPT - ULTRA-RELIABLE VERSION
     # ---------------------------------------------------------------------------
     def evaluate_final_response(self, final_response, original_request, execution_history, tool_results, full_context=None) -> tuple[str, str]:
         """
-        Final workflow assessment with ENHANCED context awareness.
-        EXPECTED OUTPUT: SINGLE JSON OBJECT (never list) with required sections.
-        user_response.message MUST be clear, human-friendly, structured, and helpful.
+        🔧 SIMPLIFIED v4.0: Ultra-reliable final evaluation with simple 2-key JSON structure.
         
-        🔧 ENHANCED v3.0: Context-aware final evaluation with comprehensive workflow understanding.
+        EXPECTED OUTPUT: SIMPLE JSON OBJECT with only 2 keys - user_response and analysis
+        This addresses LLM reliability issues with complex nested structures that often return lists instead of dicts.
+        
+        Args:
+            final_response: The raw tool response before polishing
+            original_request: User's original request
+            execution_history: List of tools executed with context
+            tool_results: Results from tool executions
+            full_context: Comprehensive workflow context for analysis
+            
+        Returns:
+            Tuple of (system_prompt, user_prompt) for simple, reliable evaluation
         """
         SYSTEM_PROMPT = """
-        🎯 ROLE: Context-Aware Workflow Completion Evaluator & Response Composer
+        🎯 ROLE: Simple & Reliable Final Response Evaluator
 
-        🧠 CONTEXT INTELLIGENCE PROTOCOL:
-        You are an intelligent evaluator that considers the FULL CONTEXT of the entire workflow,
-        conversation history, execution patterns, and user intent evolution to create comprehensive evaluations.
+        🚨 CRITICAL RELIABILITY PROTOCOL:
+        You are designed for MAXIMUM JSON RELIABILITY. Your job is to create a simple, well-structured 
+        final response that the user will see, plus identify key areas for improvement.
 
-        📊 CONTEXT AWARENESS FRAMEWORK:
-        - **Conversation Evolution**: Understand how the user's request evolved through the conversation
-        - **Workflow Progression**: Assess the logical flow and effectiveness of tool execution
-        - **Intent Fulfillment**: Evaluate how well the final result aligns with user intent
-        - **Learning Patterns**: Identify what worked well and what could be improved
-        - **User Experience**: Consider the overall user experience and satisfaction for both success and failure cases
-
-        🚨 CRITICAL ALERT: YOU MUST RETURN EXACTLY ONE JSON OBJECT - NEVER A LIST, NEVER A STRING, NEVER ANYTHING ELSE
-
-        ⛔ ABSOLUTELY FORBIDDEN RESPONSES:
-        - ["item1", "item2", "item3"]  ← NEVER DO THIS
-        - "Here is my evaluation..."   ← NEVER DO THIS  
-        - ```json {...} ```           ← NEVER DO THIS
-        - Any response that is not a pure JSON object
-
-        ✅ ONLY ALLOWED RESPONSE FORMAT:
+        ⛔ ABSOLUTE RULE: RETURN EXACTLY THIS JSON STRUCTURE - NOTHING ELSE:
         {
-          "evaluation": {
-            "overall_status": "complete_success" | "partial_success" | "needs_improvement" | "requires_followup",
-            "quality_score": 0.8,
-            "completeness_score": 0.9,
-            "accuracy_score": 0.85,
-            "relevance_score": 0.9,
-            "efficiency_score": 0.75,
-            "user_satisfaction_prediction": 0.85
+          "user_response": {
+            "message": "<clear_human_friendly_summary_of_what_was_accomplished>",
+            "next_steps": "<actionable_next_steps_for_user>"
           },
           "analysis": {
-            "request_fulfillment": "context-aware analysis of how well the request was fulfilled",
-            "workflow_effectiveness": "assessment of tool chain performance considering context",
-            "strengths": ["context-informed strength1", "context-informed strength2"],
-            "weaknesses": ["context-aware weakness1", "context-aware weakness2"],
-            "improvement_opportunities": ["context-based improvement1", "context-based improvement2"]
-          },
-          "user_response": {
-            "message": "🎯 **WORKFLOW SUMMARY** 🎯\\n\\n🧠 **Understanding Your Request:** I analyzed your request in the context of our conversation and understood what you needed.\\n\\n⚙️ **Action Plan Executed:** Based on your request, I identified the appropriate tools and parameters needed to accomplish your task.\\n\\n🔄 **What I Did (Step by Step):**\\n{workflow_steps}\\n\\n📊 **Results Achieved:**\\n{results_summary}\\n\\n✅ **Task Status:** {completion_status}\\n\\n🚀 **Next Steps You Can Take:**\\n{next_steps_detailed}\\n\\n💡 **Context Notes:** {context_insights}\\n\\nIMPORTANT: This response explains the complete workflow from your request to final results. Every tool execution and decision was made to deliver exactly what you asked for. The AI agent worked through multiple steps to ensure comprehensive and accurate results.",
-            "confidence_level": "high",
-            "next_steps_suggested": ["context-informed step1", "context-informed step2"],
-            "formatting_style": "clean_and_readable_with_structure"
-          },
-          "system_analytics": {
-            "execution_time_assessment": "fast",
-            "tool_chain_efficiency": 0.85,
-            "error_recovery_effectiveness": 0.9,
-            "context_preservation_quality": 0.8,
-            "learning_insights": ["context-aware insight1", "context-aware insight2"],
-            "optimization_recommendations": ["context-informed rec1", "context-informed rec2"]
-          },
-          "follow_up_actions": {
-            "required": false,
-            "suggested_actions": ["context-appropriate action1", "context-appropriate action2"],
-            "alternative_approaches": ["context-informed approach1", "context-informed approach2"]
+            "issues": "<where_we_could_have_performed_better_max_2_specific_issues>",
+            "reason": "<why_these_issues_occurred_and_what_could_improve_them>"
           }
         }
 
-        🧠 CONTEXT-AWARE EVALUATION STRATEGIES:
-        - **Holistic Assessment**: Consider the entire conversation and workflow context
-        - **Intent Tracking**: Evaluate how well the final result fulfills the user's evolving intent
-        - **Workflow Intelligence**: Assess the logical progression and effectiveness of tool choices
-        - **Learning Integration**: Identify patterns and insights for future improvement
-        - **User Experience Focus**: Prioritize user satisfaction and task completion
+        🔒 ULTRA-STRICT RULES (VIOLATION = SYSTEM FAILURE):
+        1. **ROOT IS JSON OBJECT** - Start with { and end with } - NEVER return a list []
+        2. **EXACTLY 2 TOP-LEVEL KEYS** - Only "user_response" and "analysis" 
+        3. **NO EXTRA KEYS** - Do not add evaluation, system_analytics, scores, etc.
+        4. **NO NESTED COMPLEXITY** - Keep structure flat and simple
+        5. **NO MARKDOWN** - No ```json fences, no **bold**, no explanations outside JSON
+        6. **ALL VALUES ARE STRINGS** - No arrays, no numbers, no booleans, no null values
+        7. **CONCISE CONTENT** - Each string should be clear but not overly long
 
-        🎯 SMART RESPONSE COMPOSITION:
-        - **Context Integration**: Reference relevant conversation context in the user response
-        - **Progressive Summary**: Explain how the workflow built toward the final result
-        - **Intent Alignment**: Show how the result addresses the user's stated and implied goals
-        - **Context-Aware Recommendations**: Suggest next steps that make sense given the full context
-        - **Learning Acknowledgment**: Acknowledge what was learned from the user's approach
+        🎯 USER_RESPONSE GUIDELINES:
+        - **message**: Explain what the AI accomplished in simple, clear terms. Show the results to the user.
+        - **next_steps**: Give the user 1-2 specific actions they can take based on the results.
 
-        🔒 ULTRA-STRICT RULES (VIOLATION = COMPLETE SYSTEM FAILURE):
-        1. **ROOT MUST BE JSON OBJECT** - Start with { and end with } - NOTHING ELSE
-        2. **NO LISTS AT ROOT LEVEL** - Never return ["item1", "item2"] as main response
-        3. **NO TEXT OUTSIDE JSON** - No explanations, no comments, no markdown
-        4. **ALL SCORES NUMERIC** - Must be floats between 0.0 and 1.0 (not strings, not percentages)
-        5. **ALL REQUIRED KEYS PRESENT** - Missing any top-level key = FAILURE
-        6. **NO EXTRA KEYS** - Only the 5 specified top-level keys allowed
-        7. **NO NULL VALUES** - Use empty arrays [] or empty strings "" instead
-        8. **CONTEXT-AWARE CONTENT** - All analysis and responses should reflect context understanding
+        🔍 ANALYSIS GUIDELINES:
+        - **issues**: Identify exactly 2 specific areas where the workflow could have been better (tool selection, parameters, execution, etc.)
+        - **reason**: Explain why these issues happened and what could prevent them in the future.
 
-        💡 CONTEXT-AWARE USER RESPONSE GUIDELINES:
-        The user_response.message should demonstrate context understanding by explaining:
-        - **Full Workflow Transparency**: Show the user exactly what tools were executed and why
-        - **Step-by-Step Journey**: Detail each action taken from request to final result
-        - **Reasoning Clarity**: Explain the AI's decision-making process in human terms
-        - **Results Context**: Connect the final output back to the user's original intent
-        - **Learning Insights**: Share what the AI discovered during the workflow execution
-        - **Actionable Guidance**: Provide specific next steps that build on the results
+        💡 CONTEXT-AWARE ANALYSIS:
+        Use the provided execution history and context to identify real issues:
+        - Did tools execute efficiently?
+        - Were the right tools selected for the task?
+        - Did parameters match user intent?
+        - Was the workflow logical and effective?
+        - Did any steps fail or produce suboptimal results?
 
-        🎯 ENHANCED USER MESSAGE TEMPLATE VARIABLES:
-        - {workflow_steps}: Detailed list of each tool executed with reasoning and results
-        - {results_summary}: Clear explanation of what was accomplished and found
-        - {completion_status}: Whether the task succeeded, partially succeeded, or needs follow-up
-        - {next_steps_detailed}: Specific actionable recommendations based on results
-        - {context_insights}: Key insights about the user's request and AI's approach
+        🚫 FORBIDDEN RESPONSES:
+        - ["item1", "item2"]  ← NEVER return an array
+        - ```json {...} ```  ← NEVER use markdown fences
+        - Extra keys beyond user_response and analysis
+        - Null values or complex nested structures
+        - Any text outside the JSON object
 
-        🔧 WORKFLOW STEP FORMAT EXAMPLE:
-        "1. 🔍 **GoogleSearch Tool**: Searched for 'GitHub workflow tutorials' because you wanted to learn Git contribution workflows. Found 9 authoritative resources including GitHub's official Hello World guide.
-        2. 📋 **Analysis**: Evaluated the search results and identified the most beginner-friendly resources that match your current Git knowledge level."
+        ✅ VALIDATION CHECKLIST (MENTAL CHECK BEFORE RESPONDING):
+        - [ ] JSON object with exactly 2 top-level keys?
+        - [ ] All 4 required nested keys present (message, next_steps, issues, reason)?
+        - [ ] All values are strings (no arrays, no null)?
+        - [ ] No extra keys or markdown formatting?
+        - [ ] Message explains what was accomplished?
+        - [ ] Next steps are actionable for the user?
+        - [ ] Issues identify specific workflow problems?
+        - [ ] Reason explains why issues occurred?
+
+        REMEMBER: Simple structure = reliable extraction. Complex structures = LLM failures.
         """
 
-        # Enhanced prompt with full context
+        # Build context section
         full_context_section = ""
         if full_context:
             full_context_section = f"""
-        🎯 FULL WORKFLOW CONTEXT (CRITICAL FOR COMPREHENSIVE EVALUATION):
+        🎯 COMPREHENSIVE WORKFLOW CONTEXT:
         {full_context}
         
-        💡 CONTEXT GUIDANCE FOR FINAL EVALUATION:
-        - Use this context to understand the complete workflow story
-        - Assess how well the final result fulfills the user's journey
-        - Identify patterns and insights from the full context
-        - Create user response that acknowledges the conversation context
+        💡 USE THIS CONTEXT TO:
+        - Understand the complete workflow story
+        - Identify what worked well and what didn't
+        - Explain results in context of user's original intent
+        - Suggest meaningful next steps based on results
         """
 
         prompt = f"""
         📝 ORIGINAL USER REQUEST:
         {original_request}
 
-        🔄 FINAL RAW RESPONSE (before context-aware polishing):
+        🔄 FINAL TOOL RESPONSE:
         {final_response}
 
-        📊 EXECUTION HISTORY (tool chain with context):
+        📊 EXECUTION HISTORY:
         {execution_history}
 
-        📋 ALL TOOL RESULTS (raw messages with context):
+        📋 TOOL RESULTS:
         {tool_results}
         {full_context_section}
-        🎯 YOUR TASK: Create a comprehensive, context-aware evaluation and polished user response.
 
-        ⚠️ CRITICAL CONTEXT-AWARE REMINDERS:
-        - Return ONLY a single JSON object that demonstrates context understanding
-        - All analysis should reflect awareness of the full conversation and workflow context
-        - User response message should acknowledge context and show understanding of user journey
-        - Scores should reflect context-aware assessment of success
-        - Recommendations should build on established context patterns
+        🎯 YOUR TASK: Create a simple, reliable JSON response with user summary and workflow analysis.
 
-        PRODUCE ONLY THE CONTEXT-AWARE JSON OBJECT. NOTHING ELSE. NO EXPLANATIONS. NO MARKDOWN.
+        ⚠️ CRITICAL REMINDERS:
+        - Return ONLY the JSON object (no markdown, no explanations)
+        - Focus on what the user accomplished and how they can proceed
+        - Identify 2 specific issues where the workflow could improve
+        - Explain why those issues occurred and how to prevent them
+        - Keep all content clear and concise
+
+        PRODUCE ONLY THE SIMPLE JSON OBJECT. NO MARKDOWN. NO EXTRA TEXT.
         """
         return SYSTEM_PROMPT, prompt

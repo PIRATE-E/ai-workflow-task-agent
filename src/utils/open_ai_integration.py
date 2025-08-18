@@ -393,6 +393,7 @@ class OpenAIIntegration:
                 metadata={
                     "content_type": "reasoning_content",
                     "content_length": len(str(reasoning_content)),
+                    'content':str(reasoning_content),
                     "extraction_needed": True
                 }
             )
