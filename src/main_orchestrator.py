@@ -6,14 +6,25 @@ project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-# 🎨 Initialize Rich Traceback FIRST for comprehensive error handling
-from src.utils.rich_traceback_manager import RichTracebackManager, rich_exception_handler
+# 🎨 Initialize Rich Traceback for MAIN PROCESS (display happens in debug console)
+from src.ui.diagnostics.rich_traceback_manager import RichTracebackManager, rich_exception_handler
+
+# ✅ Handle Sentry encoding issues without disabling error monitoring
+try:
+    import sentry_sdk  # type: ignore
+    from sentry_sdk.integrations.threading import ThreadingIntegration  # type: ignore
+
+    sentry_sdk.init()
+except ImportError:  # Sentry optional; suppress noise
+    sentry_sdk = None  # type: ignore
+except Exception:
+    # Silently ignore other Sentry initialization failures
+    sentry_sdk = None  # type: ignore
+
 RichTracebackManager.initialize(
-    show_locals=True,
-    max_frames=15,
-    theme="monokai",
-    extra_lines=2,
-    suppress_modules=["click", "rich", "__main__", "runpy", "threading"]
+    show_locals=False,  # Disabled for main process - display in debug console
+    max_frames=10,
+    suppress_modules=["click", "rich", "__main__", "runpy", "threading", "socket", "pickle"]
 )
 
 from src.core.chat_destructor import ChatDestructor
@@ -34,40 +45,35 @@ from src.utils.argument_schema_util import get_tool_argument_schema
 
 @rich_exception_handler("Main Chat Application")
 def run_chat(destructor: ChatDestructor):
-    """
-    Run the chat application.
-    This function initializes the chat and compile the graph and starts the conversation loop.
-    """
+    """Run the chat application."""
     try:
         chat = ChatInitializer()
         graph = GraphBuilder(State).compile_graph()
         chat.set_graph(graph).tools_register().set_exit(destructor.call_all_cleanup_functions)
 
-        os.system('cls' if os.name == 'nt' else 'clear')  # Clear console for better UX
+        os.system('cls' if os.name == 'nt' else 'clear')  # Clear console
         print_banner()
-        console = settings.console
+        console = settings.console or __import__('rich').console.Console()
+        settings.console = console
+
         console.print(Align.center("[bold blue]Welcome to the LangGraph Chatbot![/bold blue]"))
         console.print(Align.center("Type '[bold red]exit[/bold red]' to end the conversation.\n"))
 
-        # Display tools in a table
         from rich.table import Table
-
         table = Table(title="Registered Tools", border_style="blue", show_lines=True)
         table.add_column("Name", style="cyan", no_wrap=True)
         table.add_column("Description", style="magenta")
         table.add_column("Arguments", style="green")
 
-        for tool in chat.tools:
+        for tool in chat.tools or []:
             try:
                 name = getattr(tool, "name", "N/A")
                 desc = getattr(tool, "description", "N/A")
                 args = get_tool_argument_schema(tool)
                 table.add_row(str(name), str(desc), str(args))
             except Exception as tool_error:
-                RichTracebackManager.handle_exception(
-                    tool_error, 
-                    context=f"Tool Registration Display - {getattr(tool, 'name', 'Unknown Tool')}"
-                )
+                RichTracebackManager.handle_exception(tool_error,
+                                                      context=f"Tool Registration Display - {getattr(tool, 'name', 'Unknown Tool')}")
                 table.add_row("ERROR", "Failed to load tool", "N/A")
 
         console.print(table)
@@ -78,45 +84,33 @@ def run_chat(destructor: ChatDestructor):
                     chat.run_chat()
                     gc.collect()
                 except Exception as chat_error:
-                    RichTracebackManager.handle_exception(
-                        chat_error, 
-                        context="Chat Loop Execution",
-                        extra_context={"break_loop": chat.break_loop}
-                    )
-                    # Continue the loop unless it's a critical error
+                    RichTracebackManager.handle_exception(chat_error, context="Chat Loop Execution",
+                                                          extra_context={"break_loop": chat.break_loop})
                     if isinstance(chat_error, (KeyboardInterrupt, SystemExit)):
                         raise
         except (KeyboardInterrupt, SystemExit):
             console.print("[bold red]Chat ended. Goodbye![/bold red]")
         finally:
-            # Let ChatDestructor handle all cleanup
             console.print("[dim]Exiting chat application...[/dim]")
-            
     except Exception as init_error:
-        RichTracebackManager.handle_exception(
-            init_error, 
-            context="Chat Application Initialization",
-            extra_context={"phase": "startup"}
-        )
+        RichTracebackManager.handle_exception(init_error, context="Chat Application Initialization",
+                                              extra_context={"phase": "startup"})
         raise
 
 
 if __name__ == '__main__':
     try:
-        # Start the chat application
         destructor = ChatDestructor()
-        # Add cleanup functions in reverse dependency order
-        # (SocketManager last because it handles logging for other cleanups)
         destructor.add_destroyer_function(SocketManager.cleanup)
         destructor.add_destroyer_function(ModelManager.cleanup_all_models)
         destructor.add_destroyer_function(MCP_Manager.cleanup)
-        destructor.register_cleanup_handlers()  # Register cleanup handlers
-
-        # Pass destructor to run_chat function
+        destructor.register_cleanup_handlers()
         run_chat(destructor)
-    except Exception as e:
+    except Exception as e:  # pragma: no cover
         console = settings.console
-        console.print(f"[bold red]Unexpected error: {e}[/bold red]")
+        if console:
+            console.print(f"[bold red]Unexpected error: {e}[/bold red]")
+        else:
+            print(f"Unexpected error: {e}")
     finally:
-        # Let ChatDestructor handle all cleanup via atexit/signal handlers
-        gc.collect()  # Clean up resources after the chat ends
+        gc.collect()

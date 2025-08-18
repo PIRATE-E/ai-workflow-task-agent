@@ -4,16 +4,40 @@ import os
 import subprocess
 from typing import Any
 
-import google.generativeai as genai
+# Optional google.generativeai dependency
+try:  # pragma: no cover - external dependency may be absent
+    import google.generativeai as genai  # type: ignore
+    _gemini_available = True
+except Exception:  # noqa: BLE001
+    genai = None  # type: ignore
+    _gemini_available = False
+
 from dotenv import load_dotenv
 from langchain_core.documents import Document
 from langchain_ollama import ChatOllama
-from neo4j import GraphDatabase
+
+# --- Optional neo4j dependency (graceful degradation) ---
+try:  # pragma: no cover - environment dependent
+    from neo4j import GraphDatabase  # type: ignore
+    _neo4j_available = True
+except Exception:  # neo4j not installed
+    GraphDatabase = None  # type: ignore
+    _neo4j_available = False
 
 from src.config import settings
 from src.utils.open_ai_integration import OpenAIIntegration
-# Socket connection now centralized in settings
-from src.utils.structured_triple_prompt import Prompt
+
+# Corrected path: structured_triple_prompt lives under prompts, not utils
+try:
+    from src.prompts.structured_triple_prompt import Prompt  # type: ignore
+except Exception:  # Fallback minimal Prompt implementation
+    class Prompt:  # type: ignore
+        @staticmethod
+        def create_structured_prompt(schema_headers, record_data):
+            return (
+                "You are extracting triples from provided structured schema headers and a single record.",
+                f"Headers: {schema_headers}\nRecord: {record_data}"
+            )
 
 SYSTEM_PROMPT_GENERATE_TRIPLE_ENHANCED = """
 You are an intelligent knowledge graph extraction system that identifies meaningful relationships between entities in text.
@@ -79,19 +103,23 @@ Output as JSON array:
 **Text to analyze:**
 """
 
-# neo4j
-try:
-    if settings.neo4j_driver is None:
-        driver = GraphDatabase.driver(
-            settings.NEO4J_URI,
-            auth=(settings.NEO4J_USER, settings.NEO4J_PASSWORD),
-        )
-    else:
-        driver = settings.neo4j_driver
-except Exception as e:
-    if settings.socket_con:
-        settings.socket_con.send_error(f"Error connecting to Neo4j database: {e}")
-    raise RuntimeError(f"Failed to connect to Neo4j database: {e}")
+# --- Neo4j driver setup (optional) ---
+# if _neo4j_available:
+#     try:
+#         if getattr(settings, "neo4j_driver", None) is None:
+#             driver = GraphDatabase.driver(
+#                 settings.NEO4J_URI,
+#                 auth=(settings.NEO4J_USER, settings.NEO4J_PASSWORD),
+#             )
+#         else:
+#             driver = settings.neo4j_driver  # type: ignore
+#     except Exception as e:  # Connection issue – degrade instead of crash
+#         if getattr(settings, "socket_con", None):  # pragma: no cover
+#             settings.socket_con.send_error(f"[Neo4j Disabled] Connection failed: {e}")
+#         driver = None
+#         _neo4j_available = False
+# else:
+#     driver = None  # Neo4j features disabled
 
 GEMINI_CLI_PATH = "C:\\Users\\pirat\\AppData\\Roaming\\npm\\gemini.cmd"
 SUBPROCESS_TIMEOUT = 120  # 2 minutes timeout per request
@@ -99,34 +127,25 @@ SUBPROCESS_TIMEOUT = 120  # 2 minutes timeout per request
 task_count = 0  # Global counter for tracking the number of tasks
 
 
-async def prompt_gemini_for_triples_cli(chunk: Document) -> dict[str, Document | str | list[Any]] | dict[
-    str, Document | list[Any]]:
-    """
-    TRULY ASYNC VERSION: Uses semaphore for proper concurrency control and async subprocess handling.
-
-    Args:
-        chunk (Document): A Document object containing the text to analyze.
-    """
-    # 🔥 CRITICAL FIX: Actually use the semaphore for concurrency control
+async def prompt_gemini_for_triples_cli(chunk: Document) -> dict[str, Any]:
+    """Process a single chunk via Gemini CLI returning a mapping with chunk & triples."""
     is_structured = chunk.metadata.get("source") == "google_sheets" if hasattr(chunk, 'metadata') else False
 
     if is_structured and hasattr(chunk, 'metadata') and 'structured_data' in chunk.metadata:
         # Use structured data prompt
         schema_headers = chunk.metadata.get('schema', [])
         record_data = chunk.metadata.get('structured_data', {})
-        prompt=Prompt.create_structured_prompt(schema_headers, record_data)
+        prompt_tuple = Prompt.create_structured_prompt(schema_headers, record_data)
+        system_part, user_part = prompt_tuple if isinstance(prompt_tuple, (list, tuple)) and len(prompt_tuple) == 2 else (prompt_tuple, "")
+        combined_prompt = f"{system_part}\n{user_part}".strip()
     else:
-        # Use original unstructured text prompt
-        prompt = SYSTEM_PROMPT_GENERATE_TRIPLE_ENHANCED + f"""\n
-                Text:
-                {chunk.page_content}
-                """
+        combined_prompt = SYSTEM_PROMPT_GENERATE_TRIPLE_ENHANCED + f"\nText:\n{chunk.page_content}\n"
 
     if not os.path.exists(GEMINI_CLI_PATH):
         raise FileNotFoundError(
             f"Gemini command not found at {GEMINI_CLI_PATH}. Please ensure it is installed and the path is correct."
         )
-    # Create subprocess with proper async handling
+
     process = await asyncio.create_subprocess_exec(
         GEMINI_CLI_PATH,
         stderr=subprocess.PIPE,
@@ -136,9 +155,8 @@ async def prompt_gemini_for_triples_cli(chunk: Document) -> dict[str, Document |
     )
 
     try:
-        prompt = f"{prompt[0] + "\n" + prompt[1]}"  # Unpack the tuple if needed
         stdout, stderr = await asyncio.wait_for(
-            process.communicate(input=prompt.encode("utf-8")),
+            process.communicate(input=combined_prompt.encode("utf-8")),
             timeout=SUBPROCESS_TIMEOUT
         )
         stdout = stdout.decode('utf-8').strip()
@@ -151,16 +169,15 @@ async def prompt_gemini_for_triples_cli(chunk: Document) -> dict[str, Document |
         process.kill()
         stdout, stderr = await process.communicate()
         raise FileNotFoundError(
-            f"Gemini CLI call timed out after {SUBPROCESS_TIMEOUT} seconds, error:-{stderr.decode('utf-8')}")
+            f"Gemini CLI call timed out after {SUBPROCESS_TIMEOUT} seconds, error:-{stderr.decode('utf-8')}"
+        )
 
     triples = None
     try:
         triples = json.loads(stdout)
-    except json.JSONDecodeError as e:
+    except json.JSONDecodeError:
         json_start_pointer = stdout.find("[")
         json_end_pointer = stdout.rfind("]") + 1
-
-        # pointer would -1 if it does not find the character "["
         if json_start_pointer != -1 and json_end_pointer > json_start_pointer:
             json_part = stdout[json_start_pointer:json_end_pointer]
             try:
@@ -226,26 +243,21 @@ async def prompt_gemini_for_triples_api(chunk: Document) -> None | dict[str, Doc
     else:
         # Use original unstructured text prompt
         prompt = SYSTEM_PROMPT_GENERATE_TRIPLE_ENHANCED + f"""\n
-        Text:
+        Text:\n
         {chunk.page_content}
         """
     load_dotenv()
     api_key_gemini = os.getenv("GEMINI_API_KEY")
-    # client = genai.Client(api_key=api_key_gemini)
-
-    # response = await client.aio.models.generate_content(model="gemini-1.5-flash", contents=prompt)
     genai.configure(api_key=api_key_gemini)
     model = genai.GenerativeModel(model_name="gemini-1.5-flash")
 
     # sending the prompt to the Gemini API using asyncio to avoid blocking the event loop
-    def get_response(prompt_g: str) -> genai.types.GenerateContentResponse | None:
-        """
-        Helper function to get response from Gemini API with error handling
-        """
+    def get_response(prompt_g: str):  # type: ignore
+        """Helper function to get response from Gemini API with error handling"""
         try:
             return model.generate_content(prompt_g)
-        except Exception as e_G:
-            if settings.socket_con:
+        except Exception as e_G:  # pragma: no cover
+            if getattr(settings, "socket_con", None):
                 settings.socket_con.send_error(f"Error calling Gemini API: {e_G}")
             return None
 
@@ -264,8 +276,8 @@ async def prompt_gemini_for_triples_api(chunk: Document) -> None | dict[str, Doc
             print(f"Warning: Expected list, got {type(triples)}. Attempting to extract...")
             raise json.JSONDecodeError("Not a list", output, 0)
         return {"chunk": chunk, "triples": triples}
-    except json.JSONDecodeError as e:
-        print(f"JSON decode error: {e}")
+    except json.JSONDecodeError:
+        print("JSON decode error; attempting extraction")
         try:
             json_start = output.find("[")
             json_end = output.rfind("]") + 1
@@ -275,14 +287,10 @@ async def prompt_gemini_for_triples_api(chunk: Document) -> None | dict[str, Doc
                 if isinstance(triples, list):
                     return {"chunk": chunk, "triples": triples}
                 else:
-                    print(f"Extracted JSON is not a list: {type(triples)}")
                     return {"chunk": chunk, "triples": []}
             else:
-                print("No JSON array found in response")
                 return {"chunk": chunk, "triples": []}
-        except Exception as extraction_error:
-            print(f"Failed to extract JSON: {extraction_error}")
-            print(f"Original result: {output}")
+        except Exception:
             return {"chunk": chunk, "triples": []}
 
 
@@ -291,26 +299,19 @@ async def prompt_openai_for_triples(chunk: Document) -> dict[str, Document | lis
     🔧 FIXED: Enhanced async version with proper response type handling and reasoning content suppression
     """
     from src.utils.model_manager import ModelManager
-    
-    # 🔧 FIX 1: Initialize system prompt with global default value FIRST
-    # This ensures the variable is always defined regardless of code path
+
     system_prompt = SYSTEM_PROMPT_GENERATE_TRIPLE_ENHANCED
     user_prompt = ""
-    
+
     is_structured = chunk.metadata.get("source") == "google_sheets" if hasattr(chunk, 'metadata') else False
-    
+
     if is_structured and hasattr(chunk, 'metadata') and 'structured_data' in chunk.metadata:
-        # Use structured data prompt
         schema_headers = chunk.metadata.get('schema', [])
         record_data = chunk.metadata.get('structured_data', {})
         prompt_tuple = Prompt.create_structured_prompt(schema_headers, record_data)
-        
-        # 🔧 FIX 2: Handle tuple structure properly
-        system_prompt = prompt_tuple[0]  # Structured system prompt
-        user_prompt = prompt_tuple[1]    # Structured user prompt
+        system_prompt = prompt_tuple[0]
+        user_prompt = prompt_tuple[1]
     else:
-        # Use enhanced system prompt with reasoning suppression
-        # 🔧 FIX 3: Keep system prompt as global, create user prompt for unstructured data
         user_prompt = f"""
         **Your Task:**
         Extract clear, factual relationships between entities in the text below.
@@ -322,7 +323,6 @@ async def prompt_openai_for_triples(chunk: Document) -> dict[str, Document | lis
         """
 
     try:
-        # 🔧 FIX 4: Use properly scoped variables
         client = OpenAIIntegration()
         response = await client.generate_text_async(messages=[
             {'role': 'system', 'content': system_prompt},
@@ -330,27 +330,21 @@ async def prompt_openai_for_triples(chunk: Document) -> dict[str, Document | lis
         ])
 
         if not response or response.strip() == "" or response.strip() == "[]":
-            if settings.socket_con:
+            if getattr(settings, "socket_con", None):
                 settings.socket_con.send_error("[WARNING] No response or empty response from OpenAI API.")
             return {"chunk": chunk, "triples": []}
 
-        # 🔧 FIX: Handle different response types properly with priority-based extraction
         parsed_response = ModelManager.convert_to_json(response)
-        
-        # Check if convert_to_json already returned a list/dict (no need for additional JSON parsing)
+
         if isinstance(parsed_response, list):
-            # Response is already a list of triples
             return {"chunk": chunk, "triples": parsed_response}
         elif isinstance(parsed_response, dict):
-            # Response is a dict, check if it contains triples or is wrapped content
             if 'content' in parsed_response and isinstance(parsed_response['content'], str):
-                # This is wrapped content from fallback, try to extract JSON
                 try:
                     content_json = json.loads(parsed_response['content'])
                     if isinstance(content_json, list):
                         return {"chunk": chunk, "triples": content_json}
                 except json.JSONDecodeError:
-                    # Try to extract JSON array from the content string
                     content_str = parsed_response['content']
                     json_start = content_str.find("[")
                     json_end = content_str.rfind("]") + 1
@@ -364,62 +358,39 @@ async def prompt_openai_for_triples(chunk: Document) -> dict[str, Document | lis
                             pass
                 return {"chunk": chunk, "triples": []}
             else:
-                # Response is a dict that might be a single triple or error
                 return {"chunk": chunk, "triples": [parsed_response] if parsed_response else []}
         else:
-            # Response is still a string, should not happen with convert_to_json but handle it
-            if settings.socket_con:
-                settings.socket_con.send_error(f"[WARNING] Unexpected response type from convert_to_json: {type(parsed_response)}")
+            if getattr(settings, "socket_con", None):
+                settings.socket_con.send_error(f"[WARNING] Unexpected response type: {type(parsed_response)}")
             return {"chunk": chunk, "triples": []}
 
-    except Exception as api_error:
-        if settings.socket_con:
+    except Exception as api_error:  # pragma: no cover
+        if getattr(settings, "socket_con", None):
             settings.socket_con.send_error(f"[ERROR] OpenAI API call failed: {api_error}")
         return {"chunk": chunk, "triples": [], "error": str(api_error)}
 
 
 def prompt_local_llm_for_triples(chunk: Document) -> list:
-    """
-    Existing function - no changes needed for this issue.
-    """
+    """Existing function - unchanged."""
     llm = ChatOllama(model="llama3.1:8b", temperature=0.1, format="json")
-
     triples = []
-
     llm.invoke(SYSTEM_PROMPT_GENERATE_TRIPLE_ENHANCED)
-
     prompt = f"""
         You are analyzing text to extract meaningful relationships for a knowledge graph.
-        
-        **Your Task:**
-        Extract clear, factual relationships between entities in the text below.
-        Focus on concrete entities (people, companies, products, technologies) and their connections.
-        
-        **Text to Analyze:**
-        \"\"\"{chunk.page_content}\"""
-        
-        **Output Format:**
-        Return a JSON array where each relationship is represented as:
-        {{"subject": "entity1", "predicate": "relationship", "object": "entity2"}}
-        
-        Focus on quality over quantity - extract only meaningful, verifiable relationships.
-        """
+        \n        **Your Task:**\n        Extract clear, factual relationships between entities in the text below.\n        Focus on concrete entities (people, companies, products, technologies) and their connections.\n        \n        **Text to Analyze:**\n        \"\"\"{chunk.page_content}\"\"\"\n        \n        **Output Format:**\n        Return a JSON array where each relationship is represented as:\n        {{"subject": "entity1", "predicate": "relationship", "object": "entity2"}}\n        \n        Focus on quality over quantity - extract only meaningful, verifiable relationships.\n        """
     response = llm.invoke([settings.HumanMessage(content=prompt)])
     output = response.content
 
     print(f"LLM response: {output}")
 
     try:
-        # if the output is had dict of lists we want to convert it to a list of dicts
         data = json.loads(output)
         if isinstance(data, dict):
-            # If dict of lists, zip them
             if all(isinstance(v, list) for v in data.values()):
                 for s, p, o in zip(data.get("subject", []), data.get("predicate", []), data.get("object", [])):
                     triples.append({"subject": s, "predicate": p, "object": o})
             else:
                 triples.append(data)
-        # Attempt to parse the output as JSON
         elif isinstance(data, list):
             triples.extend(data)
         else:
@@ -440,17 +411,16 @@ def prompt_local_llm_for_triples(chunk: Document) -> list:
 
 
 def clear_database():
-    """
-    Deletes all nodes and relationships from the Neo4j database.
-
-    This function connects to the Neo4j database and runs a Cypher query to remove every node and relationship,
-    effectively resetting the database to an empty state.
-    """
+    """Deletes all nodes and relationships from the Neo4j database if available."""
+    from src.config.settings import neo4j_driver as driver  # type: ignore
+    if not _neo4j_available or driver is None:
+        print("Neo4j not available; clear_database skipped.")
+        return
     try:
-        with settings.neo4j_driver.session() as session:
+        with driver.session() as session:  # type: ignore
             session.run("MATCH (n) DETACH DELETE n")
-    except Exception as e:
-        if settings.socket_con:
+    except Exception as e:  # pragma: no cover
+        if getattr(settings, "socket_con", None):
             settings.socket_con.send_error(f"Error clearing Neo4j database: {e}")
         else:
             print(f"Error clearing Neo4j database: {e}")
@@ -458,12 +428,7 @@ def clear_database():
 
 
 def _insert_triple(tx, subject, relation, object):
-    """
-    Inserts a single subject-predicate-object triple into the Neo4j database.
-
-    This function creates or finds two entities (nodes) for the subject and object, and creates a relationship between them
-    with the specified relation type. It uses the provided transaction object to execute the Cypher query.
-    """
+    """Insert a single triple into Neo4j (internal helper)."""
     query = (
         "MERGE (s:Entity {name: $subject}) "
         "MERGE (o:Entity {name: $object}) "
@@ -473,35 +438,33 @@ def _insert_triple(tx, subject, relation, object):
 
 
 def insert_triples(triples):
-    """
-    Inserts multiple subject-predicate-object triples into the Neo4j database.
-
-    This function takes a list of triples (each as a tuple of subject, relation, object) and inserts each one into the database
-    by calling the insert_triple function for each triple.
-    """
+    """Insert multiple triples into Neo4j if available."""
+    from src.config.settings import neo4j_driver as driver  # type: ignore
+    if not _neo4j_available or driver is None:
+        return
     try:
-        with driver.session() as session:
+        with driver.session() as session:  # type: ignore
             for subject, relation, object in triples:
                 if all([subject, relation, object]):
                     session.write_transaction(_insert_triple, subject, relation, object)
-    except Exception as e:
+    except Exception as e:  # pragma: no cover
         print(f"Error inserting triples: {e}")
 
 
 def get_triples(cypher_query: str):
-    """
-    Retrieves triples from the Neo4j database based on a Cypher query.
-    Handles both single and variable-length relationships.
-    """
+    """Retrieve triples via Cypher if Neo4j is available; else return empty list."""
+    from src.config.settings import neo4j_driver as driver  # type: ignore
+    from src.ui.diagnostics.debug_helpers import debug_error
+    if not _neo4j_available or driver is None:
+        return []
     try:
-        with driver.session() as session:
+        with driver.session() as session:  # type: ignore
             result = session.run(cypher_query)
             triples = []
             for record in result:
                 s = record["s"]
                 o = record["o"]
                 r = record["r"]
-                # Handle variable-length relationships (list)
                 if isinstance(r, list):
                     relation_types = " -> ".join([rel.get("type", str(rel)) for rel in r])
                 else:
@@ -512,21 +475,26 @@ def get_triples(cypher_query: str):
                     "object": o.get("name", str(o)),
                 })
             return triples
-    except Exception as e:
-        if settings.socket_con:
-            settings.socket_con.send_error(f"Error executing cypher query: {e}")
+    except Exception as e:  # pragma: no cover
+        debug_error(
+            heading="Error retrieving triples",
+            body=f"Failed to execute Cypher query: {cypher_query}\nError: {e}",
+            metadata={
+                "cypher_query": cypher_query,
+                "error": str(e),
+                "neo4j_available": _neo4j_available,
+                "driver": driver is not None
+            }
+        )
         return []
 
 
 def extract_triple_text(triple):
-    # Handles both key sets: 'subject'/'relation'/'object' and 's'/'r'/'o'
     if 'subject' in triple and 'relation' in triple and 'object' in triple:
         return f"{triple['subject']} - {triple['relation']} - {triple['object']}"
     elif 's' in triple and 'r' in triple and 'o' in triple:
-        # Try to extract names/types from objects
         s = triple['s']['name'] if isinstance(triple['s'], dict) and 'name' in triple['s'] else str(triple['s'])
         o = triple['o']['name'] if isinstance(triple['o'], dict) and 'name' in triple['o'] else str(triple['o'])
-        # r can be a list or a dict
         r = triple['r']
         if isinstance(r, list):
             relation_types = "->".join([rel.get('type', str(rel)) for rel in r])
@@ -536,58 +504,58 @@ def extract_triple_text(triple):
             relation_types = str(r)
         return f"{s} - {relation_types} - {o}"
     else:
-        return str(triple)  # fallback, unlikely
+        return str(triple)
 
 
 def get_retrieve_triples(cypher_query: str):
-    """
-    Retrieves triples from the Neo4j database based on a Cypher query.
-    This function was referenced in lggraph.py but was missing.
-    """
+    """Retrieve raw records via Cypher if available; else empty list."""
+    from src.config.settings import neo4j_driver as driver  # type: ignore
+    from src.ui.diagnostics.debug_helpers import debug_error
+    if not _neo4j_available or driver is None:
+        return []
     try:
-        with driver.session() as session:
-
+        with driver.session() as session:  # type: ignore
             result = session.run(cypher_query)
             records = []
             for record in result:
                 records.append(dict(record))
             return records
-    except Exception as e:
-        if settings.socket_con:
-            settings.socket_con.send_error(f"Error executing cypher query: {e}")
+    except Exception as e:  # pragma: no cover
+        debug_error(
+            heading="Error retrieving records",
+            body=f"Failed to execute Cypher query: {cypher_query}\nError: {e}",
+            metadata={
+                "cypher_query": cypher_query,
+                "error": str(e),
+                "neo4j_available": _neo4j_available,
+                "driver": driver is not None
+            }
+        )
         return []
 
 
 def get_all_labels_and_names() -> dict[str, list[str]]:
-    """
-    Retrieves all labels and distinct names from the Neo4j database for understanding of llm
-    :return: A tuple containing two lists names and labels.:
-    """
-    with driver.session() as session:
+    """Return labels & names if Neo4j available; else empty placeholders."""
+    from src.config.settings import neo4j_driver as driver  # type: ignore
+    if not _neo4j_available or driver is None:
+        return {"labels": [], "names": []}
+    with driver.session() as session:  # type: ignore
         labels = [record["label"] for record in session.run("CALL db.labels() YIELD label RETURN label")]
         names = [record["name"] for record in session.run("MATCH (n) RETURN DISTINCT n.name AS name") if record["name"]]
     return {"labels": labels, "names": names}
 
 
 def get_all_relationship_types() -> list[str]:
-    """
-    Retrieves all unique relationship types from the Neo4j database
-    :return: A list of relationship types
-    """
-    with driver.session() as session:
+    """Return relation types if Neo4j available; else empty list."""
+    from src.config.settings import neo4j_driver as driver  # type: ignore
+    if not _neo4j_available or driver is None:
+        return []
+    with driver.session() as session:  # type: ignore
         relationship_types = [
-            record["type"] for record in
-            session.run("MATCH ()-[r:RELATION]-() RETURN DISTINCT r.type AS type")
-            if record["type"]
+            record["type"] for record in session.run("MATCH ()-[r:RELATION]-() RETURN DISTINCT r.type AS type") if record["type"]
         ]
     return relationship_types
 
 
 if __name__ == "__main__":
-    # import google.generativeai as genai
-    # c = genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-    # model = genai.GenerativeModel(model_name="gemini-1.5-flash")
-    # # Example usage
-    # model.generate_content("Hello, world!")  # This is just a placeholder to test the import
-
     pass

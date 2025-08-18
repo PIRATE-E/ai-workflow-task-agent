@@ -42,31 +42,42 @@ ENABLE_SOUND_NOTIFICATIONS = os.getenv("ENABLE_SOUND_NOTIFICATIONS", "true").low
 # 'background' - Runs log server in background (logs not visible)
 # 'file' - Logs to file (socket_server.log)
 # 'console' - Shows logs in same console (can be messy)
-LOG_DISPLAY_MODE = os.getenv("LOG_DISPLAY_MODE", "separate_window").lower()
+LOG_DISPLAY_MODE = os.getenv("LOG_DISPLAY_MODE", "separate_window")
 
 # Development/Production mode
 DEBUG = os.getenv("DEBUG", "false").lower() == "true"
 
+# API Timeout settings (in seconds)
+OPENAI_TIMEOUT = int(os.getenv("OPENAI_TIMEOUT", 60))  # Default 60 seconds
+OPENAI_CONNECT_TIMEOUT = int(os.getenv("OPENAI_CONNECT_TIMEOUT", 10))  # Default 10 seconds
+
 # NEO4J settings
 NEO4J_URI=os.getenv("NEO4J_URI", "bolt://localhost:7687")
-NEO4J_USER=os.getenv("NEO4J_USER", "neo4j")
+NEO4J_USER=os.getenv("NEO4J_USERNAME", "neo4j")
 NEO4J_PASSWORD=os.getenv("NEO4J_PASSWORD","your_password_here")
 neo4j_driver = None  # Placeholder for Neo4j driver, to be initialized in main_orchestrator.py
 
 # SEMAPHORE SETTINGS
 SEMAPHORE_CLI = int(os.getenv("SEMAPHORE_LIMIT_CLI", 15))
 SEMAPHORE_API = int(os.getenv("SEMAPHORE_LIMIT_API", 5))
+SEMAPHORE_OPENAI = int(os.getenv("SEMAPHORE_LIMIT_OPENAI", 15))
 
 # PNG FILE PATH
 PNG_FILE_PATH = BASE_DIR.parent / "basic_logs" / "graph.png"
 
 console = None  # Placeholder for console object, to be initialized in main_orchestrator.py
+debug_console = None  # Placeholder for debug console object, to be initialized in error_transfer.py
 
 # Message class placeholders - to be initialized in chat_initializer.py
 HumanMessage = None  # Placeholder for HumanMessage class
 AIMessage = None     # Placeholder for AIMessage class  
 BaseMessage = None   # Placeholder for BaseMessage class
 socket_con = None  # Placeholder for socket connection, to be initialized in main_orchestrator.py
+
+# listeners
+listeners = {
+    'eval':None
+}
 
 
 # mcp configs

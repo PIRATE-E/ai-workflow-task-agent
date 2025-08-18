@@ -168,6 +168,7 @@ lggraphOLD_MAIN.py
 copilot_instructions
 AI_llm.sln
 reports
+.crush
 # Node.js/MCP config (if not needed in root)
 package.json
 

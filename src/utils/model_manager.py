@@ -11,9 +11,19 @@ from langchain_ollama import ChatOllama
 
 from src.config import settings
 from src.utils.open_ai_integration import OpenAIIntegration
+from src.ui.diagnostics.debug_helpers import debug_info, debug_warning, debug_error
 
-# 🎨 Rich Traceback Integration
-from src.utils.rich_traceback_manager import RichTracebackManager, rich_exception_handler, safe_execute
+# 🎨 Rich Traceback Integration (updated path after refactor)
+try:  # Lazy-resilient import in case path shifts
+    from src.ui.diagnostics.rich_traceback_manager import RichTracebackManager, rich_exception_handler, safe_execute
+except ImportError:  # Fallback (older path compatibility)
+    from src.ui.diagnostics import rich_traceback_manager as _rtm  # type: ignore
+    RichTracebackManager = _rtm.RichTracebackManager  # type: ignore
+    rich_exception_handler = _rtm.rich_exception_handler  # type: ignore
+    safe_execute = getattr(_rtm, 'safe_execute', lambda f, *a, **k: f(*a, **k))  # type: ignore
+
+# 🔧 COMPLETELY ISOLATED DEBUG LOGGING - NO IMPORTS, NO DEPENDENCIES
+# (Replaced by debug_helpers unified logging)
 
 
 class ModelManager(ChatOllama):
@@ -120,55 +130,59 @@ class ModelManager(ChatOllama):
         Public method to explicitly clean up all models.
         Can be called manually or by signal handlers.
         """
-        try:
-            if cls._openai_integration is not None:
-                try:
-                    if settings.socket_con:
-                        settings.socket_con.send_error("🧹 Cleaning up OpenAI integration")
-                    OpenAIIntegration.cleanup()
-                    cls._openai_integration = None
-                    cls._is_openai_mode = False
-                    if settings.socket_con:
-                        settings.socket_con.send_error("✅ OpenAI integration cleanup completed")
-                        return  # Exit early if OpenAI integration is cleaned up
-                except Exception as openai_cleanup_error:
-                    RichTracebackManager.handle_exception(
-                        openai_cleanup_error,
-                        context="OpenAI Integration Cleanup",
-                        extra_context={"integration_status": "cleanup_failed"}
-                    )
-                    if settings.socket_con:
-                        settings.socket_con.send_error(f"❌ Error during OpenAI integration cleanup: {openai_cleanup_error}")
-        except Exception as e:
-            RichTracebackManager.handle_exception(
-                e,
-                context="OpenAI Integration Cleanup Wrapper",
-                extra_context={"cleanup_phase": "openai_integration"}
-            )
-            
-        try:
-            if cls.current_model:
-                try:
-                    if settings.socket_con:
-                        settings.socket_con.send_error(f"🧹 Cleaning up model: {cls.current_model}")
-                    cls._stop_model()
-                    cls.current_model = None
-                    if settings.socket_con:
-                        settings.socket_con.send_error("✅ Model cleanup completed")
-                except Exception as model_cleanup_error:
-                    RichTracebackManager.handle_exception(
-                        model_cleanup_error,
-                        context="Ollama Model Cleanup",
-                        extra_context={"current_model": cls.current_model}
-                    )
-                    if settings.socket_con:
-                        settings.socket_con.send_error(f"❌ Error during model cleanup: {model_cleanup_error}")
-        except Exception as e:
-            RichTracebackManager.handle_exception(
-                e,
-                context="Ollama Model Cleanup Wrapper",
-                extra_context={"cleanup_phase": "ollama_model"}
-            )
+        # OpenAI Integration Cleanup
+        if cls._openai_integration is not None:
+            try:
+                debug_info(
+                    "MODEL_MANAGER • CLEANUP",
+                    "Cleaning up OpenAI integration",
+                    {"cleanup_type": "openai_integration"}
+                )
+                OpenAIIntegration.cleanup()
+                cls._openai_integration = None
+                cls._is_openai_mode = False
+                debug_info(
+                    "MODEL_MANAGER • CLEANUP_SUCCESS",
+                    "OpenAI integration cleanup completed",
+                    {"cleanup_type": "openai_integration", "status": "completed"}
+                )
+            except Exception as openai_cleanup_error:
+                RichTracebackManager.handle_exception(
+                    openai_cleanup_error,
+                    context="OpenAI Integration Cleanup",
+                    extra_context={"integration_status": "cleanup_failed"}
+                )
+                debug_error(
+                    "MODEL_MANAGER • CLEANUP_ERROR",
+                    f"Error during OpenAI integration cleanup: {openai_cleanup_error}",
+                    {"cleanup_type": "openai_integration", "error_type": type(openai_cleanup_error).__name__}
+                )
+        # Ollama Model Cleanup
+        if cls.current_model:
+            try:
+                debug_info(
+                    "MODEL_MANAGER • MODEL_CLEANUP",
+                    f"Cleaning up model: {cls.current_model}",
+                    {"cleanup_type": "model", "model_name": cls.current_model}
+                )
+                cls._stop_model()
+                cls.current_model = None
+                debug_info(
+                    "MODEL_MANAGER • MODEL_CLEANUP_SUCCESS",
+                    "Model cleanup completed",
+                    {"cleanup_type": "model", "status": "completed"}
+                )
+            except Exception as model_cleanup_error:
+                RichTracebackManager.handle_exception(
+                    model_cleanup_error,
+                    context="Ollama Model Cleanup",
+                    extra_context={"current_model": cls.current_model}
+                )
+                debug_error(
+                    "MODEL_MANAGER • MODEL_CLEANUP_ERROR",
+                    f"Error during model cleanup: {model_cleanup_error}",
+                    {"cleanup_type": "model", "error_type": type(model_cleanup_error).__name__}
+                )
 
     @staticmethod
     def load_model(model_name: str):
@@ -187,25 +201,39 @@ class ModelManager(ChatOllama):
         for i in ModelManager.model_list:
             if r_read.__contains__(i):
                 ModelManager.current_model = i
-
         if model_name not in ModelManager.model_list:
             raise ValueError(f"Model {model_name} is not available. Available models: {ModelManager.model_list}")
-        else:
-            if settings.socket_con:
-                settings.socket_con.send_error(
-                    f"\t[log]current model {ModelManager.current_model}, loading model {model_name}")
-            if not ModelManager.current_model is None:
-                if ModelManager.current_model == model_name:
-                    if settings.socket_con:
-                        settings.socket_con.send_error(f"\t[log]Model {model_name} is already loaded.")
-                else:
-                    ModelManager._stop_model()
-                    ModelManager.current_model = model_name
-                    # Here you would add the actual loading logic
+        debug_info(
+            "MODEL_MANAGER • MODEL_LOADING",
+            f"Loading model {model_name}",
+            {
+                "current_model": ModelManager.current_model,
+                "target_model": model_name,
+                "action": "model_loading"
+            }
+        )
+        if ModelManager.current_model is not None:
+            if ModelManager.current_model == model_name:
+                debug_info(
+                    "MODEL_MANAGER • MODEL_ALREADY_LOADED",
+                    f"Model {model_name} is already loaded",
+                    {"model": model_name, "status": "already_loaded"}
+                )
             else:
+                ModelManager._stop_model()
                 ModelManager.current_model = model_name
-                if settings.socket_con:
-                    settings.socket_con.send_error(f"Model {model_name} loaded successfully.")
+                debug_info(
+                    "MODEL_MANAGER • MODEL_SWITCHED",
+                    f"Switched to model {model_name}",
+                    {"model": model_name, "status": "switched"}
+                )
+        else:
+            ModelManager.current_model = model_name
+            debug_info(
+                "MODEL_MANAGER • MODEL_LOADED",
+                f"Model {model_name} loaded successfully",
+                {"model": model_name, "status": "loaded"}
+            )
 
     @classmethod
     def _stop_model(cls):
@@ -213,10 +241,12 @@ class ModelManager(ChatOllama):
         Stops the currently running model using the Ollama CLI.
         """
         if cls.current_model:
-            if settings.socket_con:
-                settings.socket_con.send_error(f"Stopping previous model: {cls.current_model}")
+            debug_info(
+                "MODEL_MANAGER • MODEL_STOPPING",
+                f"Stopping model: {cls.current_model}",
+                {"model": cls.current_model, "action": "stopping"}
+            )
             os.system(f"ollama stop {cls.current_model}")
-        pass
 
     def invoke(
             self,
@@ -313,7 +343,7 @@ class ModelManager(ChatOllama):
     @classmethod
     def convert_to_json(cls, response: Union[str, dict, list, BaseMessage]) -> Union[dict, list]:
         """
-        🔧 ENHANCED: JSON extraction with proper type handling for async responses and reasoning content
+        🔧 ENHANCED v4.0: JSON extraction with COMPLETELY ISOLATED logging (no recursion possible)
         
         Args:
             response: Response to convert (can be string, dict, list, or BaseMessage)
@@ -323,6 +353,14 @@ class ModelManager(ChatOllama):
         """
         # Handle already parsed objects (most common case for async responses)
         if isinstance(response, (dict, list)):
+            debug_info(
+                "MODEL_MANAGER • JSON_CONVERSION",
+                "Response already parsed as JSON",
+                {
+                    "response_type": type(response).__name__,
+                    "conversion_method": "direct_passthrough"
+                }
+            )
             return response
         
         # Handle BaseMessage objects with priority-based content extraction
@@ -333,11 +371,28 @@ class ModelManager(ChatOllama):
 
         # Handle empty or None responses
         if not content or content.strip() == "":
+            debug_warning(
+                "MODEL_MANAGER • JSON_CONVERSION_EMPTY",
+                "Empty response detected, returning fallback",
+                {
+                    "response_type": type(response).__name__,
+                    "fallback_action": "empty_response_wrapper"
+                }
+            )
             return {"content": "empty_response"}
 
-        # Try 1: Direct JSON parsing
+        # Try 1: Direct JSON parsing (highest priority)
         try:
-            return json.loads(content)
+            parsed = json.loads(content)
+            debug_info(
+                "MODEL_MANAGER • JSON_CONVERSION_DIRECT",
+                "Direct JSON parsing successful",
+                {
+                    "response_type": type(parsed).__name__,
+                    "conversion_method": "direct_parsing"
+                }
+            )
+            return parsed
         except (json.JSONDecodeError, TypeError):
             pass
 
@@ -347,14 +402,42 @@ class ModelManager(ChatOllama):
         markdown_match = re.search(markdown_pattern, content, re.DOTALL)
         if markdown_match:
             try:
-                return json.loads(markdown_match.group(1))
+                parsed = json.loads(markdown_match.group(1))
+                debug_info(
+                    "MODEL_MANAGER • JSON_CONVERSION_MARKDOWN",
+                    "JSON extracted from markdown code block",
+                    {
+                        "response_type": type(parsed).__name__,
+                        "conversion_method": "markdown_extraction"
+                    }
+                )
+                return parsed
             except json.JSONDecodeError:
                 pass
 
-        # Try 3: Find JSON objects or arrays with proper brace/bracket matching
+        # Try 3: Find JSON objects with proper brace matching (prioritize objects for agent_mode)
         json_objects = []
         
-        # Look for JSON arrays first (priority for RAG triple extraction)
+        # Look for JSON objects first (priority for agent mode compliance)
+        brace_count = 0
+        start_pos = -1
+        for i, char in enumerate(content):
+            if char == '{':
+                if brace_count == 0:
+                    start_pos = i
+                brace_count += 1
+            elif char == '}':
+                brace_count -= 1
+                if brace_count == 0 and start_pos != -1:
+                    try:
+                        json_str = content[start_pos:i + 1]
+                        parsed = json.loads(json_str)
+                        json_objects.append(('object', parsed))
+                    except json.JSONDecodeError:
+                        pass
+                    start_pos = -1
+
+        # Then look for JSON arrays
         bracket_count = 0
         start_pos = -1
         for i, char in enumerate(content):
@@ -368,36 +451,44 @@ class ModelManager(ChatOllama):
                     try:
                         json_str = content[start_pos:i + 1]
                         parsed = json.loads(json_str)
-                        json_objects.append(parsed)
+                        json_objects.append(('array', parsed))
                     except json.JSONDecodeError:
                         pass
                     start_pos = -1
 
-        # If no arrays found, look for JSON objects
-        if not json_objects:
-            brace_count = 0
-            start_pos = -1
-            for i, char in enumerate(content):
-                if char == '{':
-                    if brace_count == 0:
-                        start_pos = i
-                    brace_count += 1
-                elif char == '}':
-                    brace_count -= 1
-                    if brace_count == 0 and start_pos != -1:
-                        try:
-                            json_str = content[start_pos:i + 1]
-                            parsed = json.loads(json_str)
-                            json_objects.append(parsed)
-                        except json.JSONDecodeError:
-                            pass
-                        start_pos = -1
-
-        # Return first valid JSON object found (prefer arrays for RAG)
+        # Return first valid JSON object found (prefer objects over arrays for agent compliance)
         if json_objects:
-            return json_objects[0]
+            # Sort to prioritize objects over arrays
+            json_objects.sort(key=lambda x: 0 if x[0] == 'object' else 1)
+            json_type, parsed_json = json_objects[0]
+            
+            debug_info(
+                "MODEL_MANAGER • JSON_CONVERSION_EXTRACTED",
+                f"JSON {json_type} extracted via pattern matching",
+                {
+                    "response_type": type(parsed_json).__name__,
+                    "conversion_method": f"pattern_matching_{json_type}",
+                    "objects_found": len([x for x in json_objects if x[0] == 'object']),
+                    "arrays_found": len([x for x in json_objects if x[0] == 'array'])
+                }
+            )
+            return parsed_json
 
-        # Fallback: wrap content
-        if settings.socket_con:
-            settings.socket_con.send_error("[warning] json conversion failed, returning content as fallback : " + content[:100])
-        return {"content": content}
+        # Fallback: wrap content with enhanced error information
+        debug_warning(
+            "MODEL_MANAGER • JSON_CONVERSION_FAILED",
+            "All JSON parsing methods failed, returning content fallback",
+            {
+                "content_preview": str(content)[:100] if content else "",
+                "content_length": len(content) if content else 0,
+                "fallback_action": "wrap_as_content",
+                "conversion_method": "fallback_wrapper"
+            }
+        )
+        
+        # Enhanced fallback with attempt to preserve useful information
+        return {
+            "content": str(content),
+            "parsing_error": "Failed to extract valid JSON",
+            "original_response_type": type(response).__name__
+        }

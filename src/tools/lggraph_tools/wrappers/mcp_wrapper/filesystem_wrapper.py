@@ -1,5 +1,3 @@
-import os.path
-
 from src.config import settings
 from src.tools.lggraph_tools.tools.mcp_integrated_tools import filesystem
 
@@ -22,10 +20,24 @@ class FileSystemWrapper:
 
         # Call the filesystem tool (now returns structured response)
         result = filesystem.file_system_tool(**kwargs)
-        settings.socket_con.send_error(f"\tResult from MCP server: {result}")  # Log the result for debugging
+        
+        # Safe debug logging
+        from src.ui.diagnostics.debug_helpers import debug_info
+        debug_info(
+            heading="MCP_WRAPPER • FILESYSTEM",
+            body=f"MCP server result received",
+            metadata={
+                "result_preview": str(result)[:100],
+                "result_type": type(result).__name__
+            }
+        )
 
         action = kwargs.get('tool_name')  # This should match the action being performed
-        settings.socket_con.send_error(f"\tAction performed: {action}")  # Log the action for debugging
+        debug_info(
+            heading="MCP_WRAPPER • ACTION",
+            body=f"Action performed: {action}",
+            metadata={"action": action, "kwargs_count": len(kwargs)}
+        )
 
         # Handle the result and create appropriate AI message
         if result and not str(result).startswith("Error:"):
