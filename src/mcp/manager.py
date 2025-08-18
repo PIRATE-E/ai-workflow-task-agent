@@ -6,7 +6,13 @@ from src.config import settings
 from src.mcp.dynamically_tool_register import DynamicToolRegister
 
 # 🎨 Rich Traceback Integration
-from src.utils.rich_traceback_manager import RichTracebackManager, rich_exception_handler, safe_execute
+from src.ui.diagnostics.rich_traceback_manager import RichTracebackManager, rich_exception_handler
+# ✅ Structured Debug Helpers
+from src.ui.diagnostics.debug_helpers import (
+    debug_info,
+    debug_warning,
+    debug_error,
+)
 
 
 class MCP_Manager:
@@ -35,7 +41,7 @@ class MCP_Manager:
         return MCP_Manager.response_id
 
     @classmethod
-    def add_server(cls, name: str, runner: Literal["uvx", "npx"], package: str, args: list[str], func : Callable):
+    def add_server(cls, name: str, runner: Literal["uvx", "npx"], package: str, args: list[str], func: Callable):
         """
         Add a server to the MCP manager.
         :param name: Name of the server.
@@ -71,9 +77,11 @@ class MCP_Manager:
                           # (function that is associated with the server to handle its responses and make requests) \
                           # to assign the function to the llm's tools.
         }
-        # Here you would implement the logic to add the server
-        settings.socket_con.send_error(
-            f"[LOG] Server '{name}' 'runner' {runner} added with package '{package}' and args {args}.")
+        debug_info(
+            heading="MCP • SERVER_ADDED",
+            body=f"Registered server '{name}' (runner={runner})",
+            metadata={"package": package, "args": args}
+        )
 
     @classmethod
     def tool_discovery(cls, mcp_server_name: str) -> Any:
@@ -82,7 +90,11 @@ class MCP_Manager:
         :return: Dictionary of discovered tools from the specified MCP server.
         """
         if mcp_server_name not in cls.mcp_servers:
-            settings.socket_con.send_error("[LOG] No MCP servers found.")
+            debug_warning(
+                heading="MCP • TOOL_DISCOVERY_MISSED",
+                body="Requested tool discovery on unknown server",
+                metadata={"server": mcp_server_name}
+            )
             return {}
 
         tool_discovery_request = {
@@ -96,24 +108,28 @@ class MCP_Manager:
         MCP_Manager.running_servers[mcp_server_name].stdin.flush()
 
         response_line_json = json.loads(MCP_Manager.running_servers[mcp_server_name].stdout.readline().strip())
-        
-        # DEBUG: Log the actual tools/list response
-        # settings.socket_con.send_error(f"[DEBUG] Tools/list response from {mcp_server_name}: {response_line_json}")
-        
-        # Check if tools exist in response
+
         if 'result' in response_line_json and 'tools' in response_line_json['result']:
             tools_found = response_line_json['result']['tools']
-            settings.socket_con.send_error(f"[DEBUG] Found {len(tools_found)} tools: {[tool.get('name', 'unnamed') for tool in tools_found]}")
-            
+            debug_info(
+                heading="MCP • TOOLS_DISCOVERED",
+                body=f"Discovered {len(tools_found)} tools",
+                metadata={"server": mcp_server_name, "tools": [t.get('name', 'unnamed') for t in tools_found]}
+            )
             if tools_found:
-                # experimental
                 DynamicToolRegister.register_tool(response_line_json, MCP_Manager.mcp_servers[mcp_server_name]["func"])
             else:
-                settings.socket_con.send_error(f"[WARNING] No tools found in MCP server '{mcp_server_name}' response")
+                debug_warning(
+                    heading="MCP • NO_TOOLS",
+                    body="Server returned empty tool list",
+                    metadata={"server": mcp_server_name}
+                )
         else:
-            settings.socket_con.send_error(f"[ERROR] Invalid tools/list response format from '{mcp_server_name}': {response_line_json}")
-        
-        # set the tool into tool assignment
+            debug_error(
+                heading="MCP • INVALID_TOOL_RESPONSE",
+                body="Server returned unexpected tools/list format",
+                metadata={"server": mcp_server_name, "response_preview": str(response_line_json)[:200]}
+            )
         return response_line_json
 
     @classmethod
@@ -128,18 +144,22 @@ class MCP_Manager:
                 server_info = MCP_Manager.mcp_servers[name]
                 runner = server_info["runner"]
                 package = server_info["package"]
-                args = server_info["args"] if "args" in server_info else []
-
-                # actual command to run the server
+                args = server_info.get("args", [])
                 command = [runner, package] + args
                 try:
-                    # Here you would implement the logic to start the server
-                    server_process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE,
-                                                      stderr=subprocess.PIPE, stdin=subprocess.PIPE, text=True, bufsize=1)
+                    server_process = subprocess.Popen(
+                        command,
+                        shell=True,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
+                        stdin=subprocess.PIPE,
+                        text=True,
+                        bufsize=1
+                    )
                     MCP_Manager.running_servers[name] = server_process
                     server_info["status"] = "running"
-                    
-                    # ######## Initialize MCP server with handshake ########
+
+                    # Handshake / initialize
                     try:
                         init_request = {
                             "jsonrpc": "2.0",
@@ -151,87 +171,101 @@ class MCP_Manager:
                                 "clientInfo": {"name": "langgraph-mcp-client", "version": "1.0.0"}
                             }
                         }
-                        init_json = json.dumps(init_request) + "\n"
-                        server_process.stdin.write(init_json)
+                        server_process.stdin.write(json.dumps(init_request) + "\n")
                         server_process.stdin.flush()
-
-                        # Read initialization response (but don't process it for now)
                         init_response = server_process.stdout.readline()
-                        settings.socket_con.send_error(
-                            f"[LOG] MCP server '{name}' initialized the response is :- {init_response}")
-
-                        ######## now get the tools from the server ############
+                        debug_info(
+                            heading="MCP • SERVER_INITIALIZED",
+                            body=f"Handshake completed for '{name}'",
+                            metadata={"init_response_preview": init_response[:120]}
+                        )
+                        # Discover tools
                         try:
                             tools = cls.tool_discovery(name)
-                            if tools:
-                                settings.socket_con.send_error(
-                                    f"[LOG] Discovered tools from server {name} ")
+                            if tools and 'result' in tools:
+                                debug_info(
+                                    heading="MCP • DISCOVERY_COMPLETE",
+                                    body=f"Tool discovery finished for '{name}'",
+                                    metadata={"server": name}
+                                )
                             else:
-                                settings.socket_con.send_error(
-                                    f"[WARNING] No tools discovered from server '{name}'. This might be expected if the server has no tools registered.")
+                                debug_warning(
+                                    heading="MCP • DISCOVERY_EMPTY",
+                                    body="No tools returned after discovery",
+                                    metadata={"server": name}
+                                )
                         except Exception as tool_discovery_error:
                             RichTracebackManager.handle_exception(
                                 tool_discovery_error,
                                 context=f"MCP Tool Discovery - {name}",
                                 extra_context={"server_name": name, "init_response": str(init_response)[:100]}
                             )
-                            settings.socket_con.send_error(f"[ERROR] Tool discovery failed for '{name}': {tool_discovery_error}")
-                            
+                            debug_error(
+                                heading="MCP • DISCOVERY_ERROR",
+                                body=f"Tool discovery failed: {tool_discovery_error}",
+                                metadata={"server": name}
+                            )
                     except Exception as init_error:
                         RichTracebackManager.handle_exception(
                             init_error,
                             context=f"MCP Server Initialization - {name}",
-                            extra_context={
-                                "server_name": name,
-                                "command": str(command),
-                                "process_id": server_process.pid if server_process else "N/A"
-                            }
+                            extra_context={"server_name": name, "command": str(command), "process_id": server_process.pid}
                         )
-                        settings.socket_con.send_error(f"[WARNING] MCP initialization failed for '{name}': {init_error}")
-                        
-                    settings.socket_con.send_error(
-                        f"[LOG] started server '{name}' with package '{package}' and args {args}.")
+                        debug_warning(
+                            heading="MCP • INIT_FAILED",
+                            body=f"Initialization failed: {init_error}",
+                            metadata={"server": name}
+                        )
+
+                    debug_info(
+                        heading="MCP • SERVER_STARTED",
+                        body=f"Started server '{name}'",
+                        metadata={"package": package, "args": args}
+                    )
                     return True
-                    
+
                 except subprocess.CalledProcessError as process_error:
                     RichTracebackManager.handle_exception(
                         process_error,
                         context=f"MCP Server Process Creation - {name}",
-                        extra_context={
-                            "command": str(command),
-                            "server_name": name,
-                            "runner": runner,
-                            "package": package
-                        }
+                        extra_context={"command": str(command), "server_name": name, "runner": runner, "package": package}
                     )
-                    settings.socket_con.send_error(
-                        f"[ERROR] Command '{command}' failed to execute. Process error: {process_error}")
+                    debug_error(
+                        heading="MCP • PROCESS_ERROR",
+                        body=f"Command failed: {process_error}",
+                        metadata={"server": name, "command": str(command)}
+                    )
                     return False
-                    
                 except Exception as e:
                     RichTracebackManager.handle_exception(
                         e,
                         context=f"MCP Server Startup - {name}",
-                        extra_context={
-                            "server_name": name,
-                            "command": str(command),
-                            "runner": runner,
-                            "package": package
-                        }
+                        extra_context={"server_name": name, "command": str(command), "runner": runner, "package": package}
                     )
-                    settings.socket_con.send_error(f"[ERROR] Failed to start server '{name}': {e}")
+                    debug_error(
+                        heading="MCP • STARTUP_ERROR",
+                        body=f"Failed to start server: {e}",
+                        metadata={"server": name}
+                    )
                     return False
             else:
-                settings.socket_con.send_error(f"[ERROR] Server '{name}' not found.")
+                debug_error(
+                    heading="MCP • UNKNOWN_SERVER",
+                    body="Attempted to start non-existent server",
+                    metadata={"server": name}
+                )
                 return False
-                
         except Exception as e:
             RichTracebackManager.handle_exception(
                 e,
                 context=f"MCP Server Startup Wrapper - {name}",
                 extra_context={"server_name": name}
             )
-            settings.socket_con.send_error(f"[ERROR] Critical error starting server '{name}': {e}")
+            debug_error(
+                heading="MCP • CRITICAL_START_ERROR",
+                body=f"Critical error starting server: {e}",
+                metadata={"server": name}
+            )
             return False
 
     def _initialize(self):
@@ -242,11 +276,11 @@ class MCP_Manager:
         """
         # Perform any necessary initialization here
         MCP_Manager.mcp_enabled = settings.MCP_CONFIG.get("MCP_ENABLED")
-        if MCP_Manager.mcp_enabled:
-            settings.socket_con.send_error("[LOG] MCP Manager initialized with MCP_ENABLED set to True.")
-
-        else:
-            settings.socket_con.send_error("[LOG] MCP Manager initialized with MCP_ENABLED set to False.")
+        debug_info(
+            heading="MCP • MANAGER_INIT",
+            body="MCP Manager initialized",
+            metadata={"enabled": bool(MCP_Manager.mcp_enabled)}
+        )
         return MCP_Manager.mcp_enabled
 
     @classmethod
@@ -260,77 +294,64 @@ class MCP_Manager:
         """
         # Check if server exists and is running
         if name not in MCP_Manager.mcp_servers:
-            error_msg = f"Server '{name}' not found"
-            settings.socket_con.send_error(f"[ERROR] {error_msg}")
-            return {"success": False, "error": error_msg}
-
+            msg = f"Server '{name}' not found"
+            debug_error(heading="MCP • CALL_ERROR", body=msg, metadata={"server": name})
+            return {"success": False, "error": msg}
         if MCP_Manager.mcp_servers[name]["status"] != "running":
-            error_msg = f"Server '{name}' is not running"
-            settings.socket_con.send_error(f"[ERROR] {error_msg}")
-            return {"success": False, "error": error_msg}
-
-        settings.socket_con.send_error(f"[LOG] Calling server '{name}' with tool '{tool_name}' and args {args}.")
-
-        get_mcp_server_process = MCP_Manager.running_servers.get(name)
-        if not get_mcp_server_process:
-            error_msg = f"Server '{name}' process not found"
-            settings.socket_con.send_error(f"[ERROR] {error_msg}")
-            return {"success": False, "error": error_msg}
-
+            msg = f"Server '{name}' is not running"
+            debug_error(heading="MCP • CALL_ERROR", body=msg, metadata={"server": name})
+            return {"success": False, "error": msg}
+        debug_info(
+            heading="MCP • TOOL_CALL",
+            body=f"Calling tool '{tool_name}'",
+            metadata={"server": name, "args": args}
+        )
+        proc = MCP_Manager.running_servers.get(name)
+        if not proc:
+            msg = f"Server '{name}' process not found"
+            debug_error(heading="MCP • CALL_ERROR", body=msg, metadata={"server": name})
+            return {"success": False, "error": msg}
         try:
-            # Create MCP JSON-RPC request
             mcp_request = {
                 "jsonrpc": "2.0",
                 "id": MCP_Manager.generate_response_id(),
                 "method": "tools/call",
-                "params": {
-                    "name": tool_name,
-                    "arguments": args
-                }
+                "params": {"name": tool_name, "arguments": args}
             }
-
-            # Send request to MCP server
-            request_json = json.dumps(mcp_request) + "\n"
-            get_mcp_server_process.stdin.write(request_json)
-            get_mcp_server_process.stdin.flush()
-
-            # Read response from MCP server
-            response_line = get_mcp_server_process.stdout.readline().strip()
+            proc.stdin.write(json.dumps(mcp_request) + "\n")
+            proc.stdin.flush()
+            response_line = proc.stdout.readline().strip()
             if not response_line:
-                error_msg = f"No response from server '{name}'"
-                settings.socket_con.send_error(f"[ERROR] {error_msg}")
-                return {"success": False, "error": error_msg}
-
-            # Parse JSON-RPC response
+                msg = f"No response from server '{name}'"
+                debug_error(heading="MCP • CALL_ERROR", body=msg, metadata={"server": name})
+                return {"success": False, "error": msg}
             try:
                 json_response = json.loads(response_line)
-
-                # Check for JSON-RPC error
                 if "error" in json_response:
-                    error_msg = f"MCP server error: {json_response['error']}"
-                    settings.socket_con.send_error(f"[ERROR] {error_msg}")
-                    return {"success": False, "error": error_msg}
-
-                # Extract result from JSON-RPC response
+                    msg = f"MCP server error: {json_response['error']}"
+                    debug_error(heading="MCP • TOOL_ERROR", body=msg, metadata={"server": name, "tool": tool_name})
+                    return {"success": False, "error": msg}
                 if "result" in json_response:
-                    result_data = json_response["result"]
-                    settings.socket_con.send_error(f"[LOG] Server '{name}' tool '{tool_name}' executed successfully")
-                    return {"success": True, "data": result_data}
-                else:
-                    # Fallback: return entire response if no result field
-                    settings.socket_con.send_error(f"[LOG] Server '{name}' returned response without result field")
-                    return {"success": True, "data": json_response}
-
+                    debug_info(
+                        heading="MCP • TOOL_SUCCESS",
+                        body="Tool executed successfully",
+                        metadata={"server": name, "tool": tool_name}
+                    )
+                    return {"success": True, "data": json_response["result"]}
+                debug_warning(
+                    heading="MCP • NO_RESULT_FIELD",
+                    body="Response missing 'result' field; returning raw payload",
+                    metadata={"server": name, "tool": tool_name}
+                )
+                return {"success": True, "data": json_response}
             except json.JSONDecodeError as e:
-                error_msg = f"Invalid JSON response from server '{name}': {e}"
-                settings.socket_con.send_error(f"[ERROR] {error_msg}")
-                # Return raw response as data for debugging
-                return {"success": False, "error": error_msg, "raw_response": response_line}
-
+                msg = f"Invalid JSON response: {e}"
+                debug_error(heading="MCP • PARSE_ERROR", body=msg, metadata={"server": name, "tool": tool_name})
+                return {"success": False, "error": msg, "raw_response": response_line}
         except Exception as e:
-            error_msg = f"Communication error with server '{name}': {str(e)}"
-            settings.socket_con.send_error(f"[ERROR] {error_msg}")
-            return {"success": False, "error": error_msg}
+            msg = f"Communication error: {e}"
+            debug_error(heading="MCP • COMM_ERROR", body=msg, metadata={"server": name, "tool": tool_name})
+            return {"success": False, "error": msg}
 
     @classmethod
     def stop_server(cls, name: str) -> bool:
@@ -340,19 +361,30 @@ class MCP_Manager:
         :return: True if server was stopped successfully, False otherwise.
         """
         if name not in cls.running_servers:
-            settings.socket_con.send_error(f"[ERROR] Server '{name}' not found or not running.")
+            debug_warning(
+                heading="MCP • STOP_IGNORED",
+                body="Stop requested for server not running",
+                metadata={"server": name}
+            )
             return False
-
-        server_process = cls.running_servers[name]
+        proc = cls.running_servers[name]
         try:
-            server_process.terminate()
-            server_process.wait(timeout=5)  # Wait up to 5 seconds
+            proc.terminate()
+            proc.wait(timeout=5)
             del cls.running_servers[name]
             cls.mcp_servers[name]["status"] = "stopped"
-            settings.socket_con.send_error(f"[LOG] Server '{name}' stopped successfully.")
+            debug_info(
+                heading="MCP • SERVER_STOPPED",
+                body="Server stopped successfully",
+                metadata={"server": name}
+            )
             return True
         except Exception as e:
-            settings.socket_con.send_error(f"[ERROR] Failed to stop server '{name}': {e}")
+            debug_error(
+                heading="MCP • STOP_ERROR",
+                body=f"Failed to stop server: {e}",
+                metadata={"server": name}
+            )
             return False
 
     @classmethod
@@ -362,25 +394,28 @@ class MCP_Manager:
         :return: True if all servers were stopped, False if any failed.
         """
         if not cls.running_servers:
-            settings.socket_con.send_error("[LOG] No MCP servers running to stop.")
+            debug_info(
+                heading="MCP • STOP_ALL_SKIP",
+                body="No running servers to stop",
+                metadata={}
+            )
             return True
-
         success = True
-        server_names = list(cls.running_servers.keys())  # Copy to avoid modification during iteration
-
-        for server_name in server_names:
+        for server_name in list(cls.running_servers.keys()):
             try:
                 if not cls.stop_server(server_name):
                     success = False
             except Exception as e:
-                settings.socket_con.send_error(f"[ERROR] Exception stopping server '{server_name}': {e}")
+                debug_error(
+                    heading="MCP • STOP_ALL_ERROR",
+                    body=f"Exception stopping '{server_name}': {e}",
+                    metadata={"server": server_name}
+                )
                 success = False
-
         if success:
-            settings.socket_con.send_error("[LOG] All MCP servers stopped successfully.")
+            debug_info(heading="MCP • STOP_ALL_COMPLETE", body="All servers stopped", metadata={})
         else:
-            settings.socket_con.send_error("[WARNING] Some MCP servers failed to stop cleanly.")
-
+            debug_warning(heading="MCP • STOP_ALL_PARTIAL", body="Some servers failed to stop", metadata={})
         return success
 
     @classmethod
@@ -392,8 +427,8 @@ class MCP_Manager:
         try:
             cls.stop_all_servers()
         except Exception as e:
-            # Don't let cleanup errors crash the application
-            if hasattr(settings, 'socket_con') and settings.socket_con:
-                settings.socket_con.send_error(f"[ERROR] MCP cleanup failed: {e}")
-            else:
-                print(f"[ERROR] MCP cleanup failed: {e}")
+            debug_error(
+                heading="MCP • CLEANUP_ERROR",
+                body=f"Cleanup failed: {e}",
+                metadata={}
+            )

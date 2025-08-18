@@ -1,5 +1,5 @@
 from src.config import settings
-
+from src.ui.diagnostics.debug_helpers import debug_warning, debug_error
 
 class RagSearchClassifierWrapper:
     """
@@ -40,9 +40,15 @@ class RagSearchClassifierWrapper:
         except Exception as e:
             # ✅ ENHANCED ERROR CATCHING WITH STACK TRACE
             import traceback
+            from src.ui.diagnostics.rich_traceback_manager import RichTracebackManager
             error_details = traceback.format_exc()
-            error_message = f"[ERROR] Exception during RAG search for '{self.query}': {str(e)}"
-            
-            print(f"[ERROR] Full traceback:\n{error_details}")
-            ai_message = settings.AIMessage(content=error_message)
+            RichTracebackManager.handle_exception(
+                exception=e,
+                context="RAG Search Classifier Wrapper Execution",
+                exc_type=ValueError,
+                exc_traceback= error_details,
+                show_locals=True,
+            )
+
+            ai_message = settings.AIMessage(content=f"[ERROR] An error occurred while executing the RAG search: {str(e)} full traceback: {error_details}")
             ToolResponseManager().set_response([ai_message])

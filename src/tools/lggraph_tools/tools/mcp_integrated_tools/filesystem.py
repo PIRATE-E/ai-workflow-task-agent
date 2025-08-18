@@ -17,13 +17,30 @@ def file_system_tool(**kwargs) -> str | dict | list[dict[str, Any]]:
     """
 
     try:
-        # Call MCP server with structured response
-        settings.socket_con.send_error(f"\tCalling MCP server with parameters: {kwargs}")
+        # Safe debug logging
+        from src.ui.diagnostics.debug_helpers import debug_info
+        
+        debug_info(
+            heading="MCP_FILESYSTEM • CALL",
+            body="Calling MCP server",
+            metadata={
+                "kwargs_preview": str(kwargs)[:100],
+                "kwargs_count": len(kwargs)
+            }
+        )
 
         tool_name = kwargs.pop('tool_name', 'unknown tool')  # Extract tool name from kwargs
         arguments = kwargs
         response = MCP_Manager.call_mcp_server("filesystem", tool_name, arguments)
-        settings.socket_con.send_error('kwargs: ' + str(kwargs))  # Log the parameters for debugging
+        
+        debug_info(
+            heading="MCP_FILESYSTEM • PARAMETERS",
+            body=f"Tool: {tool_name}",
+            metadata={
+                "tool_name": tool_name,
+                "arguments": arguments
+            }
+        )
         
         if response is None:
             return "Error: No response from MCP server"
@@ -31,12 +48,24 @@ def file_system_tool(**kwargs) -> str | dict | list[dict[str, Any]]:
         if response.get("success"):
             # Extract the actual content from the structured response
             data = response.get("data")
-            # settings.socket_con.send_error(f"\tResponse from MCP server: \n{data}")  # Log the response for debugging
+            debug_info(
+                heading="MCP_FILESYSTEM • SUCCESS",
+                body="Response received from MCP server",
+                metadata={
+                    "data_type": type(data).__name__,
+                    "has_content": 'content' in data if isinstance(data, dict) else False
+                }
+            )
             return data['content'] if isinstance(data, dict) and 'content' in data else "No content returned"
         else:
             # Handle error response
             error_msg = response.get("error", "Unknown error occurred")
-            settings.socket_con.send_error(f"\tError from MCP server: {error_msg}")
+            from src.utils.debug_helpers import debug_error
+            debug_error(
+                heading="MCP_FILESYSTEM • ERROR",
+                body=f"Error from MCP server: {error_msg}",
+                metadata={"error_message": error_msg, "response": response}
+            )
             return response
             
     except Exception as e:

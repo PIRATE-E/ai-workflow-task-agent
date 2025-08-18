@@ -17,7 +17,7 @@ from src.config import settings
 from src.utils.model_manager import ModelManager
 
 
-# ✅ LAZY LOADING: Heavy imports moved to function level
+# ✅ LAZY LOADING: Heavy imports google_sheet.md to function level
 # torch, cosine_similarity, genai, Chroma, OllamaEmbeddings, ChatOllama
 # will be imported only when needed
 
@@ -376,7 +376,7 @@ async def process_chunks_with_immediate_saving(chunks_to_process: list[Document]
     active_task = 0
     # --------- FIXED: Enhanced semaphore with better resource management ---------
     semaphore = (Semaphore(
-        settings.SEMAPHORE_API if function == neo4j_rag.prompt_gemini_for_triples_api else settings.SEMAPHORE_CLI))  # Set limit based on function  # Reduced from 5 to 3 for better stability
+        settings.SEMAPHORE_CLI if function == neo4j_rag.prompt_gemini_for_triples_cli else settings.SEMAPHORE_API))  # Set limit based on function  # Reduced from 5 to 3 for better stability
 
     async def using_semaphore(chunk: Document):
         """Process a single chunk within semaphore limit"""

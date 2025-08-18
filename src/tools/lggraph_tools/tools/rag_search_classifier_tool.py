@@ -25,13 +25,25 @@ def retrieve_knowledge_graph(query: str) -> str:
     # Get actual relationship types from database
     relationship_types = neo4j_rag.get_all_relationship_types()
 
-    if settings.socket_con:
-        settings.socket_con.send_error(f"[LOG] CYPHER QUERY GENERATION STARTED with {len(labels)} labels, {len(names)} names, and {len(relationship_types)} relationship types.")
+    from src.ui.diagnostics.debug_helpers import debug_info
+    debug_info(
+        heading="RAG_CLASSIFIER • CYPHER_GENERATION",
+        body="Cypher query generation started",
+        metadata={
+            "labels_count": len(labels),
+            "names_count": len(names), 
+            "relationship_types_count": len(relationship_types)
+        }
+    )
 
     # If no names available, return early
     if not names:
-        if settings.socket_con:
-            settings.socket_con.send_error("[ERROR] No entity names available in knowledge graph")
+        from src.utils.debug_helpers import debug_error
+        debug_error(
+            heading="RAG_CLASSIFIER • NO_ENTITIES",
+            body="No entity names available in knowledge graph",
+            metadata={"error_type": "empty_knowledge_graph"}
+        )
         return "[ERROR] Knowledge graph appears to be empty. Please ensure data is loaded."
 
     # Debug: Check if (user query name) and email-related terms exist
@@ -47,11 +59,24 @@ def retrieve_knowledge_graph(query: str) -> str:
     relation_found = any(token in rel.lower() for rel in relationship_types for token in query_tokens)
 
     if not name_found and not relation_found:
-        if settings.socket_con:
-            settings.socket_con.send_error(f"[WARNING] No matching entity names or relationship types found for query: '{query}'")
-    if settings.socket_con:
-        settings.socket_con.send_error(f"[DEBUG] Query tokens: {query_tokens} | Name found: {name_found} | Relation found: {relation_found}")
-        settings.socket_con.send_error(f"[DEBUG] User query: '{query}'")
+        from src.utils.debug_helpers import debug_warning
+        debug_warning(
+            heading="RAG_CLASSIFIER • NO_MATCHES",
+            body=f"No matching entity names or relationship types found for query: '{query}'",
+            metadata={"query": query, "query_tokens": query_tokens}
+        )
+    
+    from src.utils.debug_helpers import debug_info
+    debug_info(
+        heading="RAG_CLASSIFIER • QUERY_ANALYSIS",
+        body="Query token analysis completed",
+        metadata={
+            "query_tokens": query_tokens,
+            "name_found": name_found,
+            "relation_found": relation_found,
+            "user_query": query
+        }
+    )
 
     # Create enhanced prompt with complete workflow and decision logic
     SYSTEM_PROMPT_CYPHER_GENERATION = src.prompts.rag_search_classifier_prompts.Prompts.get_system_prompt_cypher(names, relationship_types, labels, query)

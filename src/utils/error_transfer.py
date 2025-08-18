@@ -3,15 +3,19 @@ import os
 import signal
 import socket
 import sys
+import threading
 from pathlib import Path
 
 import winsound
+from anyio import sleep
 
 # Add project root to Python path
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 from src.config import settings
+from src.ui.rich_error_print import RichErrorPrint
+from rich.console import Console
 
 
 class SocketCon:
@@ -43,7 +47,7 @@ class SocketCon:
 
     def receive_error(self) -> str:
         try:
-            data = self.client_socket.recv(1024)
+            data = self.client_socket.recv(1024 * 1024)  # Receive up to 1 MB of data
             return data.decode('utf-8')
         except socket.error as e:
             print(f"Error receiving message: {e}")
@@ -131,6 +135,18 @@ def create_lock_file():
         print(f"Error creating lock file: {e}")
         return False
 
+def write_to_file(text:str, mode='a'):
+    """Write text to a file in the basic_logs directory"""
+    file_path = settings.BASE_DIR / 'basic_logs' / 'error_log.txt'
+    w_lock = threading.Lock()  # Use a lock to prevent concurrent writes
+    with w_lock:
+        try:
+            with open(file_path, mode, encoding='utf-8') as f:
+                f.write('\n'+text+'\n')
+        except Exception as we:
+            print_error.print_rich(f"[Error] Writing to file failed: {we}")
+    pass
+
 
 if __name__ == '__main__':
     # Check for existing instance and create lock file
@@ -140,6 +156,22 @@ if __name__ == '__main__':
 
     # Register cleanup function
     atexit.register(cleanup_lock_file)
+    try:
+        console = Console(force_terminal=True,
+                color_system="windows",  # Better Windows compatibility
+                width=120,  # Default width if not specified
+                legacy_windows=False,  # Use modern Windows console features
+                safe_box=True,  # Safe box drawing for Windows
+                highlight=True,  # Enable syntax highlighting
+                emoji=True,  # Enable emoji support
+                markup=True,  # Enable Rich markup
+                log_time=True,  # Add timestamps to logs
+                log_path=False)  # Don't show file paths in logs  # Initialize rich console for logging
+        settings.debug_console = console  # Set debug console for the application
+        print_error = RichErrorPrint(console)  # Initialize rich error printing
+    except Exception as e:
+        print(f"Error initializing console: {e}", flush=True, file=sys.stderr)
+        sleep(10)
 
     # Set up signal handlers for graceful shutdown
     try:
@@ -162,37 +194,45 @@ if __name__ == '__main__':
         listening = True
         SocketCon.got_killed = False  # Flag to indicate if the server was killed
 
-        print("Server is listening...")
+        write_to_file('', mode='w')  # Clear the log file on startup
+        print_error.print_rich("Server is listening...")
 
         while listening and not SocketCon.got_killed:
             try:
                 client_socket, addr = server_socket.accept()
-                print(f"Connection from {addr}")
+                print_error.print_rich(f"Connection from {addr}")
                 try:
                     socket_con = SocketCon(client_socket)
                     while not SocketCon.got_killed and client_socket:
                         received_error = socket_con.receive_error()
                         if not received_error:
-                            print("No data received, closing connection.", flush=True, file=sys.stderr)
+                            print_error.print_rich("No data received, closing connection.")
                             break  # Client disconnected or error occurred
-                        print(f"{received_error}", flush=True, file=sys.stderr)
+                        if isinstance(received_error, str):
+                            print_error.print_rich(f"{received_error}")
+                            write_to_file(received_error)
+                        else:
+                            print_error.print_rich(received_error)
                         winsound.Beep(7933, 500)  # Beep sound for error notification
-                    listening = False  # Exit the loop after handling the connection
+                    # Don't exit the loop - continue listening for new connections
+                    print_error.print_rich("Client disconnected, waiting for new connections...")
                 finally:
                     client_socket.close()
+                    write_to_file('Connection closed with client.')
             except socket.timeout:
                 # Check got_killed flag on timeout and continue if not killed
                 if SocketCon.got_killed:
-                    print("Server shutdown requested, exiting...")
+                    print_error.print_rich("Server shutdown requested, exiting...")
                     break
                 continue  # Continue listening if not killed
             except Exception as e:
                 if not SocketCon.got_killed:
-                    print(f"Error accepting connection: {e}")
+                    print_error.print_rich(f"accepting connection: {e}")
                 break
 
     except Exception as e:
-        print(f"Server error: {e}")
+        print_error.print_rich(f"Server encountered an error: {e}")
+        sleep(2) # Wait before exiting to allow error message to be seen
     finally:
         if server_socket:
             print("Closing server socket...")

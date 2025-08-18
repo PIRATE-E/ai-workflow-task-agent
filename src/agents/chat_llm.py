@@ -72,5 +72,12 @@ def generate_llm_response(state) -> dict:
             chunk = part.content if part.content is not None else ""
             content += chunk
     # Print AI message in modern style
+    # now we will not print raw json now we will extract the response from the content
+    json_content = llm.convert_to_json(content)
+    if json_content and "response" in json_content:
+        content = json_content["response"]
+    else:
+        # If the response is not in the expected format, print the raw content
+        pass
     print_message(content.strip(), sender="ai")
     return {"messages": [AIMessage(content=content.strip())]}
