@@ -169,6 +169,7 @@ copilot_instructions
 AI_llm.sln
 reports
 .crush
+QWEN.md
 # Node.js/MCP config (if not needed in root)
 package.json
 

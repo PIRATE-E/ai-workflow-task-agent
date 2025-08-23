@@ -87,9 +87,10 @@ MCP_CONFIG = {
     "MCP_PORT": int(os.getenv("MCP_PORT", 5000)),
     "MCP_API_KEY": os.getenv("MCP_API_KEY", "your_api_key_here"),
     "MCP_TIMEOUT": int(os.getenv("MCP_TIMEOUT", 30)),  # Timeout in seconds
+    "MCP_CONFIG_PATH": BASE_DIR.parent / '.mcp.json',  # Path to MCP configuration file
 }
 
 if __name__ == '__main__':
     # true
-    # print(Path(Path().resolve().parent / "RAG" / "RAG_FILES" / "kafka.pdf").resolve().exists())
-    print(Path(Path().resolve().parent / "RAG" / "RAG_FILES" / "kafka.pdf").exists())
+    print(Path(Path().resolve().parent / "RAG" / "RAG_FILES" / "kafka.pdf").resolve().exists())
+    # print(MCP_CONFIG.get('MCP_CONFIG_PATH').exists()) # true

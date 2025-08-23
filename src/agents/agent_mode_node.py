@@ -208,7 +208,11 @@ class Agent:
                     if tool.name.lower() == tool_name.lower():
                         try:
                             # run the tool with the provided parameters
-                            tool.invoke(parameters)
+                            # 🔧 FIX: Include tool_name in parameters for MCP tools
+                            invoke_params = parameters.copy()
+                            invoke_params['tool_name'] = tool_name
+                            
+                            tool.invoke(invoke_params)
                             # only for debugging going to remove it later
                             debug_info(
                                 heading="AGENT_MODE • TOOL_EXECUTION",
@@ -518,6 +522,53 @@ class Agent:
                             response["reasoning"] = "Auto-generated reasoning due to missing key"
                         if "parameters" not in response:
                             response["parameters"] = {}
+
+                    # 🔧 FIX: Enhanced parameter validation for MCP tools
+                    parameters = response.get("parameters", {})
+                    if not isinstance(parameters, dict):
+                        debug_warning(
+                            heading="AGENT_MODE • INVALID_PARAMETERS_TYPE",
+                            body=f"Parameters should be dict, got {type(parameters).__name__}",
+                            metadata={
+                                "parameters_type": type(parameters).__name__,
+                                "tool_name": self.agent_exe_array[index]["tool_name"],
+                                "fallback_action": "convert_to_dict"
+                            }
+                        )
+                        # Force parameters to be a dict
+                        response["parameters"] = {}
+
+                    # 🔧 FIX: Ensure tool_name is always included in parameters for MCP tools
+                    tool_name = self.agent_exe_array[index]["tool_name"]
+                    
+                    # Check if this is an MCP tool (tools that use universal wrapper)
+                    mcp_tools = [
+                        'read_graph', 'search_nodes', 'open_nodes', 'create_entities', 'create_relations', 'add_observations',
+                        'delete_entities', 'delete_observations', 'delete_relations', 'create_or_update_file', 'search_repositories',
+                        'create_repository', 'get_file_contents', 'push_files', 'create_issue', 'create_pull_request',
+                        'fork_repository', 'create_branch', 'list_commits', 'list_issues', 'update_issue', 'add_issue_comment',
+                        'search_code', 'search_issues', 'search_users', 'get_issue', 'get_pull_request', 'list_pull_requests',
+                        'create_pull_request_review', 'merge_pull_request', 'get_pull_request_files', 'get_pull_request_status',
+                        'update_pull_request_branch', 'get_pull_request_comments', 'get_pull_request_reviews', 'read_file',
+                        'read_text_file', 'read_media_file', 'read_multiple_files', 'write_file', 'edit_file', 'create_directory',
+                        'list_directory', 'list_directory_with_sizes', 'directory_tree', 'move_file', 'search_files',
+                        'get_file_info', 'list_allowed_directories', 'puppeteer_navigate', 'puppeteer_screenshot',
+                        'puppeteer_click', 'puppeteer_fill', 'puppeteer_select', 'puppeteer_hover', 'puppeteer_evaluate',
+                        'sequentialthinking'
+                    ]
+                    
+                    if tool_name in mcp_tools:
+                        # Ensure tool_name is in parameters for MCP tools
+                        response["parameters"]["tool_name"] = tool_name
+                        debug_info(
+                            heading="AGENT_MODE • MCP_TOOL_NAME_INJECTION",
+                            body=f"Added tool_name '{tool_name}' to parameters for MCP tool",
+                            metadata={
+                                "tool_name": tool_name,
+                                "is_mcp_tool": True,
+                                "parameters_count": len(response["parameters"])
+                            }
+                        )
 
                     # Validate tool_name matches expected
                     if response.get("tool_name") != self.agent_exe_array[index]["tool_name"]:
@@ -1093,7 +1144,7 @@ def agent_node(state):
 
                 rich_evaluation_listener = RichStatusListener(settings.console)
                 rich_evaluation_listener.start_status('Evaluating workflow quality with simplified structure...', spinner='dots')
-                settings.listeners['eval'] = rich_evaluation_listener  # Register listener for evaluation status updates
+                settings.listeners['eval'] = rich_evaluation_listener # Register listener for evaluation status updates
 
                 # 🔧 NEW: Log simplified final evaluation
                 debug_info(
@@ -1203,7 +1254,9 @@ def agent_node(state):
                         next_steps = user_response.get("next_steps", "")
                         
                         # Create improved display response
-                        create_display_response = f"{user_message}"
+                        create_display_response = (f"{user_message} "
+                                                   f"\nanalysis issues:- {analysis.get('issues', 'No issues reported')} "
+                                                   f"\nreason:- {analysis.get('reason', 'No reason provided')}")
                         if next_steps:
                             create_display_response += f"\n\n🚀 **Next Steps:** {next_steps}"
                         

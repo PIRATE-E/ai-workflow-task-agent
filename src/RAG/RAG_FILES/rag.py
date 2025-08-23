@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 from asyncio import Semaphore
+from typing import Awaitable
 
 import dotenv
 # ✅ LIGHTWEIGHT LANGCHAIN IMPORTS
@@ -409,7 +410,7 @@ async def process_chunks_with_immediate_saving(chunks_to_process: list[Document]
                     print(f"🔄 Active tasks after completion: {active_task}")
 
     # ⚠️ CRITICAL: Create ALL tasks first before awaiting any
-    tasks = [using_semaphore(chunk) for chunk in chunks_to_process]
+    tasks: list[Awaitable] = [asyncio.create_task(using_semaphore(chunk)) for chunk in chunks_to_process]
     print(f"Created {len(tasks)} tasks for parallel execution")
 
     # Track progress and timing
