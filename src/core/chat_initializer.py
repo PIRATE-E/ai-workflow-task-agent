@@ -1,23 +1,27 @@
+import asyncio
 import gc
 import json
 import platform
+import threading
 from threading import Thread
+from typing import Awaitable
 
-from src.config import settings
 from langgraph.graph.state import CompiledStateGraph
 from rich import console, prompt, inspect
 
+from src.config import settings
 from src.config.settings import PNG_FILE_PATH
+from src.mcp.load_config import McpConfigFile
+from src.mcp.manager import MCP_Manager
 from src.models.state import StateAccessor, State
+from src.ui.diagnostics.debug_helpers import debug_warning, debug_info
+# 🎨 Rich Traceback Integration
+from src.ui.diagnostics.rich_traceback_manager import RichTracebackManager, rich_exception_handler
 from src.ui.print_message_style import print_message
 from src.utils.socket_manager import SocketManager
 
-# 🎨 Rich Traceback Integration
-from src.ui.diagnostics.rich_traceback_manager import RichTracebackManager, rich_exception_handler
-from src.ui.diagnostics.debug_helpers import debug_warning, debug_info
 
 # mcp servers integration
-from src.tools.lggraph_tools.wrappers.mcp_wrapper.filesystem_wrapper import FileSystemWrapper
 
 class ChatInitializer:
     @rich_exception_handler("ChatInitializer Initialization")
@@ -35,11 +39,10 @@ class ChatInitializer:
         self.tools = None
 
         # mcp servers integration
-        self.initialize_mcp_servers()
+        self._initialize_mcp_servers_sync()
         self.initialize_neo4j()
 
         self.ToolResponseManager = None  # Initialize ToolResponseManager later
-
 
     @rich_exception_handler("Core Classes Setup")
     def _set_core_classes(self):
@@ -54,22 +57,22 @@ class ChatInitializer:
 
             # we must set the console for rich console to use it in different classes to the settings
             settings.console = self.console
-            
+
             # Set message classes for centralized access
             settings.HumanMessage = HumanMessage
             settings.AIMessage = AIMessage
             settings.BaseMessage = BaseMessage
-            
+
             # now import the ToolResponseManager to set the response
             from src.tools.lggraph_tools.tool_response_manager import ToolResponseManager
             self.ToolResponseManager = ToolResponseManager()
-            
+
             # Set the socket connection for logging
             settings.socket_con = SocketManager.get_socket_con()
-            
+
         except Exception as e:
             RichTracebackManager.handle_exception(
-                e, 
+                e,
                 context="Core Classes Setup",
                 extra_context={"phase": "message_classes_initialization"}
             )
@@ -135,7 +138,7 @@ class ChatInitializer:
         return self
 
     @rich_exception_handler("MCP Server Initialization")
-    def initialize_mcp_servers(self):
+    async def initialize_mcp_servers(self):
         """
         Initialize MCP servers if they are not already running.
         This method can be extended to initialize any required MCP servers.
@@ -143,22 +146,58 @@ class ChatInitializer:
         try:
             from src.mcp.manager import MCP_Manager
             # Add and start MCP servers if needed with allowed path of AI_llm folder
-            MCP_Manager.add_server("filesystem", "npx", "@modelcontextprotocol/server-filesystem", [f"{settings.BASE_DIR.parent}"], FileSystemWrapper)
+            # to add server we required [server_name, runner, package, server_args, server_wrapper]
+            # list form of that is: (that's working)
+            # add_servers_config: List[ServerConfig] = [
+            #     {
+            #         "name": 'filesystem',
+            #         "command": Command.NPX,
+            #         "package": "@modelcontextprotocol/server-filesystem",
+            #         "args": [f"{settings.BASE_DIR.parent}"],
+            #         "wrapper": FileSystemWrapper
+            #     },
+            #     # Add more servers here as needed
+            # ]
 
-            # Start all servers
-            for server in MCP_Manager.mcp_servers:
-                try:
-                    if not MCP_Manager.start_server(server):
-                        self.console.print(f"[bold red]Failed to start MCP server: {server}[/bold red]")
-                    else:
-                        self.console.print(f"[bold green]MCP server '{server}' started successfully.[/bold green]")
-                except Exception as server_error:
-                    RichTracebackManager.handle_exception(
-                        server_error,
-                        context=f"MCP Server Startup - {server}",
-                        extra_context={"server_name": server}
+            add_servers_config = McpConfigFile.retrieve_config()
+
+            # add servers for list (that's working)
+            for server_config in add_servers_config:
+                server_name = server_config["name"]
+                runner = server_config[
+                    "command"]  # this has been changed to command from runner (uvx, npx, pipx, pip, python)
+                # package = server_config["package"]
+                args = server_config["args"]
+                wrapper = server_config["wrapper"]
+
+                MCP_Manager.add_server(server_name, package=None, runner=runner, args=args, func=wrapper)
+
+            # LEGACY: Uncomment if you want to use the legacy filesystem server
+            # MCP_Manager.add_server("filesystem", "npx", "@modelcontextprotocol/server-filesystem", [f"{settings.BASE_DIR.parent}"], FileSystemWrapper)
+            # start the MCP servers in asynchronously (that's working)
+            async def start_mcp_server(server_name: str):
+                loop = asyncio.get_running_loop()
+                got_start = await loop.run_in_executor(None, MCP_Manager.start_server, server_name)
+                if not got_start:
+                    debug_warning(
+                        heading="MCP Server Startup Failed",
+                        body=f"Failed to start MCP server: {server_name}",
+                        metadata={"server_name": server_name}
                     )
-                    self.console.print(f"[bold red]Error starting MCP server {server}: {server_error}[/bold red]")
+                else:
+                    debug_info(
+                        heading="MCP Server Started",
+                        body=f"MCP server '{server_name}' started successfully.",
+                        metadata={"server_name": server_name}
+                    )
+
+            task: list[Awaitable] = [asyncio.create_task(start_mcp_server(server)) for server in
+                                     MCP_Manager.mcp_servers]
+            await asyncio.gather(*task)
+
+
+
+
         except Exception as e:
             RichTracebackManager.handle_exception(
                 e,
@@ -178,9 +217,9 @@ class ChatInitializer:
                 # Neo4j not installed; log and return
                 debug_warning(heading="Neo4j Driver Not Found",
                               body="Neo4j driver is not installed. Skipping Neo4j initialization.",
-                                metadata={
-                                    "neo4j_uri": settings.NEO4J_URI,
-                                    "neo4j_user": settings.NEO4J_USER,}
+                              metadata={
+                                  "neo4j_uri": settings.NEO4J_URI,
+                                  "neo4j_user": settings.NEO4J_USER, }
                               )
                 return
             # if neo4j driver is installed, try to create the driver
@@ -240,17 +279,20 @@ class ChatInitializer:
 
             # dynamically register tools
             from src.mcp.dynamically_tool_register import DynamicToolRegister
-            
+
             tools = []
-            
+
             # Register each tool with individual error handling
             tool_configs = [
-                ("GoogleSearch", GoogleSearchToolWrapper, "For general web searches (recent info, facts, news).", google_search),
-                ("RAGSearch", RagSearchClassifierWrapper, "For searching the knowledge base (RAG search).", rag_search_message),
-                ("Translatetool", TranslateToolWrapper, "For translating messages into different languages.", TranslationMessage),
+                ("GoogleSearch", GoogleSearchToolWrapper, "For general web searches (recent info, facts, news).",
+                 google_search),
+                ("RAGSearch", RagSearchClassifierWrapper, "For searching the knowledge base (RAG search).",
+                 rag_search_message),
+                ("Translatetool", TranslateToolWrapper, "For translating messages into different languages.",
+                 TranslationMessage),
                 ("RunShellCommand", ShellCommandWrapper, "For executing shell commands.", run_shell_command_message),
             ]
-            
+
             for name, func, description, schema in tool_configs:
                 try:
                     tool = ToolAssign(func=func, name=name, description=description, args_schema=schema)
@@ -263,7 +305,7 @@ class ChatInitializer:
                     )
                     # Continue with other tools even if one fails
                     continue
-            
+
             # Add dynamically registered tools with error handling
             try:
                 dynamic_tools = DynamicToolRegister.tool_list
@@ -274,11 +316,11 @@ class ChatInitializer:
                     context="Dynamic Tool Registration",
                     extra_context={"dynamic_tools_count": len(getattr(DynamicToolRegister, 'tool_list', []))}
                 )
-            
+
             # Set tools list
             ToolAssign.set_tools_list(tools)
             self.tools = ToolAssign.get_tools_list()
-            
+
             debug_info(
                 heading="Tools Registered",
                 body=f"Registered {len(self.tools)} tools successfully.",
@@ -286,9 +328,9 @@ class ChatInitializer:
                     "tools_count": len(self.tools),
                 }
             )
-            
+
             return self
-            
+
         except Exception as e:
             RichTracebackManager.handle_exception(
                 e,
@@ -364,5 +406,30 @@ class ChatInitializer:
                 e,
                 context="Chat Execution Loop",
                 extra_context={"phase": "main_chat_loop"
-            })
+                               })
             raise
+
+    def _initialize_mcp_servers_sync(self):
+        """Synchronous wrapper for MCP server initialization"""
+
+        def run_async_init():
+            # Create new event loop for this thread if needed
+            try:
+                loop = asyncio.get_event_loop()
+            except RuntimeError:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+
+            # Run the async initialization
+            loop.run_until_complete(self.initialize_mcp_servers())
+
+        # Run in separate thread to avoid event loop conflicts
+        init_thread = threading.Thread(target=run_async_init)
+        init_thread.start()
+        init_thread.join()  # Wait for completion
+
+        debug_info(
+            heading="MCP • SYNC_INIT_COMPLETE",
+            body="All MCP servers initialized synchronously",
+            metadata={"servers_count": len(MCP_Manager.mcp_servers)}
+        )

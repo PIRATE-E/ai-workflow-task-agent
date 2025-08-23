@@ -106,6 +106,7 @@ If no tool is needed, use "none" as the tool_name and empty object {} for parame
         for tool in tools:
             if tool.name.lower() == selection.tool_name.lower():
                 try:
+                    parameters.update({'tool_name': tool.name})  # Ensure tool_name is included in parameters
                     tool.invoke(parameters)
                     result = ToolResponseManager().get_response()[
                         -1].content  # Get the last response from the tool manager
