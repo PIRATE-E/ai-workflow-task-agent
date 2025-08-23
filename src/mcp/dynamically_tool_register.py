@@ -58,13 +58,14 @@ class DynamicToolRegister:
                 if 'required' not in arguments:
                     arguments['required'] = []
                 if 'tool_name' not in arguments['required']:
-                    arguments['required'].append('tool_name')
+                    # arguments['required'].append('tool_name')
+                    pass
 
                 # get the description of the tool
                 description = (
                     f"{tool['description']} \n"
-                    f"**Usage:** Provide all required arguments: {', '.join(arguments.get('required', []))}. "
-                    f"Set `tool_name` to `{tool_name}` to select this tool."
+                    # f"**Usage:** Provide all required arguments: {', '.join(arguments.get('required', []))}. "
+                    # f"Set `tool_name` to `{tool_name}` to select this tool."
                 )
 
                 # log the tool registration

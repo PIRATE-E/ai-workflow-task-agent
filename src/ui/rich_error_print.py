@@ -496,7 +496,7 @@ class RichErrorPrint:
         title = Text("⚠️ PARSE ERROR", style="bold bright_yellow")
         title.append(f" • {timestamp}", style="dim yellow")
 
-        content = f"Failed to parse message: {error}\n\nRaw message:\n{message[:200]}{'...' if len(message) > 200 else ''}"
+        content = f"Failed to parse message: {error}\n\nRaw message:\n{message}{'...' if len(message) > 200 else ''}"
 
         panel = Panel(
             Align.left(content),

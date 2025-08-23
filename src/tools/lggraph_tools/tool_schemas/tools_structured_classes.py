@@ -26,21 +26,6 @@ class rag_search_message(BaseModel):
     )
 
 
-class mcp_tool_filesystem(BaseModel):
-    file_path: str = Field(
-        description="The path to the file you want to read. Provide a valid file path in the filesystem.",
-    )
-    action: str = Field(
-        description=(
-            "Valid actions are: 'read_file', 'write_file', 'delete_file'. "
-            "The action to perform on the file.\n"
-            "Use 'read_file' to read the content of the file, "
-            "'write_file' to write content to the file, or "
-            "'delete_file' to delete the file."
-        ),
-        default="read_file"
-    )
-
 
 class run_shell_command_message(BaseModel):
     command: str = Field(
