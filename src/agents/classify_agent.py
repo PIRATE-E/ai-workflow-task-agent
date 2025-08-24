@@ -1,6 +1,6 @@
-
 from src.config import settings
 from src.tools.lggraph_tools.tool_assign import ToolAssign
+from src.ui.diagnostics.debug_helpers import debug_info
 from src.utils.model_manager import ModelManager
 
 
@@ -16,28 +16,50 @@ def classify_message_type(state) -> dict:
     last_message = messages[-1] if messages else None
     content = last_message.content if last_message else ""
 
-    explicit_ai_phrases = ["/use ai", "/use llm"]
+    explicit_ai_phrases = ["/use ai", "/use llm", '/llm', '/ai', '/assistant']
     lowered_content = content.lower()
     for phrase in explicit_ai_phrases:
         if phrase in lowered_content:
             if settings.socket_con:
                 settings.socket_con.send_error(f"[LOG] Removing explicit AI phrase: {phrase}")
             else:
-                print(f"[LOG] Removing explicit AI phrase: {phrase}")
+                debug_info(
+                    "Explicit AI Phrase Detected",
+                    f"Removing explicit AI phrase: {phrase}",
+                    {"phrase": phrase}
+                )
             last_message.content = last_message.content.replace(phrase, "")
             console.print(f"[u][red]Message classified as[/u][/red]: llm (explicit user request override)")
             return {"message_type": "llm"}
 
-    explicit_tool_phrases = ["/search", "/use tool"]
+    explicit_tool_phrases = ["/use tool", '/tool']
     for phrase in explicit_tool_phrases:
         if phrase in lowered_content:
             if settings.socket_con:
                 settings.socket_con.send_error(f"[LOG] Removing explicit tool phrase: {phrase}")
             else:
-                print(f"[LOG] Removing explicit tool phrase: {phrase}")
+                debug_info(
+                    "Explicit Tool Phrase Detected",
+                    f"Removing explicit tool phrase: {phrase}",
+                    {"phrase": phrase}
+                )
             last_message.content = last_message.content.replace(phrase, "")
             console.print(f"[u][red]Message classified as[/u][/red]: tool (explicit user request override)")
             return {"message_type": "tool"}
+    explicit_agent_phrases = ["/use agent", '/agent', '/tool chain', '/agent mode']
+    for phrase in explicit_agent_phrases:
+        if phrase in lowered_content:
+            if settings.socket_con:
+                settings.socket_con.send_error(f"[LOG] Removing explicit agent phrase: {phrase}")
+            else:
+                debug_info(
+                    "Explicit Agent Phrase Detected",
+                    f"Removing explicit agent phrase: {phrase}",
+                    {"phrase": phrase}
+                )
+            last_message.content = last_message.content.replace(phrase, "")
+            console.print(f"[u][red]Message classified as[/u][/red]: agent (explicit user request override)")
+            return {"message_type": "agent"}
 
     # Build history from state messages directly
     history_parts = []
@@ -117,22 +139,22 @@ Classify thoughtfully based on true user intent, not just keywords."""
         **Tool Context:**
         {tool_context}
     """
-    
+
     response = llm.invoke([
         settings.HumanMessage(content=system_prompt),
         settings.HumanMessage(content=content)
     ])
-    
+
     # Use the new JSON conversion method
     result_json = ModelManager.convert_to_json(response)
-    
+
     # Create message_classifier object from JSON
     from dataclasses import dataclass
     @dataclass
     class MessageClassifier:
         message_type: str
         reasoning: str = ""
-    
+
     result = MessageClassifier(
         message_type=result_json.get("message_type", "llm"),
         reasoning=result_json.get("reasoning", "")
