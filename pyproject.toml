@@ -166,3 +166,5 @@ dependencies = [
     "zipp==3.23.0",
     "zstandard==0.24.0",
 ]
+[tool.ruff]
+lint.select = ["PTH", "ASYNC"]
