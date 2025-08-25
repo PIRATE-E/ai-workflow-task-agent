@@ -9,9 +9,10 @@ import sys
 import time
 
 # Add the project root to the Python path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
 from utils.socket_manager import socket_manager
+
 
 def test_socket_manager_creation():
     """Test socket manager creation and singleton pattern"""
@@ -39,6 +40,7 @@ def test_socket_manager_creation():
 
     return socket_con is not None
 
+
 def test_singleton_pattern():
     """Test that singleton pattern works correctly"""
     print("\n🧪 Testing Singleton Pattern...")
@@ -60,14 +62,18 @@ def test_singleton_pattern():
         print(f"   manager3 ID: {id(manager3)}")
         return False
 
+
 def test_connection_status():
     """Test connection status checking"""
     print("\n🧪 Testing Connection Status...")
 
     is_connected = socket_manager.is_connected()
-    print(f"Connection status: {'🟢 Connected' if is_connected else '🔴 Not connected'}")
+    print(
+        f"Connection status: {'🟢 Connected' if is_connected else '🔴 Not connected'}"
+    )
 
     return True
+
 
 def test_error_handling():
     """Test error handling scenarios"""
@@ -79,7 +85,7 @@ def test_error_handling():
         "Testing message with special chars: àáâãäå",
         "Testing long message: " + "x" * 1000,
         "Testing empty message: ",
-        "Testing unicode: 🚀🔥💯🎉"
+        "Testing unicode: 🚀🔥💯🎉",
     ]
 
     success_count = 0
@@ -95,6 +101,7 @@ def test_error_handling():
 
     print(f"📊 Success rate: {success_count}/{len(test_messages)} messages")
     return success_count > 0
+
 
 def test_cleanup():
     """Test connection cleanup"""
@@ -117,6 +124,7 @@ def test_cleanup():
         print(f"❌ Cleanup failed: {e}")
         return False
 
+
 def run_comprehensive_test():
     """Run all socket manager tests"""
     print("=" * 70)
@@ -128,13 +136,13 @@ def run_comprehensive_test():
         ("Singleton Pattern", test_singleton_pattern),
         ("Connection Status", test_connection_status),
         ("Error Handling", test_error_handling),
-        ("Connection Cleanup", test_cleanup)
+        ("Connection Cleanup", test_cleanup),
     ]
 
     results = []
 
     for test_name, test_func in tests:
-        print(f"\n{'='*20} {test_name} {'='*20}")
+        print(f"\n{'=' * 20} {test_name} {'=' * 20}")
         try:
             result = test_func()
             results.append((test_name, result))
@@ -166,6 +174,7 @@ def run_comprehensive_test():
     print("      python utils/error_transfer.py")
     print("   2. Check your config.py for correct socket settings")
     print("   3. Verify ENABLE_SOCKET_LOGGING=true in config")
+
 
 if __name__ == "__main__":
     run_comprehensive_test()

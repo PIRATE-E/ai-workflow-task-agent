@@ -4,20 +4,22 @@ class Prompt:
     This class provides a structure for defining prompts with a name, description, and content.
     NOTE: The entire agent pipeline depends on STRICT JSON SCHEMAS. Any deviation (lists vs objects, wrong keys,
     hallucinated parameter names, extra fields) will BREAK execution (see agent_mode_node.py parsing logic).
-    
+
     🔧 ENHANCED v3.0: Context-aware prompting with comprehensive context integration for intelligent decision-making.
     """
 
     # ---------------------------------------------------------------------------
     # 1. TOOL LIST SELECTION PROMPT - CONTEXT-AWARE VERSION
     # ---------------------------------------------------------------------------
-    def generate_tool_list_prompt(self, conversation_history, last_message, tool_context, execution_context=None) -> tuple[str, str]:
+    def generate_tool_list_prompt(
+        self, conversation_history, last_message, tool_context, execution_context=None
+    ) -> tuple[str, str]:
         """
         Returns the system prompt content for tool selection with ENHANCED context awareness.
         EXPECTED OUTPUT (AND ONLY OUTPUT): JSON array (not wrapped in code fences, no prose):
         [ {"tool_name": "<valid_tool_name>"}, ... ] or []
         DO NOT RETURN AN OBJECT HERE. agent_mode_node.start() expects a LIST.
-        
+
         🔧 ENHANCED v3.0: Context-aware tool selection with execution history and reasoning context.
         """
         SYSTEM_PROMPT = """
@@ -142,12 +144,19 @@ class Prompt:
     # ---------------------------------------------------------------------------
     # 2. PARAMETER GENERATION PROMPT - CONTEXT-AWARE VERSION
     # ---------------------------------------------------------------------------
-    def generate_parameter_prompt(self, tool_name, parameters: dict, previous_response, conversation_history, execution_context=None) -> tuple[str, str]:
+    def generate_parameter_prompt(
+        self,
+        tool_name,
+        parameters: dict,
+        previous_response,
+        conversation_history,
+        execution_context=None,
+    ) -> tuple[str, str]:
         """
         Generates parameters for a SINGLE tool with ENHANCED context awareness.
         EXPECTED OUTPUT: ONE JSON OBJECT with keys: tool_name, reasoning, parameters
         DO NOT return an array here. agent_mode_node expects dict.
-        
+
         🔧 ENHANCED v3.0: Context-aware parameter generation with comprehensive context integration.
         """
         SYSTEM_PROMPT = f"""
@@ -287,11 +296,13 @@ class Prompt:
     # ---------------------------------------------------------------------------
     # 3. PER-TOOL EXECUTION EVALUATION + FALLBACK PROMPT - CONTEXT-AWARE VERSION
     # ---------------------------------------------------------------------------
-    def evaluate_in_end(self, last_tool_called, its_response, human_query, execution_context=None) -> tuple[str, str]:
+    def evaluate_in_end(
+        self, last_tool_called, its_response, human_query, execution_context=None
+    ) -> tuple[str, str]:
         """
         Evaluate a single tool execution result with ENHANCED context awareness.
         EXPECTED OUTPUT: ONE JSON OBJECT (never list) possibly containing fallback.
-        
+
         🔧 ENHANCED v3.0: Context-aware evaluation with workflow understanding.
         """
         SYSTEM_PROMPT = f"""
@@ -426,20 +437,27 @@ class Prompt:
     # ---------------------------------------------------------------------------
     # 4. SIMPLIFIED FINAL WORKFLOW EVALUATION PROMPT - ULTRA-RELIABLE VERSION
     # ---------------------------------------------------------------------------
-    def evaluate_final_response(self, final_response, original_request, execution_history, tool_results, full_context=None) -> tuple[str, str]:
+    def evaluate_final_response(
+        self,
+        final_response,
+        original_request,
+        execution_history,
+        tool_results,
+        full_context=None,
+    ) -> tuple[str, str]:
         """
         🔧 SIMPLIFIED v4.0: Ultra-reliable final evaluation with simple 2-key JSON structure.
-        
+
         EXPECTED OUTPUT: SIMPLE JSON OBJECT with only 2 keys - user_response and analysis
         This addresses LLM reliability issues with complex nested structures that often return lists instead of dicts.
-        
+
         Args:
             final_response: The raw tool response before polishing
             original_request: User's original request
             execution_history: List of tools executed with context
             tool_results: Results from tool executions
             full_context: Comprehensive workflow context for analysis
-            
+
         Returns:
             Tuple of (system_prompt, user_prompt) for simple, reliable evaluation
         """

@@ -1,6 +1,7 @@
 """
 Integration tests for ModelManager with ChatOllama
 """
+
 import os
 import sys
 import unittest
@@ -9,15 +10,14 @@ from unittest.mock import patch, MagicMock
 from langchain_core.messages import BaseMessage, HumanMessage
 
 # Add paths for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'utils'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "utils"))
 
 from model_manager import ModelManager
 import config
 
 
 class TestModelManagerIntegration(unittest.TestCase):
-
     def setUp(self):
         """Reset singleton instance before each test"""
         ModelManager.instance = None
@@ -28,8 +28,8 @@ class TestModelManagerIntegration(unittest.TestCase):
         ModelManager.instance = None
         ModelManager.current_model = None
 
-    @patch('subprocess.Popen')
-    @patch.object(ModelManager, 'invoke')
+    @patch("subprocess.Popen")
+    @patch.object(ModelManager, "invoke")
     def test_invoke_method_inheritance(self, mock_invoke, mock_popen):
         """Test that invoke method is properly inherited from ChatOllama"""
         mock_process = MagicMock()
@@ -51,8 +51,8 @@ class TestModelManagerIntegration(unittest.TestCase):
         mock_invoke.assert_called_once_with(input_message)
         self.assertEqual(result, mock_response)
 
-    @patch('subprocess.Popen')
-    @patch.object(ModelManager, 'invoke')
+    @patch("subprocess.Popen")
+    @patch.object(ModelManager, "invoke")
     def test_invoke_with_parameters(self, mock_invoke, mock_popen):
         """Test invoke method with various parameters"""
         mock_process = MagicMock()
@@ -73,18 +73,18 @@ class TestModelManagerIntegration(unittest.TestCase):
             input=input_message,
             config=config_param,
             stop=stop_param,
-            custom_param="test"
+            custom_param="test",
         )
 
         mock_invoke.assert_called_once_with(
             input=input_message,
             config=config_param,
             stop=stop_param,
-            custom_param="test"
+            custom_param="test",
         )
         self.assertEqual(result, mock_response)
 
-    @patch('subprocess.Popen')
+    @patch("subprocess.Popen")
     def test_initialization_with_chatollama_params(self, mock_popen):
         """Test ModelManager initialization with ChatOllama parameters"""
         mock_process = MagicMock()
@@ -96,13 +96,13 @@ class TestModelManagerIntegration(unittest.TestCase):
             model=config.DEFAULT_MODEL,
             temperature=0.8,
             top_p=0.9,
-            base_url="http://localhost:11434"
+            base_url="http://localhost:11434",
         )
 
         self.assertIsInstance(manager, ModelManager)
         self.assertEqual(ModelManager.current_model, config.DEFAULT_MODEL)
 
-    @patch('subprocess.Popen')
+    @patch("subprocess.Popen")
     def test_multiple_instances_same_functionality(self, mock_popen):
         """Test that multiple instance references work identically"""
         mock_process = MagicMock()
@@ -119,7 +119,7 @@ class TestModelManagerIntegration(unittest.TestCase):
         self.assertEqual(manager1.current_model, manager2.current_model)
         self.assertEqual(manager1.model_list, manager2.model_list)
 
-    @patch('subprocess.Popen')
+    @patch("subprocess.Popen")
     def test_class_variables_persistence(self, mock_popen):
         """Test that class variables persist across instance creation"""
         mock_process = MagicMock()
@@ -141,5 +141,5 @@ class TestModelManagerIntegration(unittest.TestCase):
         self.assertEqual(manager1.current_model, manager2.current_model)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

@@ -9,9 +9,10 @@ import sys
 import time
 
 # Add the project root to the Python path so we can import modules
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
 from utils.socket_manager import socket_manager
+
 
 def test_logging():
     """Test the socket-based logging system"""
@@ -32,7 +33,7 @@ def test_logging():
             "💾 Saving data to database...",
             "🔍 Searching knowledge graph...",
             "🌐 Making web request...",
-            "✅ Process completed successfully"
+            "✅ Process completed successfully",
         ]
 
         print(f"📤 Sending {len(messages)} test messages to log server...")
@@ -52,6 +53,7 @@ def test_logging():
         print("   2. Then run this test again")
         print("   3. Check your config.py for ENABLE_SOCKET_LOGGING=true")
 
+
 def test_error_scenarios():
     """Test various error scenarios"""
     print("\n🧪 Testing error scenarios...")
@@ -65,7 +67,7 @@ def test_error_scenarios():
             "TimeoutError: RAG search timed out after 30 seconds",
             "ValueError: Invalid JSON format in API response",
             "MemoryError: Not enough memory to process large document",
-            "KeyError: Missing required field 'cypher_query' in response"
+            "KeyError: Missing required field 'cypher_query' in response",
         ]
 
         print(f"📤 Sending {len(error_scenarios)} error scenarios...")
@@ -79,6 +81,7 @@ def test_error_scenarios():
     else:
         print("❌ Could not connect to log server for error testing")
 
+
 def test_socket_manager_singleton():
     """Test that socket manager follows singleton pattern"""
     print("\n🧪 Testing singleton pattern...")
@@ -91,9 +94,12 @@ def test_socket_manager_singleton():
     if manager1 is manager2:
         print("✅ Singleton pattern working correctly")
         if manager1.get_socket_connection():
-            manager1.send_error("[SINGLETON TEST] Both managers use the same connection")
+            manager1.send_error(
+                "[SINGLETON TEST] Both managers use the same connection"
+            )
     else:
         print("❌ Singleton pattern failed - different objects created")
+
 
 def run_all_tests():
     """Run all logging system tests"""
@@ -112,6 +118,7 @@ def run_all_tests():
     print("   1. Make sure log server is running: python utils/error_transfer.py")
     print("   2. Check the server terminal for all received messages")
     print("   3. Verify that messages appear in chronological order")
+
 
 if __name__ == "__main__":
     run_all_tests()

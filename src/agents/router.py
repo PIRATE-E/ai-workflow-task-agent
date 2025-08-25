@@ -12,4 +12,4 @@ def route_message(state):
     # 🔄 Sync StateAccessor with current LangGraph state
     state_accessor.sync_with_langgraph(state)
     message_type = state.get("message_type", "llm")
-    return {'message_type': message_type}
+    return {"message_type": message_type}

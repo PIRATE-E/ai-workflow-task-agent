@@ -18,11 +18,13 @@ from src.config import settings
 def show_log_display_options():
     """Show all available log display options"""
     console = settings.console
-    console.print(Panel.fit(
-        Text("📊 Log Display Options", style="bold magenta"),
-        title="LangGraph Chatbot - Log Viewing",
-        style="bold blue"
-    ))
+    console.print(
+        Panel.fit(
+            Text("📊 Log Display Options", style="bold magenta"),
+            title="LangGraph Chatbot - Log Viewing",
+            style="bold blue",
+        )
+    )
 
     table = Table(title="Available Log Display Modes")
     table.add_column("Mode", style="cyan", no_wrap=True)
@@ -34,31 +36,36 @@ def show_log_display_options():
         "separate_window",
         "Opens log server in separate console window",
         "Development, debugging",
-        "✅ Fully visible"
+        "✅ Fully visible",
     )
     table.add_row(
         "background",
         "Runs log server silently in background",
         "Production, clean interface",
-        "❌ Not visible"
+        "❌ Not visible",
     )
     table.add_row(
         "file",
         "Logs to socket_server.log file",
         "Production, log analysis",
-        "📄 File-based"
+        "📄 File-based",
     )
     table.add_row(
         "console",
         "Shows logs in same console (mixed output)",
         "Quick testing",
-        "⚠️ Mixed with app output"
+        "⚠️ Mixed with app output",
     )
 
     console.print(table)
 
-    console.print(f"\n📋 Current setting: LOG_DISPLAY_MODE = '{config.LOG_DISPLAY_MODE}'")
-    console.print("💡 Change this in config.py or set environment variable LOG_DISPLAY_MODE")
+    console.print(
+        f"\n📋 Current setting: LOG_DISPLAY_MODE = '{config.LOG_DISPLAY_MODE}'"
+    )
+    console.print(
+        "💡 Change this in config.py or set environment variable LOG_DISPLAY_MODE"
+    )
+
 
 def demo_separate_window():
     """Demo the separate window log display"""
@@ -68,20 +75,22 @@ def demo_separate_window():
 
     # Temporarily set to separate window mode
     original_mode = config.LOG_DISPLAY_MODE
-    config.LOG_DISPLAY_MODE = 'separate_window'
+    config.LOG_DISPLAY_MODE = "separate_window"
 
     try:
         socket_con = socket_manager.get_socket_connection()
 
         if socket_con:
             console.print("✅ Log server opened in separate window!")
-            console.print("👀 Check for a new console window titled 'LangGraph Log Server'")
+            console.print(
+                "👀 Check for a new console window titled 'LangGraph Log Server'"
+            )
 
             # Send some demo messages
             demo_messages = [
                 "🪟 Separate Window Demo Message 1",
                 "🪟 Separate Window Demo Message 2",
-                "🪟 Separate Window Demo Message 3"
+                "🪟 Separate Window Demo Message 3",
             ]
 
             for i, msg in enumerate(demo_messages, 1):
@@ -97,6 +106,7 @@ def demo_separate_window():
     finally:
         config.LOG_DISPLAY_MODE = original_mode
 
+
 def demo_file_logging():
     """Demo the file-based log display"""
     console = settings.console
@@ -104,7 +114,7 @@ def demo_file_logging():
 
     # Temporarily set to file mode
     original_mode = config.LOG_DISPLAY_MODE
-    config.LOG_DISPLAY_MODE = 'file'
+    config.LOG_DISPLAY_MODE = "file"
 
     # Reset socket connection to force new mode
     socket_manager.close_connection()
@@ -115,7 +125,9 @@ def demo_file_logging():
         socket_con = socket_manager.get_socket_connection()
 
         if socket_con:
-            log_file_path = os.path.join(os.path.dirname(__file__), 'utils', 'socket_server.log')
+            log_file_path = os.path.join(
+                os.path.dirname(__file__), "utils", "socket_server.log"
+            )
             console.print(f"✅ Log server started with file logging!")
             console.print(f"📄 Logs will be written to: {log_file_path}")
 
@@ -123,7 +135,7 @@ def demo_file_logging():
             demo_messages = [
                 "📄 File Logging Demo Message 1",
                 "📄 File Logging Demo Message 2",
-                "📄 File Logging Demo Message 3"
+                "📄 File Logging Demo Message 3",
             ]
 
             for i, msg in enumerate(demo_messages, 1):
@@ -138,10 +150,12 @@ def demo_file_logging():
             if os.path.exists(log_file_path):
                 console.print(f"\n📖 Log file contents:")
                 try:
-                    with open(log_file_path, 'r') as f:
+                    with open(log_file_path, "r") as f:
                         content = f.read()
                         if content.strip():
-                            console.print(Panel(content, title="socket_server.log", style="green"))
+                            console.print(
+                                Panel(content, title="socket_server.log", style="green")
+                            )
                         else:
                             console.print("📄 Log file is empty (logs may be buffered)")
                 except Exception as e:
@@ -154,6 +168,7 @@ def demo_file_logging():
 
     finally:
         config.LOG_DISPLAY_MODE = original_mode
+
 
 def show_current_logs():
     """Show what logs are currently being generated"""
@@ -180,6 +195,7 @@ def show_current_logs():
     else:
         console.print("❌ No active log server connection")
 
+
 def interactive_log_demo():
     """Interactive demo where user can send custom log messages"""
     console = settings.console
@@ -200,12 +216,14 @@ def interactive_log_demo():
         try:
             user_input = input("\n📝 Enter log message (or 'quit'): ").strip()
 
-            if user_input.lower() in ['quit', 'exit', 'q']:
+            if user_input.lower() in ["quit", "exit", "q"]:
                 break
 
             if user_input:
                 message_count += 1
-                socket_con.send_error(f"[USER MESSAGE {message_count:02d}] {user_input}")
+                socket_con.send_error(
+                    f"[USER MESSAGE {message_count:02d}] {user_input}"
+                )
                 console.print(f"✅ Message sent to log server!")
             else:
                 console.print("⚠️ Empty message, try again")
@@ -214,6 +232,7 @@ def interactive_log_demo():
             break
 
     console.print(f"\n✅ Interactive demo complete! Sent {message_count} messages.")
+
 
 def main():
     """Main log viewer demo"""
@@ -235,15 +254,15 @@ def main():
         try:
             choice = input("\n🤔 Choose demo (1-5): ").strip()
 
-            if choice == '1':
+            if choice == "1":
                 show_current_logs()
-            elif choice == '2':
+            elif choice == "2":
                 demo_separate_window()
-            elif choice == '3':
+            elif choice == "3":
                 demo_file_logging()
-            elif choice == '4':
+            elif choice == "4":
                 interactive_log_demo()
-            elif choice == '5':
+            elif choice == "5":
                 show_log_display_options()
                 break
             else:
@@ -259,6 +278,7 @@ def main():
     console.print("\n🧹 Cleaning up...")
     socket_manager.close_connection()
     console.print("✅ Demo complete!")
+
 
 if __name__ == "__main__":
     main()

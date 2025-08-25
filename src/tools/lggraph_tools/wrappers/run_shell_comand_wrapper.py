@@ -4,7 +4,9 @@ from src.tools.lggraph_tools.tools.run_shell_command_tool import run_shell_comma
 
 
 class ShellCommandWrapper:
-    def __init__(self, command: str, capture_output: bool = True, creation_flag: bool = False):
+    def __init__(
+        self, command: str, capture_output: bool = True, creation_flag: bool = False
+    ):
         self.command = command
         self.capture_output = capture_output
         self.creation_flag = creation_flag
@@ -24,4 +26,10 @@ class ShellCommandWrapper:
         if self.capture_output:
             ToolResponseManager().set_response([settings.AIMessage(content=response)])
         else:
-            ToolResponseManager().set_response([settings.AIMessage(content="Command executed without capturing output.")])
+            ToolResponseManager().set_response(
+                [
+                    settings.AIMessage(
+                        content="Command executed without capturing output."
+                    )
+                ]
+            )

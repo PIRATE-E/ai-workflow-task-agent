@@ -13,6 +13,7 @@ Usage:
 
     # Your event-aware classes will automatically update the status
 """
+
 import sys
 import threading
 from typing import Optional, List
@@ -36,12 +37,14 @@ class RichStatusListener:
     """
 
     _listeners = WeakKeyDictionary()  # WeakKeyDictionary to hold listeners so when ever new listener is created added to the dictionary
-    event_manager: EventListener.EventManager = None  # This will be initialized in the __init__ method
+    event_manager: EventListener.EventManager = (
+        None  # This will be initialized in the __init__ method
+    )
 
     class ConsoleDescriptor:
         """
         🎯 Descriptor for Console validation
-        
+
         Ensures that only Rich Console instances can be assigned to the console attribute.
         Uses WeakKeyDictionary to prevent memory leaks.
         """
@@ -57,7 +60,9 @@ class RichStatusListener:
         def __set__(self, instance, value):
             # ✅ CORRECT: Validate the VALUE being assigned, not the instance
             if not isinstance(value, Console):
-                raise TypeError(f"console must be a Rich Console instance, got {type(value).__name__}")
+                raise TypeError(
+                    f"console must be a Rich Console instance, got {type(value).__name__}"
+                )
 
             # Store the console for this specific RichStatusListener instance
             self.instance_data[instance] = value
@@ -69,7 +74,7 @@ class RichStatusListener:
     class StatusContextDescriptor:
         """
         🎯 Descriptor for Status Context validation
-        
+
         Ensures that only Rich Status context managers can be assigned.
         """
 
@@ -84,9 +89,10 @@ class RichStatusListener:
         def __set__(self, instance, value):
             # ✅ CORRECT: Validate status context (can be None or have __enter__/__exit__)
             if value is not None:
-                if not (hasattr(value, '__enter__') and hasattr(value, '__exit__')):
+                if not (hasattr(value, "__enter__") and hasattr(value, "__exit__")):
                     raise TypeError(
-                        f"status_context must be a context manager (have __enter__ and __exit__), got {type(value).__name__}")
+                        f"status_context must be a context manager (have __enter__ and __exit__), got {type(value).__name__}"
+                    )
 
             self.instance_data[instance] = value
 
@@ -105,6 +111,7 @@ class RichStatusListener:
         """
         # Try to get the variable name of the instance if possible (best effort)
         import inspect
+
         name = None
         for frame_info in inspect.stack():
             frame = frame_info.frame
@@ -126,9 +133,11 @@ class RichStatusListener:
             if console_name:
                 break
 
-        return (f"<RichStatusListener name={name!r} id={id(self)} "
-                f"console=({console_name!r}, id={id(self.console)}) "
-                f"status_context={self.status_context}>")
+        return (
+            f"<RichStatusListener name={name!r} id={id(self)} "
+            f"console=({console_name!r}, id={id(self.console)}) "
+            f"status_context={self.status_context}>"
+        )
 
     def __init__(self, console=None, status_context=None):
         """
@@ -143,14 +152,18 @@ class RichStatusListener:
         if self not in RichStatusListener._listeners:
             RichStatusListener._listeners[self] = self
         else:
-            raise ValueError("This RichStatusListener instance already exists. Use a new instance.")
+            raise ValueError(
+                "This RichStatusListener instance already exists. Use a new instance."
+            )
 
         # ✅ PROPER DESCRIPTOR USAGE: Assignment triggers validation
         if console is None:
             console = Console()
 
         # These assignments will trigger the descriptor validation
-        self.console = console  # ← ConsoleDescriptor.__set__ validates this is a Console
+        self.console = (
+            console  # ← ConsoleDescriptor.__set__ validates this is a Console
+        )
         self.status_context: Status = status_context  # ← StatusContextDescriptor.__set__ validates this is a context manager or None
         self.current_status = None  # this is the __enter__ of the status context manager it is equivalent to status.start()
         self.status_thread_lock = threading.Lock()
@@ -164,21 +177,20 @@ class RichStatusListener:
         debug_info(
             heading="RICH_STATUS_LISTENER • INIT",
             body="🎯 Rich Status Listener initialized!",
-            metadata={"listener_id": id(self)}
+            metadata={"listener_id": id(self)},
         )
 
     def _do_we_need_to_listen(self, event_data):
-
         """
-            Checks whether the listener should actively listen for events and update the Rich status display.
+        Checks whether the listener should actively listen for events and update the Rich status display.
 
-            Returns:
-                bool: True if the listener should listen, False otherwise.
-            """
+        Returns:
+            bool: True if the listener should listen, False otherwise.
+        """
         # Check if the event data contains metadata of id for this listener
         if not event_data.meta_data:
             return False
-        if 'id' in event_data.meta_data and event_data.meta_data['id'] == id(self):
+        if "id" in event_data.meta_data and event_data.meta_data["id"] == id(self):
             return True
         return False
 
@@ -194,7 +206,7 @@ class RichStatusListener:
             self._on_variable_changed,
             filter_func=self._do_we_need_to_listen,
             # this is the function that decides whether the listener should listen or not
-            priority=5
+            priority=5,
         )
 
     def _on_variable_changed(self, event_data):
@@ -214,7 +226,7 @@ class RichStatusListener:
 
         meta_data = event_data.meta_data
 
-        event_info = f"{event_data.source_class.__name__ if not isinstance(event_data.source_class, str) else event_data.source_class} - {event_data.event_type} changed from {meta_data["old_value"]} to {meta_data["new_value"]}"
+        event_info = f"{event_data.source_class.__name__ if not isinstance(event_data.source_class, str) else event_data.source_class} - {event_data.event_type} changed from {meta_data['old_value']} to {meta_data['new_value']}"
         if event_info in self.processed_events:
             return
 
@@ -252,7 +264,7 @@ class RichStatusListener:
                 debug_info(
                     heading="RICH_STATUS_LISTENER • STATUS_UPDATE",
                     body=f"Status context is not active, cannot update status. {status_message}",
-                    metadata={"listener_id": id(self)}
+                    metadata={"listener_id": id(self)},
                 )
 
     def start_status(self, initial_message, spinner="dots"):
@@ -267,27 +279,32 @@ class RichStatusListener:
         with self.status_thread_lock:
             if not self.status_is_active:
                 self.status_context = self.console.status(
-                    initial_message, spinner=spinner)  # the status is now set to the context manager
+                    initial_message, spinner=spinner
+                )  # the status is now set to the context manager
                 self.current_status = self.status_context.__enter__()
                 self.status_is_active = True
                 debug_info(
                     heading="RICH_STATUS_LISTENER • STATUS_START",
                     body=f"Status started with message: {initial_message}",
-                    metadata={"listener_id": id(self)}
+                    metadata={"listener_id": id(self)},
                 )
                 # save the first status message in the processed events
                 start_event = EventListener.EventData(
                     event_type=EventListener.EventType.VARIABLE_CHANGED,
                     source_class=self.__class__,
-                    meta_data={'id': id(self), 'old_value': None, 'new_value': initial_message,
-                               'variable_name': 'status'},
+                    meta_data={
+                        "id": id(self),
+                        "old_value": None,
+                        "new_value": initial_message,
+                        "variable_name": "status",
+                    },
                 )
                 self.event_history.append(start_event)
             else:
                 debug_info(
                     heading="RICH_STATUS_LISTENER • STATUS_START",
                     body=f"Status is already active of consol object {self.console}, cannot start again.",
-                    metadata={"listener_id": id(self)}
+                    metadata={"listener_id": id(self)},
                 )
 
     def stop_status_display(self):
@@ -300,21 +317,25 @@ class RichStatusListener:
                 # Clean up the current status
                 self.current_status = None
                 self.status_context = None
-                self.event_manager.unregister_listener(EventListener.EventType.VARIABLE_CHANGED, self._on_variable_changed)
+                self.event_manager.unregister_listener(
+                    EventListener.EventType.VARIABLE_CHANGED, self._on_variable_changed
+                )
                 # Set the status to inactive
 
                 self.status_is_active = False
-                RichStatusListener._listeners.pop(self)  # Remove this listener from the listeners dictionary
+                RichStatusListener._listeners.pop(
+                    self
+                )  # Remove this listener from the listeners dictionary
                 debug_info(
                     heading="RICH_STATUS_LISTENER • STATUS_STOP",
                     body=f"RichStatusListener refcount: {sys.getrefcount(RichStatusListener)}",
-                    metadata={"listener_id": id(self)}
+                    metadata={"listener_id": id(self)},
                 )
             else:
                 debug_info(
                     heading="RICH_STATUS_LISTENER • STATUS_STOP",
                     body=f"Status is not active, cannot stop. of console object {self.console}",
-                    metadata={"listener_id": id(self)}
+                    metadata={"listener_id": id(self)},
                 )
 
     def _clean_up_processed_events(self):
@@ -324,11 +345,13 @@ class RichStatusListener:
         """
         # For simplicity, we can just clear the processed events after a certain number of events
         if len(self.processed_events) > 1000:
-            self.processed_events = set(list(self.processed_events)[-1000:])  # Keep the last 1000 events
+            self.processed_events = set(
+                list(self.processed_events)[-1000:]
+            )  # Keep the last 1000 events
             debug_info(
                 heading="RICH_STATUS_LISTENER • CLEANUP",
                 body="Processed events cleared to prevent memory leaks.",
-                metadata={"listener_id": id(self)}
+                metadata={"listener_id": id(self)},
             )
 
         if len(self.event_history) > 1000:
@@ -336,7 +359,7 @@ class RichStatusListener:
             debug_info(
                 heading="RICH_STATUS_LISTENER • CLEANUP",
                 body="Event history cleared to prevent memory leaks.",
-                metadata={"listener_id": id(self)}
+                metadata={"listener_id": id(self)},
             )
 
     def get_last_event(self) -> Optional[EventListener.EventData]:
@@ -350,7 +373,9 @@ class RichStatusListener:
             return self.event_history[-1]
         return None
 
-    def emit_on_variable_change(self, source_class, variable_name, old_value, new_value):
+    def emit_on_variable_change(
+        self, source_class, variable_name, old_value, new_value
+    ):
         """
         Emits a variable change event to update the status display.
         this is limited to the variable change event only, because this is the only event that we are interested in for
@@ -367,7 +392,12 @@ class RichStatusListener:
         event_data = EventListener.EventData(
             event_type=EventListener.EventType.VARIABLE_CHANGED,
             source_class=source_class,
-            meta_data={'id': id(self), 'old_value': old_value, 'new_value': new_value, 'variable_name': variable_name},
+            meta_data={
+                "id": id(self),
+                "old_value": old_value,
+                "new_value": new_value,
+                "variable_name": variable_name,
+            },
         )
         EventListener.EventManager().emit_event(event_data)
 
@@ -377,18 +407,19 @@ class RichStatusListener:
         """
         with self.status_thread_lock:
             if self in RichStatusListener._listeners:
-                self.event_manager.unregister_listener(EventListener.EventType.VARIABLE_CHANGED,
-                                                       self._on_variable_changed)
+                self.event_manager.unregister_listener(
+                    EventListener.EventType.VARIABLE_CHANGED, self._on_variable_changed
+                )
                 RichStatusListener._listeners.pop(self, None)
                 debug_info(
                     heading="RICH_STATUS_LISTENER • UNREGISTER",
                     body=f"Unregistered {self} from RichStatusListener.",
-                    metadata={"listener_id": id(self)}
+                    metadata={"listener_id": id(self)},
                 )
             else:
                 debug_info(
                     heading="RICH_STATUS_LISTENER • UNREGISTER",
                     body=f"{self} was not registered in RichStatusListener.",
-                    metadata={"listener_id": id(self)}
+                    metadata={"listener_id": id(self)},
                 )
             self.stop_status_display()

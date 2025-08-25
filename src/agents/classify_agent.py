@@ -16,49 +16,61 @@ def classify_message_type(state) -> dict:
     last_message = messages[-1] if messages else None
     content = last_message.content if last_message else ""
 
-    explicit_ai_phrases = ["/use ai", "/use llm", '/llm', '/ai', '/assistant']
+    explicit_ai_phrases = ["/use ai", "/use llm", "/llm", "/ai", "/assistant"]
     lowered_content = content.lower()
     for phrase in explicit_ai_phrases:
         if phrase in lowered_content:
             if settings.socket_con:
-                settings.socket_con.send_error(f"[LOG] Removing explicit AI phrase: {phrase}")
+                settings.socket_con.send_error(
+                    f"[LOG] Removing explicit AI phrase: {phrase}"
+                )
             else:
                 debug_info(
                     "Explicit AI Phrase Detected",
                     f"Removing explicit AI phrase: {phrase}",
-                    {"phrase": phrase}
+                    {"phrase": phrase},
                 )
             last_message.content = last_message.content.replace(phrase, "")
-            console.print(f"[u][red]Message classified as[/u][/red]: llm (explicit user request override)")
+            console.print(
+                "[u][red]Message classified as[/u][/red]: llm (explicit user request override)"
+            )
             return {"message_type": "llm"}
 
-    explicit_tool_phrases = ["/use tool", '/tool']
+    explicit_tool_phrases = ["/use tool", "/tool"]
     for phrase in explicit_tool_phrases:
         if phrase in lowered_content:
             if settings.socket_con:
-                settings.socket_con.send_error(f"[LOG] Removing explicit tool phrase: {phrase}")
+                settings.socket_con.send_error(
+                    f"[LOG] Removing explicit tool phrase: {phrase}"
+                )
             else:
                 debug_info(
                     "Explicit Tool Phrase Detected",
                     f"Removing explicit tool phrase: {phrase}",
-                    {"phrase": phrase}
+                    {"phrase": phrase},
                 )
             last_message.content = last_message.content.replace(phrase, "")
-            console.print(f"[u][red]Message classified as[/u][/red]: tool (explicit user request override)")
+            console.print(
+                "[u][red]Message classified as[/u][/red]: tool (explicit user request override)"
+            )
             return {"message_type": "tool"}
-    explicit_agent_phrases = ["/use agent", '/agent', '/tool chain', '/agent mode']
+    explicit_agent_phrases = ["/use agent", "/agent", "/tool chain", "/agent mode"]
     for phrase in explicit_agent_phrases:
         if phrase in lowered_content:
             if settings.socket_con:
-                settings.socket_con.send_error(f"[LOG] Removing explicit agent phrase: {phrase}")
+                settings.socket_con.send_error(
+                    f"[LOG] Removing explicit agent phrase: {phrase}"
+                )
             else:
                 debug_info(
                     "Explicit Agent Phrase Detected",
                     f"Removing explicit agent phrase: {phrase}",
-                    {"phrase": phrase}
+                    {"phrase": phrase},
                 )
             last_message.content = last_message.content.replace(phrase, "")
-            console.print(f"[u][red]Message classified as[/u][/red]: agent (explicit user request override)")
+            console.print(
+                "[u][red]Message classified as[/u][/red]: agent (explicit user request override)"
+            )
             return {"message_type": "agent"}
 
     # Build history from state messages directly
@@ -69,7 +81,7 @@ def classify_message_type(state) -> dict:
 
     llm = ModelManager(model=settings.GPT_MODEL, temperature=0.5)
 
-    system_prompt = F"""You are an intelligent conversation analyzer that understands context and user intent.
+    system_prompt = """You are an intelligent conversation analyzer that understands context and user intent.
 
 **Your Task:** Analyze the user's message within the full conversation context to determine if they need:
 - 'llm': Direct conversation, reasoning, or explanation
@@ -110,11 +122,11 @@ def classify_message_type(state) -> dict:
 **Key Insight:** USER WILL BE PROVIDE THE (LAST MESSAGE), (CONVERSATION HISTORY) AND (TOOL CONTEXT), SO YOU CAN MAKE A DECISION BASED ON THE LAST MESSAGE AND TOOL CONTEXT.
 
 **IMPORTANT:** Respond with valid JSON in this exact format:
-{{"message_type": "llm", "reasoning": "Your reasoning here"}}
+{"message_type": "llm", "reasoning": "Your reasoning here"}
 OR
-{{"message_type": "tool", "reasoning": "Your reasoning here"}}
+{"message_type": "tool", "reasoning": "Your reasoning here"}
 OR
-{{""message_type": "agent", "reasoning": "your reasoning here"}}
+{""message_type": "agent", "reasoning": "your reasoning here"}
 
 Classify thoughtfully based on true user intent, not just keywords."""
     # modify the content and provide the history and tool context
@@ -123,10 +135,16 @@ Classify thoughtfully based on true user intent, not just keywords."""
     if not content:
         content = "No current message provided."
     # Add conversation context and tool context to the content
-    tool_context = "No tools available" if not ToolAssign.get_tools_list() else "\n".join([
-        f"Tool: {tool.name}\nDescription: {tool.description}\nParameters: {tool.args_schema}"
-        for tool in ToolAssign.get_tools_list()
-    ])
+    tool_context = (
+        "No tools available"
+        if not ToolAssign.get_tools_list()
+        else "\n".join(
+            [
+                f"Tool: {tool.name}\nDescription: {tool.description}\nParameters: {tool.args_schema}"
+                for tool in ToolAssign.get_tools_list()
+            ]
+        )
+    )
 
     content = f"""
 
@@ -140,16 +158,19 @@ Classify thoughtfully based on true user intent, not just keywords."""
         {tool_context}
     """
 
-    response = llm.invoke([
-        settings.HumanMessage(content=system_prompt),
-        settings.HumanMessage(content=content)
-    ])
+    response = llm.invoke(
+        [
+            settings.HumanMessage(content=system_prompt),
+            settings.HumanMessage(content=content),
+        ]
+    )
 
     # Use the new JSON conversion method
     result_json = ModelManager.convert_to_json(response)
 
     # Create message_classifier object from JSON
     from dataclasses import dataclass
+
     @dataclass
     class MessageClassifier:
         message_type: str
@@ -157,7 +178,7 @@ Classify thoughtfully based on true user intent, not just keywords."""
 
     result = MessageClassifier(
         message_type=result_json.get("message_type", "llm"),
-        reasoning=result_json.get("reasoning", "")
+        reasoning=result_json.get("reasoning", ""),
     )
     console.print(f"[u][red]Message classified as[/u][/red]: {result.message_type}")
     return {"message_type": result.message_type}

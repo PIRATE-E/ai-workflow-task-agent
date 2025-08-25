@@ -2,18 +2,20 @@ import json
 import pathlib
 from typing import List, Optional, Union
 
-from src.mcp.mcp_register_structure import ServerConfig, Command  # Import Command from correct location
+from src.mcp.mcp_register_structure import (
+    ServerConfig,
+    Command,
+)  # Import Command from correct location
 
 
 def load_mcp_configs():
     """Load and register MCP configurations."""
     from src.mcp.manager import MCP_Manager
-    from src.tools.lggraph_tools.wrappers.mcp_wrapper.uni_mcp_wrappers import UniversalMCPWrapper
-    
+
     try:
         config_loader = McpConfigFile()
         server_configs = config_loader.retrieve_config()
-        
+
         if server_configs:
             for config in server_configs:
                 MCP_Manager.add_server(
@@ -21,7 +23,7 @@ def load_mcp_configs():
                     runner=config.command,
                     package=None,  # No package parameter for these configs
                     args=config.args,
-                    func=config.wrapper
+                    func=config.wrapper,
                 )
         return True
     except Exception as e:
@@ -31,6 +33,7 @@ def load_mcp_configs():
 
 class McpConfigFile:
     __config_path: Union[str | pathlib.Path]
+
     @property
     def config_path(self) -> str:
         return self.__config_path
@@ -39,30 +42,39 @@ class McpConfigFile:
     def config_path(self, value: str):
         self.__config_path = value
 
-
     @classmethod
     def __load(cls):
         """Load the MCP configuration from the specified file."""
         from src.config import settings
-        if not hasattr(cls, '__config_path') or cls.__config_path is None:
-            cls.__config_path = settings.MCP_CONFIG.get('MCP_CONFIG_PATH')  # Default path if not set
+        from pathlib import Path
+
+        if not hasattr(cls, "__config_path") or cls.__config_path is None:
+            cls.__config_path = settings.MCP_CONFIG.get(
+                "MCP_CONFIG_PATH"
+            )  # Default path if not set
         try:
-            from pathlib import Path
             if not Path.exists(Path(cls.__config_path).resolve()):
-                raise FileNotFoundError(f"Configuration file '{cls.__config_path}' does not exist.")
-            with open(cls.__config_path, 'r') as file:
+                raise FileNotFoundError(
+                    f"Configuration file '{cls.__config_path}' does not exist."
+                )
+            with Path(cls.__config_path).open("r") as file:
                 config_data = file.read()
             return config_data
         except FileNotFoundError:
-            raise FileNotFoundError(f"Configuration file '{cls.__config_path}' not found.")
+            raise FileNotFoundError(
+                f"Configuration file '{cls.__config_path}' not found."
+            )
         except Exception as e:
             raise Exception(f"An error occurred while loading the configuration: {e}")
 
     # File: load_config.py
     @classmethod
     def retrieve_config(cls) -> Optional[List[ServerConfig]]:
-        """Parse .mcp.json into ServerConfig list"""
-        from src.tools.lggraph_tools.wrappers.mcp_wrapper.uni_mcp_wrappers import UniversalMCPWrapper
+        """Parse .mcp.md.json into ServerConfig list"""
+        from src.tools.lggraph_tools.wrappers.mcp_wrapper.uni_mcp_wrappers import (
+            UniversalMCPWrapper,
+        )
+
         content = cls.__load()
 
         if content:
@@ -77,10 +89,12 @@ class McpConfigFile:
                 for name, server_data in servers_dict.items():
                     server_config = ServerConfig(
                         name=name,
-                        command=Command(server_data.get("command", "npx")),  # Convert to Command enum
+                        command=Command(
+                            server_data.get("command", "npx")
+                        ),  # Convert to Command enum
                         args=server_data.get("args", []),
                         env=server_data.get("env", {}),
-                        wrapper=UniversalMCPWrapper
+                        wrapper=UniversalMCPWrapper,
                     )
                     server_configs.append(server_config)
 

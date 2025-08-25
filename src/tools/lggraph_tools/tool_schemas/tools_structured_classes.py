@@ -4,6 +4,7 @@ from pydantic import Field, BaseModel
 
 # --- register tools (structured classes)  -----------
 
+
 class TranslationMessage(BaseModel):
     message: str = Field(
         description="The message to translate. Provide the text you want to translate into the targeted language."
@@ -26,19 +27,18 @@ class rag_search_message(BaseModel):
     )
 
 
-
 class run_shell_command_message(BaseModel):
     command: str = Field(
         description="The shell command or bash script to execute. You have full control over the shell environment,"
-                    " allowing you to run custom commands, scripts, or complex shell operations."
-                    " Provide a valid shell command or the path to a bash script for execution.",
+        " allowing you to run custom commands, scripts, or complex shell operations."
+        " Provide a valid shell command or the path to a bash script for execution.",
     )
     capture_output: bool = Field(
         description="Set to True to capture and return the output of the executed command or script."
-                    " If False, output will not be captured.",
-        default=True
+        " If False, output will not be captured.",
+        default=True,
     )
-    creation_flag : bool = Field(
+    creation_flag: bool = Field(
         description="Set True if you want user interaction with the command in a new console window",
-        default=False
+        default=False,
     )

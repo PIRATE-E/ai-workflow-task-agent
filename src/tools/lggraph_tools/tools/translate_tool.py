@@ -1,7 +1,7 @@
-
 def translate_text(message: str, target_language: str) -> str | None:
     import requests
     from src.config import settings
+
     """
     Translates the given message to the target language using an external translation service.
     """
@@ -11,7 +11,7 @@ def translate_text(message: str, target_language: str) -> str | None:
             "q": message,
             "source": "auto",
             "target": target_language,
-            "format": "text"
+            "format": "text",
         }
         response = requests.post(url, json=data)
 

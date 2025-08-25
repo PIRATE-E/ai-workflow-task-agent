@@ -14,29 +14,32 @@ from src.config import settings
 # Cross-platform keyboard input
 try:
     import msvcrt
+
     WINDOWS = True
 except ImportError:
     import termios, tty
+
     WINDOWS = False
 
 # Commands like Gemini CLI
 COMMANDS = {
-    '/help': 'Show help information',
-    '/search': 'Search the web',
-    '/translate': 'Translate text',
-    '/rag': 'Search knowledge base',
-    '/clear': 'Clear conversation',
-    '/history': 'Show history',
-    '/exit': 'Exit application',
-    '/hello': 'Say hello',
-    '/health': 'System health',
-    '/home': 'Go home'
+    "/help": "Show help information",
+    "/search": "Search the web",
+    "/translate": "Translate text",
+    "/rag": "Search knowledge base",
+    "/clear": "Clear conversation",
+    "/history": "Show history",
+    "/exit": "Exit application",
+    "/hello": "Say hello",
+    "/health": "System health",
+    "/home": "Go home",
 }
+
 
 def get_char():
     """Get single character input"""
     if WINDOWS:
-        return msvcrt.getch().decode('utf-8', errors='ignore')
+        return msvcrt.getch().decode("utf-8", errors="ignore")
     else:
         fd = sys.stdin.fileno()
         old = termios.tcgetattr(fd)
@@ -47,13 +50,15 @@ def get_char():
             termios.tcsetattr(fd, termios.TCSADRAIN, old)
         return char
 
+
 def get_best_match(input_text):
     """Get the best matching command"""
-    if not input_text.startswith('/'):
+    if not input_text.startswith("/"):
         return None
 
     matches = [cmd for cmd in COMMANDS.keys() if cmd.startswith(input_text.lower())]
     return matches[0] if matches else None
+
 
 def create_input_display(current_input, cursor_visible=True):
     """Create the input display with inline suggestions"""
@@ -68,7 +73,7 @@ def create_input_display(current_input, cursor_visible=True):
     # Inline suggestion (grayed out)
     best_match = get_best_match(current_input)
     if best_match and len(current_input) > 0:
-        suggestion_part = best_match[len(current_input):]
+        suggestion_part = best_match[len(current_input) :]
         display.append(suggestion_part, style="dim white")
 
     # Cursor
@@ -77,9 +82,10 @@ def create_input_display(current_input, cursor_visible=True):
 
     return display
 
+
 def create_suggestions_list(current_input):
     """Create list of all matching suggestions"""
-    if not current_input.startswith('/'):
+    if not current_input.startswith("/"):
         return Text("Type '/' to see commands...", style="dim yellow")
 
     matches = [cmd for cmd in COMMANDS.keys() if cmd.startswith(current_input.lower())]
@@ -103,6 +109,7 @@ def create_suggestions_list(current_input):
         suggestions.append(f"    ... and {len(matches) - 6} more\n", style="dim white")
 
     return suggestions
+
 
 def main():
     """Main demo"""
@@ -138,7 +145,13 @@ def main():
             console.print()
             console.print(Panel(input_display, title="Input", border_style="cyan"))
             console.print()
-            console.print(Panel(suggestions_display, title="Available Commands", border_style="green"))
+            console.print(
+                Panel(
+                    suggestions_display,
+                    title="Available Commands",
+                    border_style="green",
+                )
+            )
 
             # Instructions
             instructions = Text()
@@ -166,16 +179,24 @@ def main():
                         result = Text()
                         result.append("✅ Command Executed!\n", style="bold green")
                         result.append(f"Command: {current_input}\n", style="bold white")
-                        result.append(f"Description: {COMMANDS[current_input]}\n", style="cyan")
-                        console.print(Panel(result, title="Execution Result", border_style="green"))
+                        result.append(
+                            f"Description: {COMMANDS[current_input]}\n", style="cyan"
+                        )
+                        console.print(
+                            Panel(
+                                result, title="Execution Result", border_style="green"
+                            )
+                        )
 
-                        if current_input == '/exit':
+                        if current_input == "/exit":
                             break
                     else:
                         error = Text()
                         error.append("❌ Unknown Command!\n", style="bold red")
                         error.append(f"You typed: {current_input}\n", style="white")
-                        error.append("Try typing '/' to see available commands", style="yellow")
+                        error.append(
+                            "Try typing '/' to see available commands", style="yellow"
+                        )
                         console.print(Panel(error, title="Error", border_style="red"))
 
                     console.print("\n[dim]Press any key to continue...[/dim]")
@@ -205,6 +226,7 @@ def main():
     goodbye.append("👋 Thanks for trying the demo!\n", style="bold green")
     goodbye.append("This is exactly how Gemini CLI suggestions work.", style="cyan")
     console.print(Panel(goodbye, title="Goodbye", border_style="green"))
+
 
 if __name__ == "__main__":
     main()

@@ -26,7 +26,11 @@ class ChatDestructor:
         Add a cleanup function to be called during the cleanup process.
         :param function: A callable function that performs cleanup.
         """
-        if function and callable(function) and function not in ChatDestructor._all_functions:
+        if (
+            function
+            and callable(function)
+            and function not in ChatDestructor._all_functions
+        ):
             ChatDestructor._all_functions.append(function)
         else:
             raise ValueError("Provided function is not callable")
@@ -39,7 +43,9 @@ class ChatDestructor:
         """
         if cls.is_cleaned_registered:
             if settings.socket_con:
-                settings.socket_con.send_error("[LOG]Cleanup handlers already registered.")
+                settings.socket_con.send_error(
+                    "[LOG]Cleanup handlers already registered."
+                )
             return
 
         # Register atexit handler (called during normal Python exit)
@@ -48,17 +54,23 @@ class ChatDestructor:
         # Register signal handlers for termination signals
         try:
             # Store original handlers before overwriting
-            cls._original_sigint_handler = signal.signal(signal.SIGINT, cls._signal_handler)  # Ctrl+C
-            cls._original_sigterm_handler = signal.signal(signal.SIGTERM, cls._signal_handler)  # Termination signal
+            cls._original_sigint_handler = signal.signal(
+                signal.SIGINT, cls._signal_handler
+            )  # Ctrl+C
+            cls._original_sigterm_handler = signal.signal(
+                signal.SIGTERM, cls._signal_handler
+            )  # Termination signal
 
-            if hasattr(signal, 'SIGBREAK'):  # Windows specific
+            if hasattr(signal, "SIGBREAK"):  # Windows specific
                 signal.signal(signal.SIGBREAK, cls._signal_handler)
         except (OSError, ValueError) as e:
             print(f"Could not register signal handler: {e}")
 
         cls.is_cleaned_registered = True
         if settings.socket_con:
-            settings.socket_con.send_error("[LOG]✅ Chat cleanup handlers registered successfully")
+            settings.socket_con.send_error(
+                "[LOG]✅ Chat cleanup handlers registered successfully"
+            )
 
     @classmethod
     def _signal_handler(cls, signum, frame):
@@ -66,7 +78,9 @@ class ChatDestructor:
         Handle termination signals and ensure proper cleanup.
         """
         if settings.socket_con:
-            settings.socket_con.send_error(f"🛑 Signal {signum} received, cleaning up models...")
+            settings.socket_con.send_error(
+                f"🛑 Signal {signum} received, cleaning up models..."
+            )
         cls.call_all_cleanup_functions()
 
         # Call original handler if it existed
@@ -83,11 +97,13 @@ class ChatDestructor:
         # Prevent double cleanup execution
         if cls._cleanup_executed:
             if settings.socket_con:
-                settings.socket_con.send_error("[LOG]Cleanup already executed, skipping.")
+                settings.socket_con.send_error(
+                    "[LOG]Cleanup already executed, skipping."
+                )
             return
-            
+
         cls._cleanup_executed = True  # Set flag to prevent re-execution
-        
+
         if len(cls._all_functions) == 0:
             if settings.socket_con:
                 settings.socket_con.send_error("[LOG]No cleanup functions registered.")
@@ -101,7 +117,9 @@ class ChatDestructor:
             try:
                 if callable(func):
                     if settings.socket_con:
-                        settings.socket_con.send_error(f"[LOG]Executing cleanup: {func.__name__}")
+                        settings.socket_con.send_error(
+                            f"[LOG]Executing cleanup: {func.__name__}"
+                        )
                     func()  # Call the cleanup function
                     terminated_count += 1
                 else:
@@ -114,6 +132,8 @@ class ChatDestructor:
                     print(error_msg)
 
         if settings.socket_con:
-            settings.socket_con.send_error(f"[LOG]✅ Cleanup completed. {terminated_count} functions executed.")
+            settings.socket_con.send_error(
+                f"[LOG]✅ Cleanup completed. {terminated_count} functions executed."
+            )
         else:
             print(f"[LOG]✅ Cleanup completed. {terminated_count} functions executed.")

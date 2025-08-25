@@ -1,6 +1,7 @@
 """
 Advanced thread safety tests for ModelManager
 """
+
 import concurrent.futures
 import os
 import sys
@@ -10,15 +11,14 @@ import unittest
 from unittest.mock import patch, MagicMock
 
 # Add paths for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'utils'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "utils"))
 
 from model_manager import ModelManager
 import config
 
 
 class TestModelManagerThreadSafety(unittest.TestCase):
-
     def setUp(self):
         """Reset singleton instance before each test"""
         ModelManager.instance = None
@@ -29,7 +29,7 @@ class TestModelManagerThreadSafety(unittest.TestCase):
         ModelManager.instance = None
         ModelManager.current_model = None
 
-    @patch('subprocess.Popen')
+    @patch("subprocess.Popen")
     def test_concurrent_instance_creation(self, mock_popen):
         """Test concurrent instance creation with multiple threads"""
         mock_process = MagicMock()
@@ -69,11 +69,12 @@ class TestModelManagerThreadSafety(unittest.TestCase):
         # All instances should be the same object
         first_instance = instances[0][1]
         for thread_id, instance in instances:
-            self.assertIs(instance, first_instance,
-                         f"Thread {thread_id} got different instance")
+            self.assertIs(
+                instance, first_instance, f"Thread {thread_id} got different instance"
+            )
 
-    @patch('subprocess.Popen')
-    @patch('os.system')
+    @patch("subprocess.Popen")
+    @patch("os.system")
     def test_concurrent_model_loading(self, mock_os_system, mock_popen):
         """Test concurrent model loading operations"""
         mock_process = MagicMock()
@@ -94,7 +95,7 @@ class TestModelManagerThreadSafety(unittest.TestCase):
         models_to_test = [
             config.DEFAULT_MODEL,
             config.CYPHER_MODEL,
-            config.CLASSIFIER_MODEL
+            config.CLASSIFIER_MODEL,
         ]
 
         threads = []
@@ -116,7 +117,7 @@ class TestModelManagerThreadSafety(unittest.TestCase):
         # Current model should be one of the valid models
         self.assertIn(ModelManager.current_model, ModelManager.model_list)
 
-    @patch('subprocess.Popen')
+    @patch("subprocess.Popen")
     def test_race_condition_singleton_creation(self, mock_popen):
         """Test for race conditions in singleton creation"""
         mock_process = MagicMock()
@@ -146,7 +147,7 @@ class TestModelManagerThreadSafety(unittest.TestCase):
         for instance in instances[1:]:
             self.assertIs(instance, first_instance)
 
-    @patch('subprocess.Popen')
+    @patch("subprocess.Popen")
     def test_thread_pool_executor(self, mock_popen):
         """Test ModelManager with ThreadPoolExecutor"""
         mock_process = MagicMock()
@@ -159,15 +160,17 @@ class TestModelManagerThreadSafety(unittest.TestCase):
         # Use ThreadPoolExecutor to create instances
         with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
             futures = [executor.submit(get_manager_instance) for _ in range(10)]
-            instances = [future.result() for future in concurrent.futures.as_completed(futures)]
+            instances = [
+                future.result() for future in concurrent.futures.as_completed(futures)
+            ]
 
         # All instances should be the same
         first_instance = instances[0]
         for instance in instances[1:]:
             self.assertIs(instance, first_instance)
 
-    @patch('subprocess.Popen')
-    @patch('os.system')
+    @patch("subprocess.Popen")
+    @patch("os.system")
     def test_model_switching_thread_safety(self, mock_os_system, mock_popen):
         """Test thread safety during model switching"""
         mock_process = MagicMock()
@@ -177,7 +180,11 @@ class TestModelManagerThreadSafety(unittest.TestCase):
         switch_results = []
 
         def switch_model_repeatedly(thread_id):
-            models = [config.DEFAULT_MODEL, config.CYPHER_MODEL, config.CLASSIFIER_MODEL]
+            models = [
+                config.DEFAULT_MODEL,
+                config.CYPHER_MODEL,
+                config.CLASSIFIER_MODEL,
+            ]
             for i in range(5):
                 model = models[i % len(models)]
                 ModelManager.load_model(model)
@@ -197,10 +204,13 @@ class TestModelManagerThreadSafety(unittest.TestCase):
 
         # Verify that current_model is always a valid model
         for thread_id, iteration, requested_model, actual_model in switch_results:
-            self.assertIn(actual_model, ModelManager.model_list,
-                         f"Thread {thread_id}, iteration {iteration}: invalid current_model {actual_model}")
+            self.assertIn(
+                actual_model,
+                ModelManager.model_list,
+                f"Thread {thread_id}, iteration {iteration}: invalid current_model {actual_model}",
+            )
 
-    @patch('subprocess.Popen')
+    @patch("subprocess.Popen")
     def test_class_variable_consistency(self, mock_popen):
         """Test that class variables remain consistent across threads"""
         mock_process = MagicMock()
@@ -212,11 +222,11 @@ class TestModelManagerThreadSafety(unittest.TestCase):
         def capture_class_vars(thread_id):
             manager = ModelManager(model=config.DEFAULT_MODEL)
             snapshot = {
-                'thread_id': thread_id,
-                'instance_id': id(manager),
-                'current_model': ModelManager.current_model,
-                'model_list': ModelManager.model_list.copy(),
-                'instance_is_none': ModelManager.instance is None
+                "thread_id": thread_id,
+                "instance_id": id(manager),
+                "current_model": ModelManager.current_model,
+                "model_list": ModelManager.model_list.copy(),
+                "instance_is_none": ModelManager.instance is None,
             }
             class_var_snapshots.append(snapshot)
 
@@ -234,11 +244,11 @@ class TestModelManagerThreadSafety(unittest.TestCase):
         # All snapshots should show consistent class variables
         first_snapshot = class_var_snapshots[0]
         for snapshot in class_var_snapshots[1:]:
-            self.assertEqual(snapshot['instance_id'], first_snapshot['instance_id'])
-            self.assertEqual(snapshot['current_model'], first_snapshot['current_model'])
-            self.assertEqual(snapshot['model_list'], first_snapshot['model_list'])
-            self.assertFalse(snapshot['instance_is_none'])
+            self.assertEqual(snapshot["instance_id"], first_snapshot["instance_id"])
+            self.assertEqual(snapshot["current_model"], first_snapshot["current_model"])
+            self.assertEqual(snapshot["model_list"], first_snapshot["model_list"])
+            self.assertFalse(snapshot["instance_is_none"])
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

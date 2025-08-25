@@ -8,7 +8,8 @@ import os
 import sys
 
 # Add the project root to the Python path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
+
 
 # Regular class - creates new objects each time
 class RegularManager:
@@ -18,6 +19,7 @@ class RegularManager:
 
     def get_id(self):
         return self.connection_id
+
 
 # Singleton class - always returns the same object
 class SingletonManager:
@@ -36,6 +38,7 @@ class SingletonManager:
     def get_id(self):
         return self._connection_id
 
+
 def test_regular_class():
     """Test regular class behavior - creates multiple objects"""
     print("🧪 Testing Regular Class (Multiple Objects)")
@@ -53,10 +56,13 @@ def test_regular_class():
     # Verify they're different
     assert regular1 is not regular2, "Regular objects should be different"
     assert regular2 is not regular3, "Regular objects should be different"
-    assert regular1.get_id() != regular2.get_id(), "Regular objects should have different IDs"
+    assert regular1.get_id() != regular2.get_id(), (
+        "Regular objects should have different IDs"
+    )
 
     print("✅ Regular class test passed - creates different objects")
     return True
+
 
 def test_singleton_class():
     """Test singleton class behavior - always returns same object"""
@@ -75,10 +81,13 @@ def test_singleton_class():
     # Verify they're the same
     assert singleton1 is singleton2, "Singleton objects should be the same"
     assert singleton2 is singleton3, "Singleton objects should be the same"
-    assert singleton1.get_id() == singleton2.get_id(), "Singleton objects should have same ID"
+    assert singleton1.get_id() == singleton2.get_id(), (
+        "Singleton objects should have same ID"
+    )
 
     print("✅ Singleton class test passed - returns same object")
     return True
+
 
 def test_class_vs_instance_variables():
     """Test understanding of class vs instance variables"""
@@ -108,11 +117,16 @@ def test_class_vs_instance_variables():
     print(f"obj2: {obj2.show_variables()}")
 
     # Verify behavior
-    assert obj1.class_variable == obj2.class_variable, "Class variables should be shared"
-    assert obj1.instance_variable != obj2.instance_variable, "Instance variables should be different"
+    assert obj1.class_variable == obj2.class_variable, (
+        "Class variables should be shared"
+    )
+    assert obj1.instance_variable != obj2.instance_variable, (
+        "Instance variables should be different"
+    )
 
     print("✅ Class vs instance variables test passed")
     return True
+
 
 def test_method_types():
     """Test different types of methods in classes"""
@@ -157,6 +171,7 @@ def test_method_types():
     print("✅ Method types test passed")
     return True
 
+
 def run_all_class_tests():
     """Run all class and object tests"""
     print("=" * 70)
@@ -167,7 +182,7 @@ def run_all_class_tests():
         ("Regular Class Behavior", test_regular_class),
         ("Singleton Pattern", test_singleton_class),
         ("Class vs Instance Variables", test_class_vs_instance_variables),
-        ("Method Types", test_method_types)
+        ("Method Types", test_method_types),
     ]
 
     results = []
@@ -199,6 +214,7 @@ def run_all_class_tests():
         print("   You now understand the basics of classes and objects!")
     else:
         print("⚠️ Some tests failed - review the concepts above")
+
 
 if __name__ == "__main__":
     run_all_class_tests()

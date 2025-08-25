@@ -3,6 +3,7 @@ import socket
 import subprocess
 import sys
 import time
+import pathlib
 
 # Handle imports - works both as module and standalone script
 try:
@@ -14,32 +15,37 @@ except ImportError:
         from error_transfer import SocketCon
     except ImportError:
         # Last resort: add current directory to path and import
-        sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+        sys.path.append(pathlib.Path(pathlib.Path(__file__).resolve()).parent)
         from error_transfer import SocketCon
 
 # Import settings - handle case where it might not be available
 from src.config import settings
+import pathlib
 
 # Structured debug protocol imports (lazy fallback if unavailable)
 try:
     from src.ui.diagnostics.debug_message_protocol import DebugMessageSender, LogLevel
 except ImportError:  # Minimal fallbacks so legacy still works
+
     class DebugMessageSender:  # type: ignore
         def __init__(self, socket_connection=None):
             self.socket_connection = socket_connection
+
         def send_plain_text(self, text: str):
-            if self.socket_connection and hasattr(self.socket_connection, 'send_error'):
+            if self.socket_connection and hasattr(self.socket_connection, "send_error"):
                 self.socket_connection.send_error(text)
             else:
                 print(text)
+
         # Unified interface expected below
         def send_debug_message(self, heading, body, level, metadata=None):
             self.send_plain_text(f"[{level}] {heading} - {body} :: {metadata or {}}")
+
     class LogLevel:  # type: ignore
-        INFO = 'INFO'
-        WARNING = 'WARNING'
-        ERROR = 'ERROR'
-        CRITICAL = 'CRITICAL'
+        INFO = "INFO"
+        WARNING = "WARNING"
+        ERROR = "ERROR"
+        CRITICAL = "CRITICAL"
 
 
 class SocketManager:
@@ -57,7 +63,11 @@ class SocketManager:
     @staticmethod
     def get_socket_con():
         """Get socket connection only when needed"""
-        return SocketManager().get_socket_connection() if settings.ENABLE_SOCKET_LOGGING else None
+        return (
+            SocketManager().get_socket_connection()
+            if settings.ENABLE_SOCKET_LOGGING
+            else None
+        )
 
     def _build_debug_sender(self):
         """Internal helper to always return a DebugMessageSender bound to current connection"""
@@ -76,11 +86,13 @@ class SocketManager:
 
         try:
             # Get the path to error_transfer.py
-            current_dir = os.path.dirname(os.path.abspath(__file__))
-            error_transfer_path = os.path.join(current_dir, 'error_transfer.py')
+            current_dir = pathlib.Path(pathlib.Path(__file__).resolve()).parent
+            error_transfer_path = current_dir / "error_transfer.py"
 
-            if not os.path.exists(error_transfer_path):
-                print(f"Error: Could not find error_transfer.py at {error_transfer_path}")
+            if not pathlib.Path(error_transfer_path).exists():
+                print(
+                    f"Error: Could not find error_transfer.py at {error_transfer_path}"
+                )
                 return False
 
             print(f"🚀 Starting log server subprocess: {error_transfer_path}")
@@ -88,46 +100,45 @@ class SocketManager:
             # Start the subprocess - choose method based on settings
             log_display_mode = settings.LOG_DISPLAY_MODE
 
-            if log_display_mode == 'separate_window':
+            if log_display_mode == "separate_window":
                 # Option 1: Separate console window (recommended)
-                if os.name == 'nt':  # Windows
+                if os.name == "nt":  # Windows
                     self._log_server_process = subprocess.Popen(
                         [sys.executable, error_transfer_path],
-                        creationflags=subprocess.CREATE_NEW_CONSOLE
+                        creationflags=subprocess.CREATE_NEW_CONSOLE,
                     )
                 else:  # Linux/Mac
                     self._log_server_process = subprocess.Popen(
-                        ['gnome-terminal', '--', sys.executable, error_transfer_path]
+                        ["gnome-terminal", "--", sys.executable, error_transfer_path]
                     )
-            elif log_display_mode == 'background':
+            elif log_display_mode == "background":
                 # Option 2: Background process (logs not visible)
                 self._log_server_process = subprocess.Popen(
                     [sys.executable, error_transfer_path],
                     stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL
+                    stderr=subprocess.DEVNULL,
                 )
-            elif log_display_mode == 'file':
-                from pathlib import Path
+            elif log_display_mode == "file":
                 # Option 3: Log to file
-                log_file = settings.BASE_DIR.parent / "basic_logs" / "error_log.txt"  ######
+                log_file = (
+                    settings.BASE_DIR.parent / "basic_logs" / "error_log.txt"
+                )  ######
                 print(log_file.exists(), "error transfer path exists")
-                with open(log_file, 'w') as f:
+                with log_file.open("w") as f:
                     self._log_server_process = subprocess.Popen(
-                        [sys.executable, error_transfer_path],
-                        stdout=f,
-                        stderr=f
+                        [sys.executable, error_transfer_path], stdout=f, stderr=f
                     )
                 print(f"📝 Log server output will be written to: {log_file}")
             else:
                 # Default: Separate window
-                if os.name == 'nt':  # Windows
+                if os.name == "nt":  # Windows
                     self._log_server_process = subprocess.Popen(
                         [sys.executable, error_transfer_path],
-                        creationflags=subprocess.CREATE_NEW_CONSOLE
+                        creationflags=subprocess.CREATE_NEW_CONSOLE,
                     )
                 else:  # Linux/Mac
                     self._log_server_process = subprocess.Popen(
-                        ['gnome-terminal', '--', sys.executable, error_transfer_path]
+                        ["gnome-terminal", "--", sys.executable, error_transfer_path]
                     )
 
             print(f"✅ Log server started with PID: {self._log_server_process.pid}")
@@ -157,7 +168,9 @@ class SocketManager:
 
                 # Check if process is still alive before terminating
                 if self._log_server_process.poll() is None:
-                    print(f"Terminating log server process (PID: {self._log_server_process.pid})")
+                    print(
+                        f"Terminating log server process (PID: {self._log_server_process.pid})"
+                    )
 
                     # First try graceful termination
                     self._log_server_process.terminate()
@@ -167,16 +180,21 @@ class SocketManager:
                         self._log_server_process.wait(timeout=5)  # Increased timeout
                         print("✅ Log server stopped gracefully")
                     except subprocess.TimeoutExpired:
-                        print("⚠️ Log server didn't stop gracefully, forcing termination...")
+                        print(
+                            "⚠️ Log server didn't stop gracefully, forcing termination..."
+                        )
                         self._log_server_process.kill()
                         try:
-                            self._log_server_process.wait(timeout=3)  # Increased timeout
+                            self._log_server_process.wait(
+                                timeout=3
+                            )  # Increased timeout
                             print("✅ Log server forcefully terminated")
                         except subprocess.TimeoutExpired:
                             print("❌ Could not terminate log server process")
                             # Try to clean up any remaining processes
                             try:
                                 import psutil
+
                                 parent = psutil.Process(self._log_server_process.pid)
                                 for child in parent.children(recursive=True):
                                     child.kill()
@@ -185,7 +203,9 @@ class SocketManager:
                             except ImportError:
                                 print("⚠️ psutil not available for process tree cleanup")
                             except Exception as cleanup_error:
-                                print(f"⚠️ Error during process tree cleanup: {cleanup_error}")
+                                print(
+                                    f"⚠️ Error during process tree cleanup: {cleanup_error}"
+                                )
                 else:
                     print("✅ Log server process already terminated")
 
@@ -196,10 +216,11 @@ class SocketManager:
 
                 # Also clean up any stale lock files
                 try:
-                    import os
-                    lock_file = os.path.join(os.path.dirname(__file__), '..', '..', 'basic_logs', 'server.lock')
-                    if os.path.exists(lock_file):
-                        os.remove(lock_file)
+                    lock_file = (
+                        pathlib.Path(__file__).parent / ".." / ".." / "basic_logs" / "server.lock"
+                    )
+                    if lock_file.exists():
+                        lock_file.unlink()
                         print("🧹 Cleaned up server lock file")
                 except Exception as lock_cleanup_error:
                     print(f"⚠️ Error cleaning up lock file: {lock_cleanup_error}")
@@ -217,12 +238,15 @@ class SocketManager:
 
         # === STEP 1: HEALTH CHECK EXISTING CONNECTION ===
         if self._socket_con is not None:
-            if hasattr(self._socket_con, '_is_connected') and self._socket_con._is_connected():
+            if (
+                hasattr(self._socket_con, "_is_connected")
+                and self._socket_con._is_connected()
+            ):
                 return self._socket_con
             else:
                 print("🔄 Detected dead connection, clearing for reconnection...")
                 try:
-                    if hasattr(self._socket_con, 'client_socket'):
+                    if hasattr(self._socket_con, "client_socket"):
                         self._socket_con.client_socket.close()
                 except Exception as e:
                     print(f"❌ Error closing dead socket: {e}")
@@ -230,7 +254,7 @@ class SocketManager:
 
         if self._socket_con is None:
             try:
-                if not getattr(settings, 'ENABLE_SOCKET_LOGGING', False):
+                if not getattr(settings, "ENABLE_SOCKET_LOGGING", False):
                     print("Socket logging is disabled in settings")
                     return None
 
@@ -273,26 +297,33 @@ class SocketManager:
                 level = LogLevel.INFO
                 heading = "LEGACY • MESSAGE"
                 body = message.strip()
-                if body.startswith('[') and ']' in body.split('\n', 1)[0]:
-                    prefix = body[1:body.find(']')].upper()
-                    body_no_prefix = body[body.find(']') + 1:].strip()
+                if body.startswith("[") and "]" in body.split("\n", 1)[0]:
+                    prefix = body[1 : body.find("]")].upper()
+                    body_no_prefix = body[body.find("]") + 1 :].strip()
                     heading = f"LEGACY • {prefix}"
                     body = body_no_prefix or body
                     level_map = {
-                        'DEBUG': LogLevel.DEBUG if hasattr(LogLevel, 'DEBUG') else LogLevel.INFO,
-                        'INFO': LogLevel.INFO,
-                        'WARNING': LogLevel.WARNING,
-                        'WARN': LogLevel.WARNING,
-                        'ERROR': LogLevel.ERROR,
-                        'CRITICAL': LogLevel.CRITICAL
+                        "DEBUG": LogLevel.DEBUG
+                        if hasattr(LogLevel, "DEBUG")
+                        else LogLevel.INFO,
+                        "INFO": LogLevel.INFO,
+                        "WARNING": LogLevel.WARNING,
+                        "WARN": LogLevel.WARNING,
+                        "ERROR": LogLevel.ERROR,
+                        "CRITICAL": LogLevel.CRITICAL,
                     }
                     level = level_map.get(prefix, LogLevel.INFO)
-                sender.send_debug_message(heading=heading, body=body, level=level, metadata={"origin": "legacy_send_error"})
+                sender.send_debug_message(
+                    heading=heading,
+                    body=body,
+                    level=level,
+                    metadata={"origin": "legacy_send_error"},
+                )
             except Exception as e:
                 print(f"Failed structured send, falling back. Error: {e}")
-                if socket_con and hasattr(socket_con, 'send_error'):
+                if socket_con and hasattr(socket_con, "send_error"):
                     try:
-                        socket_con.send_error(message + '\n')
+                        socket_con.send_error(message + "\n")
                     except Exception as inner:
                         print(f"Legacy fallback failed: {inner}\nOriginal: {message}")
         else:
@@ -300,13 +331,13 @@ class SocketManager:
 
     def is_connected(self):
         """Check if socket connection is active"""
-        if self._socket_con and hasattr(self._socket_con, '_is_connected'):
+        if self._socket_con and hasattr(self._socket_con, "_is_connected"):
             return self._socket_con._is_connected()
         return False
 
     def close_connection(self):
         """Close the socket connection and optionally stop the log server"""
-        if self._socket_con and hasattr(self._socket_con, 'client_socket'):
+        if self._socket_con and hasattr(self._socket_con, "client_socket"):
             try:
                 self._socket_con.client_socket.close()
                 print("Socket connection closed")
@@ -321,12 +352,12 @@ class SocketManager:
     def cleanup(cls):
         """Simple cleanup - just kill the subprocess"""
         print("🧹 Cleaning up SocketManager...")
-        if hasattr(cls, 'instance') and cls.instance is not None:
+        if hasattr(cls, "instance") and cls.instance is not None:
             cls.instance._cleanup_in_progress = True
             instance = cls.instance
             if instance._socket_con:
                 try:
-                    if hasattr(instance._socket_con, 'client_socket'):
+                    if hasattr(instance._socket_con, "client_socket"):
                         instance._socket_con.client_socket.close()
                         print("🔌 Socket closed")
                 except Exception:
@@ -358,7 +389,7 @@ class SafeSocketWrapper:
         return self._manager.is_connected()
 
     # Structured helpers for external callers wanting protocol level access
-    def send_debug(self, heading: str, body: str, level: str = 'INFO', metadata=None):
+    def send_debug(self, heading: str, body: str, level: str = "INFO", metadata=None):
         sender = self._manager._build_debug_sender()
         try:
             sender.send_debug_message(heading, body, level, metadata or {})
@@ -367,13 +398,16 @@ class SafeSocketWrapper:
             print(f"[SAFE_SOCKET_FALLBACK] {heading}: {body} ({e})")
             return False
 
+
 # Global instances
 socket_manager = SocketManager()
 safe_socket = SafeSocketWrapper(socket_manager)
 
 # Ensure settings.socket_con always has something usable for legacy code
 try:
-    if not hasattr(settings, 'socket_con') or settings.socket_con is None:
-        settings.socket_con = safe_socket  # Provide wrapper that emulates expected interface
+    if not hasattr(settings, "socket_con") or settings.socket_con is None:
+        settings.socket_con = (
+            safe_socket  # Provide wrapper that emulates expected interface
+        )
 except Exception:
     pass

@@ -9,52 +9,51 @@ import os
 import time
 
 # Add project root to path
-project_root = os.path.join(os.path.dirname(__file__), '..', '..')
+project_root = os.path.join(os.path.dirname(__file__), "..", "..")
 sys.path.append(project_root)
 
 from rich.console import Console
+
 console = Console()
 
 try:
     from src.utils.listeners.rich_status_listen import RichStatusListener
     from src.utils.listeners.event_listener import EventListener
+
     console.print("🔍 [bold blue]QUICK VALIDATION[/bold blue]")
-    
+
     # Test 1: Import validation
     console.print("✅ All imports successful")
-    
+
     # Test 2: Listener creation
     listener = RichStatusListener(Console())
     console.print(f"✅ Listener created with ID: {id(listener)}")
-    
+
     # Test 3: Status start
     listener.start_status("🧪 Validation test...")
     console.print("✅ Status display started")
-    
+
     # Test 4: Event emission
     listener.emit_on_variable_change(
-        type("TestClass", (), {}),
-        "test_var",
-        "old_value", 
-        "new_value"
+        type("TestClass", (), {}), "test_var", "old_value", "new_value"
     )
     console.print("✅ Event emission successful")
-    
+
     time.sleep(2)
-    
+
     # Test 5: Status stop
     listener.stop_status_display()
     console.print("✅ Status display stopped")
-    
+
     console.print("\n🎉 [bold green]VALIDATION PASSED![/bold green]")
     console.print("✅ Event listener system is working correctly")
     console.print("🚀 Ready to run full test suite!")
-    
+
 except ImportError as e:
     console.print(f"❌ Import error: {e}")
     console.print("🔧 Check that your event listener files are in the correct location")
     console.print("💡 Try running from project root directory")
-    
+
 except Exception as e:
     console.print(f"❌ Validation failed: {e}")
     console.print("🔧 Check your event listener implementation")

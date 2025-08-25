@@ -5,20 +5,30 @@ from typing import Any, Callable, Optional
 
 from src.config import settings
 from src.mcp.dynamically_tool_register import DynamicToolRegister
-from src.mcp.mcp_register_structure import ServerConfig, Command, MPC_TOOL_SERVER_MAPPING
+from src.mcp.mcp_register_structure import (
+    ServerConfig,
+    Command,
+    MPC_TOOL_SERVER_MAPPING,
+)
+
 # ✅ Structured Debug Helpers
 from src.ui.diagnostics.debug_helpers import (
     debug_info,
     debug_warning,
     debug_error,
 )
+
 # 🎨 Rich Traceback Integration
-from src.ui.diagnostics.rich_traceback_manager import RichTracebackManager, rich_exception_handler
+from src.ui.diagnostics.rich_traceback_manager import (
+    RichTracebackManager,
+    rich_exception_handler,
+)
+import pathlib
 
 
 class MCP_Manager:
     instance = None
-    # mcp configs
+    # mcp.md configs
     mcp_enabled = None
     mcp_servers: dict[str, ServerConfig] = {}
     running_servers: dict[str, subprocess.Popen] = {}
@@ -42,7 +52,14 @@ class MCP_Manager:
         return MCP_Manager.response_id
 
     @classmethod
-    def add_server(cls, name: str, runner: Command, package: Optional[str], args: list[str], func: Callable):
+    def add_server(
+        cls,
+        name: str,
+        runner: Command,
+        package: Optional[str],
+        args: list[str],
+        func: Callable,
+    ):
         """
         Add a server to the MCP manager.
         :param name: Name of the server.
@@ -78,10 +95,10 @@ class MCP_Manager:
         #                   # (function that is associated with the server to handle its responses and make requests) \
         #                   # to assign the function to the llm's tools.
         # }
-        
+
         # Filter out None package to avoid None in args array
         server_args = args if package is None else [package] + args
-        
+
         MCP_Manager.mcp_servers[name] = ServerConfig(
             name=name,
             command=runner,
@@ -89,12 +106,12 @@ class MCP_Manager:
             env={},
             wrapper=func,
             status="stopped",
-            pid=None
+            pid=None,
         )
         debug_info(
             heading="MCP • SERVER_ADDED",
             body=f"Registered server '{name}' (runner={runner})",
-            metadata={"package": package, "args": args}
+            metadata={"package": package, "args": args},
         )
 
     @classmethod
@@ -107,7 +124,7 @@ class MCP_Manager:
             debug_warning(
                 heading="MCP • TOOL_DISCOVERY_MISSED",
                 body="Requested tool discovery on unknown server",
-                metadata={"server": mcp_server_name}
+                metadata={"server": mcp_server_name},
             )
             return {}
 
@@ -115,7 +132,7 @@ class MCP_Manager:
             "jsonrpc": "2.0",
             "id": MCP_Manager.generate_response_id(),
             "method": "tools/list",
-            "params": {}
+            "params": {},
         }
 
         try:
@@ -130,14 +147,14 @@ class MCP_Manager:
                     debug_warning(
                         heading="MCP • TOOL_DISCOVERY_EMPTY_RESPONSE",
                         body="Server returned empty response for tools/list",
-                        metadata={"server": mcp_server_name}
+                        metadata={"server": mcp_server_name},
                     )
                     return {}
-                
+
                 # Handle potential encoding issues with multiple fallback strategies
                 if isinstance(response_line, bytes):
                     # Try multiple encoding strategies for robust handling
-                    for encoding in ['utf-8', 'utf-8-sig', 'latin-1', 'cp1252']:
+                    for encoding in ["utf-8", "utf-8-sig", "latin-1", "cp1252"]:
                         try:
                             response_line = response_line.decode(encoding)
                             break
@@ -145,49 +162,54 @@ class MCP_Manager:
                             continue
                     else:
                         # Final fallback: decode with error replacement
-                        response_line = response_line.decode('utf-8', errors='replace')
+                        response_line = response_line.decode("utf-8", errors="replace")
                         debug_warning(
                             heading="MCP • TOOL_DISCOVERY_ENCODING_FALLBACK",
                             body="Used encoding fallback with character replacement",
-                            metadata={"server": mcp_server_name}
+                            metadata={"server": mcp_server_name},
                         )
                 elif isinstance(response_line, str):
                     # Already a string, but might have encoding issues
                     try:
                         # Test if string is properly encoded by trying to encode/decode
-                        response_line.encode('utf-8')
+                        response_line.encode("utf-8")
                     except UnicodeEncodeError:
                         # Re-encode with error handling
-                        response_line = response_line.encode('utf-8', errors='replace').decode('utf-8')
+                        response_line = response_line.encode(
+                            "utf-8", errors="replace"
+                        ).decode("utf-8")
                         debug_warning(
                             heading="MCP • TOOL_DISCOVERY_STRING_ENCODING_FIX",
                             body="Fixed string encoding issues",
-                            metadata={"server": mcp_server_name}
+                            metadata={"server": mcp_server_name},
                         )
-                
+
                 response_line_json = json.loads(response_line)
-                
+
             except UnicodeDecodeError as encoding_error:
                 debug_error(
                     heading="MCP • TOOL_DISCOVERY_ENCODING_ERROR",
                     body=f"All encoding strategies failed: {encoding_error}",
-                    metadata={"server": mcp_server_name}
+                    metadata={"server": mcp_server_name},
                 )
                 return {}
             except json.JSONDecodeError as json_error:
                 debug_error(
                     heading="MCP • TOOL_DISCOVERY_JSON_ERROR",
                     body=f"JSON parsing failed: {json_error}",
-                    metadata={"server": mcp_server_name, "response_preview": str(response_line)}
+                    metadata={
+                        "server": mcp_server_name,
+                        "response_preview": str(response_line),
+                    },
                 )
                 return {}
 
             # 🔧 ENHANCED: Handle different response formats and error cases
-            if 'error' in response_line_json:
-                error_info = response_line_json['error']
-                error_code = error_info.get('code', 'unknown')
-                error_message = error_info.get('message', 'unknown error')
-                
+            if "error" in response_line_json:
+                error_info = response_line_json["error"]
+                error_code = error_info.get("code", "unknown")
+                error_message = error_info.get("message", "unknown error")
+
                 debug_warning(
                     heading="MCP • TOOL_DISCOVERY_SERVER_ERROR",
                     body=f"Server returned error: {error_message} (code: {error_code})",
@@ -195,41 +217,53 @@ class MCP_Manager:
                         "server": mcp_server_name,
                         "error_code": error_code,
                         "error_message": error_message,
-                        "full_error": str(error_info)
-                    }
+                        "full_error": str(error_info),
+                    },
                 )
-                
+
                 # For git server, this might be normal - just continue without tools
                 if mcp_server_name == "git" and error_code == -32602:
                     debug_info(
                         heading="MCP • GIT_SERVER_PROTOCOL_ISSUE",
                         body="Git server has different protocol requirements, continuing without tools",
-                        metadata={"server": mcp_server_name}
+                        metadata={"server": mcp_server_name},
                     )
-                
+
                 return {}
 
             ### main successful path
-            if 'result' in response_line_json and 'tools' in response_line_json['result']:
-                tools_found = response_line_json['result']['tools']
+            if (
+                "result" in response_line_json
+                and "tools" in response_line_json["result"]
+            ):
+                tools_found = response_line_json["result"]["tools"]
                 debug_info(
                     heading="MCP • TOOLS_DISCOVERED",
                     body=f"Discovered {len(tools_found)} tools",
-                    metadata={"server": mcp_server_name, "tools": [t.get('name', 'unnamed') for t in tools_found]}
+                    metadata={
+                        "server": mcp_server_name,
+                        "tools": [t.get("name", "unnamed") for t in tools_found],
+                    },
                 )
                 if tools_found:
-                    DynamicToolRegister.register_tool(response_line_json, MCP_Manager.mcp_servers[mcp_server_name].get('wrapper'))
+                    DynamicToolRegister.register_tool(
+                        response_line_json,
+                        MCP_Manager.mcp_servers[mcp_server_name].get("wrapper"),
+                    )
                 else:
                     debug_warning(
                         heading="MCP • NO_TOOLS",
                         body="Server returned empty tool list",
-                        metadata={"server": mcp_server_name}
+                        metadata={"server": mcp_server_name},
                     )
             else:
                 debug_error(
                     heading="MCP • INVALID_TOOL_RESPONSE",
                     body="Server returned unexpected tools/list format",
-                    metadata={"server": mcp_server_name, "response_preview": str(response_line_json)}
+                    metadata={
+                        "server": mcp_server_name,
+                        "response_preview": str(response_line_json),
+                    },
                 )
             return response_line_json
 
@@ -240,8 +274,8 @@ class MCP_Manager:
                 metadata={
                     "server": mcp_server_name,
                     "error_type": type(discovery_error).__name__,
-                    "error_message": str(discovery_error)[:200]
-                }
+                    "error_message": str(discovery_error)[:200],
+                },
             )
             return {}
 
@@ -257,7 +291,7 @@ class MCP_Manager:
                 server_info = MCP_Manager.mcp_servers[name]
                 runner = server_info["command"]
                 args = server_info.get("args", [])
-                
+
                 # 🔧 DEBUG: Add comprehensive debugging
                 debug_info(
                     heading="MCP • DEBUG_SERVER_START",
@@ -266,21 +300,21 @@ class MCP_Manager:
                         "server": name,
                         "runner": str(runner),
                         "runner_type": str(type(runner)),
-                        "runner_value": getattr(runner, 'value', 'NO_VALUE_ATTR'),
+                        "runner_value": getattr(runner, "value", "NO_VALUE_ATTR"),
                         "args": str(args),
-                        "args_type": str(type(args))
-                    }
+                        "args_type": str(type(args)),
+                    },
                 )
-                
+
                 # Convert Command enum to its string value
                 try:
-                    if hasattr(runner, 'value'):
+                    if hasattr(runner, "value"):
                         command_str = runner.value
                     else:
                         command_str = str(runner)
-                    
+
                     command = [command_str] + args
-                    
+
                     debug_info(
                         heading="MCP • DEBUG_COMMAND_ARRAY",
                         body=f"Command array created for '{name}'",
@@ -288,18 +322,20 @@ class MCP_Manager:
                             "command_str": command_str,
                             "command_array": str(command),
                             "first_element": str(command[0]) if command else "EMPTY",
-                            "first_element_type": str(type(command[0])) if command else "EMPTY"
-                        }
+                            "first_element_type": str(type(command[0]))
+                            if command
+                            else "EMPTY",
+                        },
                     )
-                    
+
                 except Exception as cmd_error:
                     debug_error(
                         heading="MCP • DEBUG_COMMAND_ERROR",
                         body=f"Error creating command for '{name}': {cmd_error}",
-                        metadata={"server": name, "runner": str(runner)}
+                        metadata={"server": name, "runner": str(runner)},
                     )
                     return False
-                
+
                 # Check working directory
                 try:
                     working_dir = str(settings.BASE_DIR.parent.resolve())
@@ -310,17 +346,17 @@ class MCP_Manager:
                             "server": name,
                             "working_dir": working_dir,
                             "base_dir": str(settings.BASE_DIR),
-                            "parent_exists": os.path.exists(working_dir)
-                        }
+                            "parent_exists": pathlib.Path(working_dir).exists(),
+                        },
                     )
                 except Exception as wd_error:
                     debug_error(
                         heading="MCP • DEBUG_WORKING_DIR_ERROR",
                         body=f"Error getting working directory: {wd_error}",
-                        metadata={"server": name}
+                        metadata={"server": name},
                     )
                     return False
-                
+
                 try:
                     # 🔧 FIX: Set proper encoding for subprocess communication
                     server_process = subprocess.Popen(
@@ -330,11 +366,11 @@ class MCP_Manager:
                         stderr=subprocess.PIPE,
                         stdin=subprocess.PIPE,
                         text=True,
-                        encoding='utf-8',  # Explicitly set UTF-8 encoding
-                        errors='replace',  # Handle encoding errors gracefully
+                        encoding="utf-8",  # Explicitly set UTF-8 encoding
+                        errors="replace",  # Handle encoding errors gracefully
                         bufsize=1,
                         cwd=working_dir,
-                        env=os.environ.copy()
+                        env=os.environ.copy(),
                     )
                     MCP_Manager.running_servers[name] = server_process
                     server_info["status"] = "running"
@@ -346,8 +382,8 @@ class MCP_Manager:
                             "server": name,
                             "pid": server_process.pid,
                             "command": str(command),
-                            "working_dir": working_dir
-                        }
+                            "working_dir": working_dir,
+                        },
                     )
 
                     # Handshake / initialize
@@ -359,8 +395,11 @@ class MCP_Manager:
                             "params": {
                                 "protocolVersion": "2024-11-05",
                                 "capabilities": {},
-                                "clientInfo": {"name": "langgraph-mcp-client", "version": "1.0.0"}
-                            }
+                                "clientInfo": {
+                                    "name": "langgraph-mcp.md-client",
+                                    "version": "1.0.0",
+                                },
+                            },
                         }
                         server_process.stdin.write(json.dumps(init_request) + "\n")
                         server_process.stdin.flush()
@@ -368,47 +407,59 @@ class MCP_Manager:
                         debug_info(
                             heading="MCP • SERVER_INITIALIZED",
                             body=f"Handshake completed for '{name}'",
-                            metadata={"init_response_preview": init_response[:120]}
+                            metadata={"init_response_preview": init_response[:120]},
                         )
                         # Discover tools
                         try:
                             tools = cls.tool_discovery(name)
-                            if tools and 'result' in tools:
+                            if tools and "result" in tools:
                                 # map discovered tools to server
-                                MPC_TOOL_SERVER_MAPPING.update({tool['name']: name for tool in tools['result']['tools']}) # working
+                                MPC_TOOL_SERVER_MAPPING.update(
+                                    {
+                                        tool["name"]: name
+                                        for tool in tools["result"]["tools"]
+                                    }
+                                )  # working
                             else:
                                 debug_warning(
                                     heading="MCP • DISCOVERY_EMPTY",
                                     body="No tools returned after discovery",
-                                    metadata={"server": name}
+                                    metadata={"server": name},
                                 )
                         except Exception as tool_discovery_error:
                             RichTracebackManager.handle_exception(
                                 tool_discovery_error,
                                 context=f"MCP Tool Discovery - {name}",
-                                extra_context={"server_name": name, "init_response": str(init_response)}
+                                extra_context={
+                                    "server_name": name,
+                                    "init_response": str(init_response),
+                                },
                             )
                             debug_error(
                                 heading="MCP • DISCOVERY_ERROR",
                                 body=f"Tool discovery failed: {tool_discovery_error}",
-                                metadata={"server": name}
+                                metadata={"server": name},
                             )
                     except Exception as init_error:
                         RichTracebackManager.handle_exception(
                             init_error,
                             context=f"MCP Server Initialization - {name}",
-                            extra_context={"server_name": name, "command": str(command), "process_id": server_process.pid}
+                            extra_context={
+                                "server_name": name,
+                                "command": str(command),
+                                "process_id": server_process.pid,
+                            },
                         )
                         debug_warning(
                             heading="MCP • INIT_FAILED",
                             body=f"Initialization failed: {init_error}",
-                            metadata={"server": name}
+                            metadata={"server": name},
                         )
 
                     debug_info(
                         heading="MCP • SERVER_STARTED",
                         body=f"Started server '{name}'",
-                        metadata={"args": args}
+                        metadata={"args": args},
                     )
                     return True
 
@@ -416,43 +467,51 @@ class MCP_Manager:
                     RichTracebackManager.handle_exception(
                         process_error,
                         context=f"MCP Server Process Creation - {name}",
-                        extra_context={"command": str(command), "server_name": name, "runner": runner}
+                        extra_context={
+                            "command": str(command),
+                            "server_name": name,
+                            "runner": runner,
+                        },
                     )
                     debug_error(
                         heading="MCP • PROCESS_ERROR",
                         body=f"Command failed: {process_error}",
-                        metadata={"server": name, "command": str(command)}
+                        metadata={"server": name, "command": str(command)},
                     )
                     return False
                 except Exception as e:
                     RichTracebackManager.handle_exception(
                         e,
                         context=f"MCP Server Startup - {name}",
-                        extra_context={"server_name": name, "command": str(command), "runner": runner}
+                        extra_context={
+                            "server_name": name,
+                            "command": str(command),
+                            "runner": runner,
+                        },
                     )
                     debug_error(
                         heading="MCP • STARTUP_ERROR",
                         body=f"Failed to start server: {e}",
-                        metadata={"server": name}
+                        metadata={"server": name},
                     )
                     return False
             else:
                 debug_error(
                     heading="MCP • UNKNOWN_SERVER",
                     body="Attempted to start non-existent server",
-                    metadata={"server": name}
+                    metadata={"server": name},
                 )
                 return False
         except Exception as e:
             RichTracebackManager.handle_exception(
                 e,
                 context=f"MCP Server Startup Wrapper - {name}",
-                extra_context={"server_name": name}
+                extra_context={"server_name": name},
             )
             debug_error(
                 heading="MCP • CRITICAL_START_ERROR",
                 body=f"Critical error starting server: {e}",
-                metadata={"server": name}
+                metadata={"server": name},
             )
             return False
 
@@ -467,12 +526,14 @@ class MCP_Manager:
         debug_info(
             heading="MCP • MANAGER_INIT",
             body="MCP Manager initialized",
-            metadata={"enabled": bool(MCP_Manager.mcp_enabled)}
+            metadata={"enabled": bool(MCP_Manager.mcp_enabled)},
         )
         return MCP_Manager.mcp_enabled
 
     @classmethod
-    def call_mcp_server(cls, name: str, tool_name: str, args: dict) -> Optional[dict[str, Any]]:
+    def call_mcp_server(
+        cls, name: str, tool_name: str, args: dict
+    ) -> Optional[dict[str, Any]]:
         """
         Call a specific MCP server by its name with additional arguments.
         :param name: Name of the server to call.
@@ -492,7 +553,7 @@ class MCP_Manager:
         debug_info(
             heading="MCP • TOOL_CALL",
             body=f"Calling tool '{tool_name}'",
-            metadata={"server": name, "args": args}
+            metadata={"server": name, "args": args},
         )
         proc = MCP_Manager.running_servers.get(name)
         if not proc:
@@ -504,23 +565,25 @@ class MCP_Manager:
                 "jsonrpc": "2.0",
                 "id": MCP_Manager.generate_response_id(),
                 "method": "tools/call",
-                "params": {"name": tool_name, "arguments": args}
+                "params": {"name": tool_name, "arguments": args},
             }
             proc.stdin.write(json.dumps(mcp_request) + "\n")
             proc.stdin.flush()
-            
+
             # 🔧 FIX: Robust response reading with encoding handling
             try:
                 response_line = proc.stdout.readline().strip()
                 if not response_line:
                     msg = f"No response from server '{name}'"
-                    debug_error(heading="MCP • CALL_ERROR", body=msg, metadata={"server": name})
+                    debug_error(
+                        heading="MCP • CALL_ERROR", body=msg, metadata={"server": name}
+                    )
                     return {"success": False, "error": msg}
-                
+
                 # Handle potential encoding issues with multiple fallback strategies
                 if isinstance(response_line, bytes):
                     # Try multiple encoding strategies for robust handling
-                    for encoding in ['utf-8', 'utf-8-sig', 'latin-1', 'cp1252']:
+                    for encoding in ["utf-8", "utf-8-sig", "latin-1", "cp1252"]:
                         try:
                             response_line = response_line.decode(encoding)
                             break
@@ -528,57 +591,75 @@ class MCP_Manager:
                             continue
                     else:
                         # Final fallback: decode with error replacement
-                        response_line = response_line.decode('utf-8', errors='replace')
+                        response_line = response_line.decode("utf-8", errors="replace")
                         debug_warning(
                             heading="MCP • CALL_ENCODING_FALLBACK",
                             body="Used encoding fallback with character replacement for tool call",
-                            metadata={"server": name, "tool": tool_name}
+                            metadata={"server": name, "tool": tool_name},
                         )
                 elif isinstance(response_line, str):
                     # Already a string, but might have encoding issues
                     try:
                         # Test if string is properly encoded by trying to encode/decode
-                        response_line.encode('utf-8')
+                        response_line.encode("utf-8")
                     except UnicodeEncodeError:
                         # Re-encode with error handling
-                        response_line = response_line.encode('utf-8', errors='replace').decode('utf-8')
+                        response_line = response_line.encode(
+                            "utf-8", errors="replace"
+                        ).decode("utf-8")
                         debug_warning(
                             heading="MCP • CALL_STRING_ENCODING_FIX",
                             body="Fixed string encoding issues in tool call response",
-                            metadata={"server": name, "tool": tool_name}
+                            metadata={"server": name, "tool": tool_name},
                         )
-                
+
             except UnicodeDecodeError as encoding_error:
                 msg = f"Encoding error reading response: {encoding_error}"
-                debug_error(heading="MCP • CALL_ENCODING_ERROR", body=msg, metadata={"server": name, "tool": tool_name})
+                debug_error(
+                    heading="MCP • CALL_ENCODING_ERROR",
+                    body=msg,
+                    metadata={"server": name, "tool": tool_name},
+                )
                 return {"success": False, "error": msg}
-            
+
             try:
                 json_response = json.loads(response_line)
                 if "error" in json_response:
                     msg = f"MCP server error: {json_response['error']}"
-                    debug_error(heading="MCP • TOOL_ERROR", body=msg, metadata={"server": name, "tool": tool_name})
+                    debug_error(
+                        heading="MCP • TOOL_ERROR",
+                        body=msg,
+                        metadata={"server": name, "tool": tool_name},
+                    )
                     return {"success": False, "error": msg}
                 if "result" in json_response:
                     debug_info(
                         heading="MCP • TOOL_SUCCESS",
                         body="Tool executed successfully",
-                        metadata={"server": name, "tool": tool_name}
+                        metadata={"server": name, "tool": tool_name},
                     )
                     return {"success": True, "data": json_response["result"]}
                 debug_warning(
                     heading="MCP • NO_RESULT_FIELD",
                     body="Response missing 'result' field; returning raw payload",
-                    metadata={"server": name, "tool": tool_name}
+                    metadata={"server": name, "tool": tool_name},
                 )
                 return {"success": True, "data": json_response}
             except json.JSONDecodeError as e:
                 msg = f"Invalid JSON response: {e}"
-                debug_error(heading="MCP • PARSE_ERROR", body=msg, metadata={"server": name, "tool": tool_name})
+                debug_error(
+                    heading="MCP • PARSE_ERROR",
+                    body=msg,
+                    metadata={"server": name, "tool": tool_name},
+                )
                 return {"success": False, "error": msg, "raw_response": response_line}
         except Exception as e:
             msg = f"Communication error: {e}"
-            debug_error(heading="MCP • COMM_ERROR", body=msg, metadata={"server": name, "tool": tool_name})
+            debug_error(
+                heading="MCP • COMM_ERROR",
+                body=msg,
+                metadata={"server": name, "tool": tool_name},
+            )
             return {"success": False, "error": msg}
 
     @classmethod
@@ -592,7 +673,7 @@ class MCP_Manager:
             debug_warning(
                 heading="MCP • STOP_IGNORED",
                 body="Stop requested for server not running",
-                metadata={"server": name}
+                metadata={"server": name},
             )
             return False
         proc = cls.running_servers[name]
@@ -604,14 +685,14 @@ class MCP_Manager:
             debug_info(
                 heading="MCP • SERVER_STOPPED",
                 body="Server stopped successfully",
-                metadata={"server": name}
+                metadata={"server": name},
             )
             return True
         except Exception as e:
             debug_error(
                 heading="MCP • STOP_ERROR",
                 body=f"Failed to stop server: {e}",
-                metadata={"server": name}
+                metadata={"server": name},
             )
             return False
 
@@ -625,7 +706,7 @@ class MCP_Manager:
             debug_info(
                 heading="MCP • STOP_ALL_SKIP",
                 body="No running servers to stop",
-                metadata={}
+                metadata={},
             )
             return True
         success = True
@@ -637,13 +718,21 @@ class MCP_Manager:
                 debug_error(
                     heading="MCP • STOP_ALL_ERROR",
                     body=f"Exception stopping '{server_name}': {e}",
-                    metadata={"server": server_name}
+                    metadata={"server": server_name},
                 )
                 success = False
         if success:
-            debug_info(heading="MCP • STOP_ALL_COMPLETE", body="All servers stopped", metadata={})
+            debug_info(
+                heading="MCP • STOP_ALL_COMPLETE",
+                body="All servers stopped",
+                metadata={},
+            )
         else:
-            debug_warning(heading="MCP • STOP_ALL_PARTIAL", body="Some servers failed to stop", metadata={})
+            debug_warning(
+                heading="MCP • STOP_ALL_PARTIAL",
+                body="Some servers failed to stop",
+                metadata={},
+            )
         return success
 
     @classmethod
@@ -656,7 +745,5 @@ class MCP_Manager:
             cls.stop_all_servers()
         except Exception as e:
             debug_error(
-                heading="MCP • CLEANUP_ERROR",
-                body=f"Cleanup failed: {e}",
-                metadata={}
+                heading="MCP • CLEANUP_ERROR", body=f"Cleanup failed: {e}", metadata={}
             )

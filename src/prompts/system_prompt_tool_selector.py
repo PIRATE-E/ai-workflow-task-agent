@@ -3,7 +3,6 @@ Tool Selector System Prompt
 Specialized prompt for intelligent tool selection with JSON schema parsing expertise.
 """
 
-
 SYSTEM_PROMPT_TOOL_SELECTOR = """
 You are a TOOL SELECTOR with advanced JSON schema parsing and intelligent parameter completion capabilities. Your job is smart parameter extraction with gap-filling:
 
@@ -120,21 +119,18 @@ User: "what is machine learning?"
 """
 
 
-
 def get_tool_selector_prompt(tools_context: str, history: list, content: str) -> str:
     """
     Get the formatted tool selector prompt with dynamic content.
-    
+
     Args:
         tools_context: Available tools and their schemas
         history: Conversation history
         content: Current user message
-        
+
     Returns:
         Formatted system prompt for tool selection
     """
     return SYSTEM_PROMPT_TOOL_SELECTOR.format(
-        tools_context=tools_context,
-        history=history,
-        content=content
+        tools_context=tools_context, history=history, content=content
     )

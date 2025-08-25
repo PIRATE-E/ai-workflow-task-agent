@@ -1,6 +1,7 @@
 """
 Test suite for ModelManager singleton behavior
 """
+
 import os
 import sys
 import threading
@@ -8,15 +9,14 @@ import unittest
 from unittest.mock import patch, MagicMock
 
 # Add paths for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'utils'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "utils"))
 
 from model_manager import ModelManager
 import config
 
 
 class TestModelManagerSingleton(unittest.TestCase):
-
     def setUp(self):
         """Reset singleton instance before each test"""
         ModelManager.instance = None
@@ -27,7 +27,7 @@ class TestModelManagerSingleton(unittest.TestCase):
         ModelManager.instance = None
         ModelManager.current_model = None
 
-    @patch('subprocess.Popen')
+    @patch("subprocess.Popen")
     def test_singleton_instance_creation(self, mock_popen):
         """Test that only one instance is created"""
         # Mock subprocess call
@@ -45,7 +45,7 @@ class TestModelManagerSingleton(unittest.TestCase):
         self.assertIs(manager1, manager2)
         self.assertEqual(id(manager1), id(manager2))
 
-    @patch('subprocess.Popen')
+    @patch("subprocess.Popen")
     def test_singleton_across_different_parameters(self, mock_popen):
         """Test singleton behavior with different initialization parameters"""
         mock_process = MagicMock()
@@ -57,7 +57,7 @@ class TestModelManagerSingleton(unittest.TestCase):
 
         self.assertIs(manager1, manager2)
 
-    @patch('subprocess.Popen')
+    @patch("subprocess.Popen")
     def test_thread_safety_basic(self, mock_popen):
         """Basic thread safety test for singleton creation"""
         mock_process = MagicMock()
@@ -90,5 +90,5 @@ class TestModelManagerSingleton(unittest.TestCase):
             self.assertIs(first_instance, instance)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

@@ -2,6 +2,4 @@
 
 from .structured_triple_prompt import Prompt as StructuredTriplePrompt
 
-__all__ = [
-    'StructuredTriplePrompt'
-]
+__all__ = ["StructuredTriplePrompt"]

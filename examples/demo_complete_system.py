@@ -18,7 +18,7 @@ def start_demo_server():
     server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
     try:
-        server.bind(('localhost', 5390))
+        server.bind(("localhost", 5390))
         server.listen(1)
         print("🚀 Demo log server started on localhost:5390")
 
@@ -42,6 +42,7 @@ def start_demo_server():
     finally:
         server.close()
 
+
 def simulate_lggraph_usage():
     """Simulate how lggraph.py uses the socket manager"""
     print("\n🤖 Simulating lggraph.py usage...")
@@ -56,6 +57,7 @@ def simulate_lggraph_usage():
         socket_con.send_error("[LGGRAPH] ✅ Response generated successfully")
     else:
         print("❌ lggraph.py: No socket connection available")
+
 
 def simulate_rag_usage():
     """Simulate how rag.py uses the socket manager"""
@@ -73,6 +75,7 @@ def simulate_rag_usage():
     else:
         print("❌ rag.py: No socket connection available")
 
+
 def demonstrate_singleton():
     """Demonstrate that both modules use the same connection"""
     print("\n🔍 Demonstrating singleton pattern...")
@@ -81,17 +84,22 @@ def demonstrate_singleton():
     lggraph_connection = socket_manager.get_socket_connection()
     rag_connection = socket_manager.get_socket_connection()
 
-    print(f"lggraph connection ID: {id(lggraph_connection) if lggraph_connection else 'None'}")
+    print(
+        f"lggraph connection ID: {id(lggraph_connection) if lggraph_connection else 'None'}"
+    )
     print(f"rag connection ID: {id(rag_connection) if rag_connection else 'None'}")
 
     if lggraph_connection and rag_connection:
         if lggraph_connection is rag_connection:
             print("✅ Both modules use the SAME connection object!")
-            lggraph_connection.send_error("[SINGLETON] 🎯 This message proves both modules share the same connection!")
+            lggraph_connection.send_error(
+                "[SINGLETON] 🎯 This message proves both modules share the same connection!"
+            )
         else:
             print("❌ Different connection objects (this shouldn't happen)")
     else:
         print("⚠️ No connections available")
+
 
 def main():
     """Run the complete system demonstration"""
@@ -125,6 +133,7 @@ def main():
 
     # Wait for server to finish
     time.sleep(2)
+
 
 if __name__ == "__main__":
     main()

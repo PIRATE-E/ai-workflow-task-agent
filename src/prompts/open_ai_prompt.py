@@ -19,11 +19,11 @@ class Prompt:
     def get_json_extraction_prompts(self) -> tuple[str, str]:
         """
         Returns system and user prompts for extracting JSON from reasoning content.
-        
+
         Returns:
             tuple[str, str]: (system_prompt, user_prompt_template)
         """
-        
+
         SYSTEM_PROMPT = (
             "You are a JSON extraction specialist. Your only job is to find and extract valid JSON from reasoning content. "
             "\n\n"
@@ -36,17 +36,17 @@ class Prompt:
             "6. If no valid JSON found, return: {}\n"
             "\n"
             "EXAMPLES:\n"
-            "Input: 'Let me think... {\"tool_name\": \"search\", \"params\": {\"q\": \"test\"}} ...done'\n"
-            "Output: {\"tool_name\": \"search\", \"params\": {\"q\": \"test\"}}\n"
+            'Input: \'Let me think... {"tool_name": "search", "params": {"q": "test"}} ...done\'\n'
+            'Output: {"tool_name": "search", "params": {"q": "test"}}\n'
             "\n"
             "Input: 'Analysis shows no structured data here'\n"
             "Output: {}"
         )
-        
+
         USER_PROMPT = (
             "Extract the JSON from this reasoning content:\n\n{reasoning_content}"
         )
-        
+
         return SYSTEM_PROMPT, USER_PROMPT
 
 
@@ -54,7 +54,7 @@ class Prompt:
 def get_extracted_json_prompt() -> str:
     """
     Legacy function for backward compatibility.
-    
+
     Returns:
         str: Standard JSON extraction prompt
     """

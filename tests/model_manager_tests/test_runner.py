@@ -1,13 +1,14 @@
 """
 Test runner for all ModelManager tests
 """
+
 import os
 import sys
 import unittest
 
 # Add the parent directory to the path so we can import model_manager
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'utils'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "utils"))
 
 # Import all test modules
 from tests.model_manager_tests.test_singleton_behavior import TestModelManagerSingleton
@@ -27,7 +28,7 @@ def create_test_suite():
         TestModelManagerLoading,
         TestModelManagerIntegration,
         TestModelManagerErrorHandling,
-        TestModelManagerThreadSafety
+        TestModelManagerThreadSafety,
     ]
 
     for test_class in test_classes:
@@ -40,15 +41,17 @@ def create_test_suite():
 def run_specific_test_class(test_class_name):
     """Run a specific test class"""
     test_classes = {
-        'singleton': TestModelManagerSingleton,
-        'loading': TestModelManagerLoading,
-        'integration': TestModelManagerIntegration,
-        'error': TestModelManagerErrorHandling,
-        'thread': TestModelManagerThreadSafety
+        "singleton": TestModelManagerSingleton,
+        "loading": TestModelManagerLoading,
+        "integration": TestModelManagerIntegration,
+        "error": TestModelManagerErrorHandling,
+        "thread": TestModelManagerThreadSafety,
     }
 
     if test_class_name.lower() in test_classes:
-        suite = unittest.TestLoader().loadTestsFromTestCase(test_classes[test_class_name.lower()])
+        suite = unittest.TestLoader().loadTestsFromTestCase(
+            test_classes[test_class_name.lower()]
+        )
         runner = unittest.TextTestRunner(verbosity=2)
         return runner.run(suite)
     else:
@@ -75,5 +78,5 @@ def main():
         sys.exit(0)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

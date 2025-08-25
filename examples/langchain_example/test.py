@@ -54,24 +54,20 @@ agent_llm = initialize_agent(
 
 try:
     user_query = input("enter your query: ")
-    result = agent_llm.invoke(
-        {
-            "input": user_query.strip()
-        }
-    )
+    result = agent_llm.invoke({"input": user_query.strip()})
 
     # Print the final answer nicely
     print("\nFinal Answer:")
-    if 'output' in result:
-        print(result['output'])
+    if "output" in result:
+        print(result["output"])
     else:
         print("No clear answer was found, but here's what I know:")
         print(result)
 
     # Print intermediate steps if available
-    if 'intermediate_steps' in result and result['intermediate_steps']:
+    if "intermediate_steps" in result and result["intermediate_steps"]:
         print("\nSearch Steps:")
-        for step in result['intermediate_steps']:
+        for step in result["intermediate_steps"]:
             print(f"Search Query: {step[0].tool_input}")
             print(f"Result: {step[1][:200]}...")  # Only print first 200 chars
             print("---")

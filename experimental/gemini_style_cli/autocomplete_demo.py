@@ -15,26 +15,29 @@ from src.config import settings
 # For cross-platform keyboard input
 try:
     import msvcrt  # Windows
+
     WINDOWS = True
 except ImportError:
     import termios
     import tty
+
     WINDOWS = False
 
 # Command registry - like Gemini CLI commands
 COMMANDS = {
-    '/help': 'Show help information',
-    '/search': 'Search the web for information',
-    '/translate': 'Translate text to another language',
-    '/rag': 'Search in knowledge base',
-    '/clear': 'Clear the conversation',
-    '/history': 'Show conversation history',
-    '/exit': 'Exit the application',
-    '/hello': 'Say hello',
-    '/health': 'Check system health',
-    '/home': 'Go to home directory',
-    '/host': 'Show host information'
+    "/help": "Show help information",
+    "/search": "Search the web for information",
+    "/translate": "Translate text to another language",
+    "/rag": "Search in knowledge base",
+    "/clear": "Clear the conversation",
+    "/history": "Show conversation history",
+    "/exit": "Exit the application",
+    "/hello": "Say hello",
+    "/health": "Check system health",
+    "/home": "Go to home directory",
+    "/host": "Show host information",
 }
+
 
 class AutoCompleteInput:
     def __init__(self):
@@ -45,7 +48,7 @@ class AutoCompleteInput:
 
     def get_suggestions(self, text):
         """Get matching commands based on current input"""
-        if not text.startswith('/'):
+        if not text.startswith("/"):
             return []
 
         matches = []
@@ -74,7 +77,7 @@ class AutoCompleteInput:
         # Add grayed suggestion
         best_suggestion = self.get_best_suggestion()
         if best_suggestion and best_suggestion.startswith(self.current_input):
-            remaining = best_suggestion[len(self.current_input):]
+            remaining = best_suggestion[len(self.current_input) :]
             display_text.append(remaining, style="dim white")
 
         # Add cursor
@@ -97,14 +100,17 @@ class AutoCompleteInput:
             suggestions_text.append(f" - {description}\n", style="dim white")
 
         if len(self.suggestions) > 5:
-            suggestions_text.append(f"  ... and {len(self.suggestions) - 5} more", style="dim white")
+            suggestions_text.append(
+                f"  ... and {len(self.suggestions) - 5} more", style="dim white"
+            )
 
         return Panel(suggestions_text, title="Suggestions", border_style="blue")
+
 
 def get_char():
     """Get a single character from stdin without pressing Enter"""
     if WINDOWS:
-        return msvcrt.getch().decode('utf-8', errors='ignore')
+        return msvcrt.getch().decode("utf-8", errors="ignore")
     else:
         fd = sys.stdin.fileno()
         old_settings = termios.tcgetattr(fd)
@@ -115,20 +121,23 @@ def get_char():
             termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
         return char
 
+
 def main():
     console = settings.console
-    console.print(Panel.fit(
-        "[bold magenta]Auto-Complete Demo[/bold magenta]\n"
-        "[cyan]Type commands starting with '/' to see suggestions[/cyan]\n"
-        "[yellow]Controls:[/yellow]\n"
-        "  • Type: See real-time suggestions\n"
-        "  • Tab: Complete suggestion\n"
-        "  • Enter: Execute command\n"
-        "  • Backspace: Delete character\n"
-        "  • Ctrl+C: Exit\n",
-        title="Welcome",
-        border_style="green"
-    ))
+    console.print(
+        Panel.fit(
+            "[bold magenta]Auto-Complete Demo[/bold magenta]\n"
+            "[cyan]Type commands starting with '/' to see suggestions[/cyan]\n"
+            "[yellow]Controls:[/yellow]\n"
+            "  • Type: See real-time suggestions\n"
+            "  • Tab: Complete suggestion\n"
+            "  • Enter: Execute command\n"
+            "  • Backspace: Delete character\n"
+            "  • Ctrl+C: Exit\n",
+            title="Welcome",
+            border_style="green",
+        )
+    )
 
     autocomplete = AutoCompleteInput()
 
@@ -139,23 +148,34 @@ def main():
             layout.split_column(
                 Layout(name="input", size=3),
                 Layout(name="suggestions", size=10),
-                Layout(name="output", size=5)
+                Layout(name="output", size=5),
             )
 
             # Update suggestions based on current input
-            autocomplete.suggestions = autocomplete.get_suggestions(autocomplete.current_input)
+            autocomplete.suggestions = autocomplete.get_suggestions(
+                autocomplete.current_input
+            )
 
             # Create display components
-            input_display = Panel(autocomplete.create_display(), title="Input", border_style="cyan")
+            input_display = Panel(
+                autocomplete.create_display(), title="Input", border_style="cyan"
+            )
             suggestions_display = autocomplete.create_suggestions_panel()
 
             # Status info
             status_text = Text()
             if autocomplete.current_input:
-                status_text.append(f"Input: '{autocomplete.current_input}' | ", style="white")
-                status_text.append(f"Suggestions: {len(autocomplete.suggestions)}", style="green")
+                status_text.append(
+                    f"Input: '{autocomplete.current_input}' | ", style="white"
+                )
+                status_text.append(
+                    f"Suggestions: {len(autocomplete.suggestions)}", style="green"
+                )
             else:
-                status_text.append("Start typing a command with '/' to see suggestions...", style="dim white")
+                status_text.append(
+                    "Start typing a command with '/' to see suggestions...",
+                    style="dim white",
+                )
 
             status_panel = Panel(status_text, title="Status", border_style="yellow")
 
@@ -178,9 +198,13 @@ def main():
                     break
                 elif ord(char) == 13:  # Enter
                     if autocomplete.current_input:
-                        console.print(f"\n[green]Executed:[/green] {autocomplete.current_input}")
+                        console.print(
+                            f"\n[green]Executed:[/green] {autocomplete.current_input}"
+                        )
                         if autocomplete.current_input in COMMANDS:
-                            console.print(f"[blue]Description:[/blue] {COMMANDS[autocomplete.current_input]}")
+                            console.print(
+                                f"[blue]Description:[/blue] {COMMANDS[autocomplete.current_input]}"
+                            )
                         console.print("\n[yellow]Press any key to continue...[/yellow]")
                         get_char()
                         autocomplete.current_input = ""
@@ -204,6 +228,7 @@ def main():
         pass
 
     console.print("\n[green]Thanks for trying the auto-complete demo![/green]")
+
 
 if __name__ == "__main__":
     main()

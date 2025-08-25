@@ -1,9 +1,9 @@
 class Prompt:
-        """
-        Enhanced prompt for structured spreadsheet data → knowledge graph conversion
-        """
+    """
+    Enhanced prompt for structured spreadsheet data → knowledge graph conversion
+    """
 
-        STRUCTURED_DATA_TRIPLE_PROMPT = """
+    STRUCTURED_DATA_TRIPLE_PROMPT = """
         You are a specialized knowledge graph extraction system for STRUCTURED SPREADSHEET DATA.
     
         **IMPORTANT: This is NOT unstructured text - this is structured tabular data with defined columns and relationships.**
@@ -57,21 +57,21 @@ class Prompt:
         **STRUCTURED DATA TO ANALYZE:**
         """
 
-        @staticmethod
-        def create_structured_prompt(schema_headers, record_data) -> tuple[str, str]:
-            """
-            Create a schema-aware prompt for structured data
-            """
+    @staticmethod
+    def create_structured_prompt(schema_headers, record_data) -> tuple[str, str]:
+        """
+        Create a schema-aware prompt for structured data
+        """
 
-            # Add schema context
-            prompt = f"\n**SCHEMA:** {', '.join(schema_headers)}\n"
+        # Add schema context
+        prompt = f"\n**SCHEMA:** {', '.join(schema_headers)}\n"
 
-            # Add record data
-            prompt += f"**RECORD DATA:**\n"
-            for header, value in record_data.items():
-                if value:
-                    prompt += f"- {header}: {value}\n"
+        # Add record data
+        prompt += "**RECORD DATA:**\n"
+        for header, value in record_data.items():
+            if value:
+                prompt += f"- {header}: {value}\n"
 
-            prompt += "\n**Extract meaningful triples that represent the relationships in this structured record:**"
+        prompt += "\n**Extract meaningful triples that represent the relationships in this structured record:**"
 
-            return Prompt.STRUCTURED_DATA_TRIPLE_PROMPT, prompt
+        return Prompt.STRUCTURED_DATA_TRIPLE_PROMPT, prompt

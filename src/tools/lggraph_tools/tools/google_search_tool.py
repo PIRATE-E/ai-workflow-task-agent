@@ -2,11 +2,12 @@ from typing import Any
 
 
 # this is tools for making searches on Google using google search api
-def search_google_tool(query : str) -> Any | None:
+def search_google_tool(query: str) -> Any | None:
     # make simple request to google search api
     import requests
     from dotenv import load_dotenv
     import os
+
     load_dotenv()
 
     api_key = os.getenv("GOOGLE_SEARCH_API_KEY")
@@ -31,7 +32,8 @@ def search_google_tool(query : str) -> Any | None:
         print(f"An error occurred while making the request: {e}")
         return None
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     # Example usage of the search_tool function
     query = "narendra modi"
     print(f"Search initiated for query: {query} : result: {search_google_tool(query)}")

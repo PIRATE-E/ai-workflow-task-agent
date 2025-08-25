@@ -8,6 +8,7 @@ import time
 
 from rich.panel import Panel
 from rich.text import Text
+
 # Add project imports
 from utils.socket_manager import socket_manager
 
@@ -18,11 +19,13 @@ def demo_automatic_logging():
     """Demonstrate automatic log server startup and usage"""
     console = settings.console
 
-    console.print(Panel.fit(
-        Text("🚀 Automatic Log Server Demo", style="bold magenta"),
-        title="LangGraph Chatbot - Subprocess Logging",
-        style="bold blue"
-    ))
+    console.print(
+        Panel.fit(
+            Text("🚀 Automatic Log Server Demo", style="bold magenta"),
+            title="LangGraph Chatbot - Subprocess Logging",
+            style="bold blue",
+        )
+    )
 
     console.print("\n📋 This demo shows how your lggraph.py will now work:")
     console.print("   1. ✅ Automatically starts log server when needed")
@@ -55,11 +58,13 @@ def demo_automatic_logging():
             "⚠️ Warning: Large document detected, this may take time",
             "🔍 Performing RAG search...",
             "💾 Saving results to knowledge graph...",
-            "✅ Operation completed successfully"
+            "✅ Operation completed successfully",
         ]
 
         for i, message in enumerate(demo_messages, 1):
-            console.print(f"   Sending message {i}/{len(demo_messages)}: {message[:40]}...")
+            console.print(
+                f"   Sending message {i}/{len(demo_messages)}: {message[:40]}..."
+            )
             socket_manager.send_error(f"[DEMO {i:02d}] {message}")
             time.sleep(1)  # Realistic delay between operations
 
@@ -78,7 +83,7 @@ def demo_automatic_logging():
             "ConnectionError: Failed to connect to Neo4j database",
             "TimeoutError: RAG search timed out after 30 seconds",
             "ValueError: Invalid JSON format in API response",
-            "FileNotFoundError: Configuration file not found"
+            "FileNotFoundError: Configuration file not found",
         ]
 
         for i, error in enumerate(error_scenarios, 1):
@@ -97,7 +102,7 @@ def demo_automatic_logging():
             ("Tool Selection", "Selected tool: GoogleSearch"),
             ("Web Search", "Searching for: machine learning basics"),
             ("Response Generation", "Generating response from search results"),
-            ("User Output", "Response delivered to user successfully")
+            ("User Output", "Response delivered to user successfully"),
         ]
 
         for step_name, step_message in workflow_steps:
@@ -109,10 +114,13 @@ def demo_automatic_logging():
 
     else:
         console.print("   ❌ Failed to establish socket connection")
-        console.print("   This might happen if there are permission issues or port conflicts")
+        console.print(
+            "   This might happen if there are permission issues or port conflicts"
+        )
         return False
 
     return True
+
 
 def demo_cleanup():
     """Demonstrate proper cleanup"""
@@ -132,16 +140,19 @@ def demo_cleanup():
     if not socket_manager.is_log_server_running():
         console.print("   ✅ Log server subprocess stopped cleanly")
     else:
-        console.print("   ⚠️ Log server subprocess still running (may need manual cleanup)")
+        console.print(
+            "   ⚠️ Log server subprocess still running (may need manual cleanup)"
+        )
 
     console.print("   ✅ Cleanup demonstration complete")
+
 
 def show_integration_example():
     """Show how this integrates with lggraph.py"""
     console = settings.console
-    console.print("\n" + "="*80)
+    console.print("\n" + "=" * 80)
     console.print("📖 HOW THIS INTEGRATES WITH YOUR LGGRAPH.PY")
-    console.print("="*80)
+    console.print("=" * 80)
 
     console.print("\n🔧 Your lggraph.py now works like this:")
 
@@ -180,6 +191,7 @@ socket_manager.close_connection()
     console.print("   🧹 Clean - proper resource cleanup")
     console.print("   🛡️ Robust - graceful fallback if logging fails")
     console.print("   👥 User-friendly - works out of the box")
+
 
 def main():
     """Main demonstration function"""
@@ -221,6 +233,7 @@ def main():
             socket_manager.close_connection()
         except:
             pass
+
 
 if __name__ == "__main__":
     main()

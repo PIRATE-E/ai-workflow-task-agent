@@ -17,6 +17,7 @@ Backward Compatibility:
     sys.modules so those imports succeed without reintroducing the old
     heavy eager import pattern.
 """
+
 from __future__ import annotations
 
 from importlib import import_module
@@ -82,4 +83,4 @@ def __getattr__(name: str) -> ModuleType:  # noqa: D401
 
 
 def __dir__():  # pragma: no cover
-    return sorted(set(__all__ + [k for k in globals().keys() if not k.startswith('_')]))
+    return sorted(set(__all__ + [k for k in globals().keys() if not k.startswith("_")]))

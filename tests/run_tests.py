@@ -10,13 +10,14 @@ import sys
 import time
 
 # Add the project root to the Python path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+
 
 def run_test_category(category_name, test_files):
     """Run all tests in a category"""
-    print(f"\n{'='*80}")
+    print(f"\n{'=' * 80}")
     print(f"🚀 RUNNING CATEGORY: {category_name}")
-    print(f"{'='*80}")
+    print(f"{'=' * 80}")
 
     category_results = []
 
@@ -28,9 +29,9 @@ def run_test_category(category_name, test_files):
             test_path = os.path.join(os.path.dirname(__file__), test_file)
 
             # Run the test file
-            result = subprocess.run([sys.executable, test_path],
-                                  capture_output=False,
-                                  text=True)
+            result = subprocess.run(
+                [sys.executable, test_path], capture_output=False, text=True
+            )
 
             if result.returncode == 0:
                 print(f"✅ {test_file} - PASSED")
@@ -47,6 +48,7 @@ def run_test_category(category_name, test_files):
 
     return category_results
 
+
 def show_instructions():
     """Show instructions for running tests"""
     print("📋 TEST SUITE INSTRUCTIONS")
@@ -59,6 +61,7 @@ def show_instructions():
     print("4. Ensure ENABLE_SOCKET_LOGGING=true in config")
     print()
 
+
 def main():
     """Main test runner"""
     print("=" * 80)
@@ -69,15 +72,13 @@ def main():
 
     # Define test categories and their files
     test_categories = {
-        "Unit Tests": [
-            "unit/test_class_examples.py"
-        ],
+        "Unit Tests": ["unit/test_class_examples.py"],
         "Error Handling Tests": [
             "error_handling/test_socket_connection.py",
             "error_handling/test_socket_manager.py",
             "error_handling/test_logging_system.py",
-            "error_handling/test_subprocess_logging.py"
-        ]
+            "error_handling/test_subprocess_logging.py",
+        ],
     }
 
     print("🎯 Available test categories:")
@@ -92,19 +93,21 @@ def main():
 
     choice = input("\n🤔 What would you like to run? (A/1/2/Q): ").strip().upper()
 
-    if choice == 'Q':
+    if choice == "Q":
         print("👋 Goodbye!")
         return
 
     # Determine which categories to run
     categories_to_run = {}
 
-    if choice == 'A':
+    if choice == "A":
         categories_to_run = test_categories
-    elif choice == '1':
+    elif choice == "1":
         categories_to_run = {"Unit Tests": test_categories["Unit Tests"]}
-    elif choice == '2':
-        categories_to_run = {"Error Handling Tests": test_categories["Error Handling Tests"]}
+    elif choice == "2":
+        categories_to_run = {
+            "Error Handling Tests": test_categories["Error Handling Tests"]
+        }
         print("\n⚠️  IMPORTANT: Make sure log server is running!")
         print("   Command: python utils/error_transfer.py")
         input("   Press Enter when ready (or Ctrl+C to cancel)...")
@@ -156,7 +159,7 @@ def main():
     print(f"\n🎯 OVERALL RESULTS:")
     print(f"   ✅ Total Passed: {total_passed}/{total_tests} tests")
     print(f"   ⏱️  Total Duration: {duration:.1f} seconds")
-    print(f"   📊 Success Rate: {(total_passed/total_tests)*100:.1f}%")
+    print(f"   📊 Success Rate: {(total_passed / total_tests) * 100:.1f}%")
 
     if total_passed == total_tests:
         print("\n🎉 ALL TESTS PASSED! 🎉")
@@ -175,6 +178,7 @@ def main():
         print("   🔍 Check error messages above")
         print("   📖 Review documentation for troubleshooting")
 
+
 if __name__ == "__main__":
     try:
         main()
@@ -183,4 +187,5 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"\n\n❌ Test suite crashed: {e}")
         import traceback
+
         traceback.print_exc()

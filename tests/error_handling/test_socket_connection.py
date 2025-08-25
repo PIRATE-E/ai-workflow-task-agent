@@ -10,10 +10,11 @@ import sys
 import time
 
 # Add the project root to the Python path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
 from utils.error_transfer import SocketCon
 import config
+
 
 def test_socket_connection_basic():
     """Test basic socket connection functionality"""
@@ -55,6 +56,7 @@ def test_socket_connection_basic():
     except Exception as e:
         print(f"❌ Connection failed: {e}")
         return False
+
 
 def test_socket_error_scenarios():
     """Test various socket error scenarios"""
@@ -102,6 +104,7 @@ def test_socket_error_scenarios():
 
     return True
 
+
 def test_concurrent_connections():
     """Test multiple concurrent connections"""
     print("\n🧪 Testing Concurrent Connections...")
@@ -138,6 +141,7 @@ def test_concurrent_connections():
     print(f"📊 Successful connections: {success_count}/3")
     return success_count > 0
 
+
 def test_message_formats():
     """Test different message formats"""
     print("\n🧪 Testing Message Formats...")
@@ -158,8 +162,8 @@ def test_message_formats():
             "Message\nwith\nnewlines",
             "Message\twith\ttabs",
             "",  # Empty message
-            "JSON-like: {\"key\": \"value\", \"number\": 42}",
-            "XML-like: <tag>content</tag>"
+            'JSON-like: {"key": "value", "number": 42}',
+            "XML-like: <tag>content</tag>",
         ]
 
         success_count = 0
@@ -181,6 +185,7 @@ def test_message_formats():
         print(f"❌ Message format testing failed: {e}")
         return False
 
+
 def run_socket_tests():
     """Run all socket connection tests"""
     print("=" * 70)
@@ -196,13 +201,13 @@ def run_socket_tests():
         ("Basic Socket Connection", test_socket_connection_basic),
         ("Socket Error Scenarios", test_socket_error_scenarios),
         ("Concurrent Connections", test_concurrent_connections),
-        ("Message Formats", test_message_formats)
+        ("Message Formats", test_message_formats),
     ]
 
     results = []
 
     for test_name, test_func in tests:
-        print(f"\n{'='*20} {test_name} {'='*20}")
+        print(f"\n{'=' * 20} {test_name} {'=' * 20}")
         try:
             result = test_func()
             results.append((test_name, result))
@@ -232,6 +237,7 @@ def run_socket_tests():
         print("   - Log server not running")
         print("   - Incorrect host/port in config")
         print("   - Firewall blocking connections")
+
 
 if __name__ == "__main__":
     run_socket_tests()

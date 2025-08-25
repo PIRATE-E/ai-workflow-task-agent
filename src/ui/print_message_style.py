@@ -5,7 +5,7 @@ from rich.panel import Panel
 from src.config import settings
 
 
-def print_message(msg : str, sender="user"):
+def print_message(msg: str, sender="user"):
     console = settings.console
     if sender == "user":
         icon = "👤"
@@ -23,11 +23,11 @@ def print_message(msg : str, sender="user"):
         icon = ""
         style = ""
         label = ""
-    
+
     # Fix: Handle newlines properly by using Rich's built-in newline support
     # Instead of Text(), use a simple string which Rich handles newlines correctly
     formatted_message = f"{icon} {label} {msg.strip()}"
-    
+
     panel = Panel(
         Align.left(formatted_message),
         border_style=style,

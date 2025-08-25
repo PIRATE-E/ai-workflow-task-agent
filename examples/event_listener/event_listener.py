@@ -8,9 +8,9 @@ from typing import Any, Dict, List, Callable
 class EventListener:
     """A simple event listener system to handle different types of events."""
 
-
     class EventType(Enum):
         """Enum for different event types."""
+
         VARIABLE_CHANGED = "variable_changed"
         STATUS_CHANGED = "status_changed"
         ERROR_OCCURRED = "error_occurred"
@@ -18,14 +18,14 @@ class EventListener:
     @dataclass
     class EventData:
         """Data structure for event data."""
-        event_type: 'EventListener.EventType'
+
+        event_type: "EventListener.EventType"
         source_class: type
         variable_name: str = None
         old_value: Any = None
         new_value: Any = None
         time_stamp: float = None
         meta_data: Dict[str, Any] = None
-
 
     class EventManager:
         """Manages event listeners and dispatches events."""
@@ -40,19 +40,19 @@ class EventListener:
             return cls._instance
 
         def __init__(self):
-            if not hasattr(self, 'initialized'):
+            if not hasattr(self, "initialized"):
                 self.initialized = True
-                self.listeners : Dict[EventListener.EventType, List[Callable]]= {}
-                self.listener_priority : Dict[EventListener.EventType, int] = {}
-                self.listener_filter : Dict[Callable, Callable] = {}
+                self.listeners: Dict[EventListener.EventType, List[Callable]] = {}
+                self.listener_priority: Dict[EventListener.EventType, int] = {}
+                self.listener_filter: Dict[Callable, Callable] = {}
 
-
-
-        def register_listener(self,
-                              event_type: 'EventListener.EventType',
-                              listener: Callable,
-                              priority: int = 0,
-                              filter_func: Callable = None) -> None:
+        def register_listener(
+            self,
+            event_type: "EventListener.EventType",
+            listener: Callable,
+            priority: int = 0,
+            filter_func: Callable = None,
+        ) -> None:
             """
             Registers a listener for a specific event type.
 
@@ -79,10 +79,12 @@ class EventListener:
 
                 # Sort listeners by priority
                 self.listeners[event_type].sort(
-                    key=lambda l: self.listener_priority.get(l, 0),
-                    reverse=True
+                    key=lambda l: self.listener_priority.get(l, 0), reverse=True
                 )
-        def unregister_listener(self, event_type: 'EventListener.EventType', listener: Callable) -> None:
+
+        def unregister_listener(
+            self, event_type: "EventListener.EventType", listener: Callable
+        ) -> None:
             """
             Unregisters a listener for a specific event type.
 
@@ -94,13 +96,16 @@ class EventListener:
                 None
             """
             with self._lock:
-                if event_type in self.listeners and listener in self.listeners[event_type]:
+                if (
+                    event_type in self.listeners
+                    and listener in self.listeners[event_type]
+                ):
                     self.listeners[event_type].remove(listener)
                     # Cleanup priority and filter data
                     self.listener_priority.pop(event_type, None)
                     self.listener_filter.pop(listener, None)
 
-        def emit_event(self, event_data: 'EventListener.EventData') -> None:
+        def emit_event(self, event_data: "EventListener.EventData") -> None:
             """
             Emits an event to all registered listeners.
 
@@ -126,7 +131,7 @@ class EventListener:
                 except Exception as e:
                     print(f"Error in event listener {listener.__name__}: {e}")
 
-        def emit_async(self, event_data: 'EventListener.EventData') -> None:
+        def emit_async(self, event_data: "EventListener.EventData") -> None:
             """
             Emits an event asynchronously (non-blocking).
 

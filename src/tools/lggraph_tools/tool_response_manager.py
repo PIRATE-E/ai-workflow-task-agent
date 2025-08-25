@@ -11,8 +11,9 @@ from src.config import settings
 
 class ToolResponseManager:
     instance = None
-    _tool_response: Optional[
-        List[settings.HumanMessage | settings.AIMessage]] = None  # because the response always be human or AI message list
+    _tool_response: Optional[List[settings.HumanMessage | settings.AIMessage]] = (
+        None  # because the response always be human or AI message list
+    )
 
     def __new__(cls):
         """
@@ -34,7 +35,9 @@ class ToolResponseManager:
         """
         return self._tool_response
 
-    def set_response(self, new_response: list[settings.HumanMessage | settings.AIMessage]):
+    def set_response(
+        self, new_response: list[settings.HumanMessage | settings.AIMessage]
+    ):
         """
         Set a new response for the tool.
         :param new_response: The new response to set for the tool.
@@ -42,14 +45,17 @@ class ToolResponseManager:
         # ✅ PROFESSIONAL ERROR HANDLING: Check for None and empty inputs
         if new_response is None:
             raise ValueError("new_response cannot be None")
-        
+
         if not new_response:
             raise ValueError("new_response cannot be empty")
-        
+
         # ✅ TYPE VALIDATION: Ensure all items are correct message types
-        if not all(isinstance(msg, (settings.HumanMessage, settings.AIMessage)) for msg in new_response):
+        if not all(
+            isinstance(msg, (settings.HumanMessage, settings.AIMessage))
+            for msg in new_response
+        ):
             raise TypeError("All messages must be HumanMessage or AIMessage instances")
-        
+
         if self._tool_response is not None:
             self._tool_response.extend(new_response)
         else:
@@ -64,16 +70,25 @@ class ToolResponseManager:
         """
         if self._tool_response is None:
             self._tool_response = []
-        message_class = settings.HumanMessage if type == 0 else settings.AIMessage if type == 1 else None
+        message_class = (
+            settings.HumanMessage
+            if type == 0
+            else settings.AIMessage
+            if type == 1
+            else None
+        )
         if message_class is None:
-            raise ValueError("Invalid type specified. Use 0 for HumanMessage or 1 for AIMessage.")
+            raise ValueError(
+                "Invalid type specified. Use 0 for HumanMessage or 1 for AIMessage."
+            )
         self._tool_response.extend(
             message_class(
                 content=msg.content,
                 additional_kwargs=msg.additional_kwargs,
                 response_metadata=getattr(msg, "response_metadata", {}),
-                id=getattr(msg, "id", None)
-            ) for msg in new_message
+                id=getattr(msg, "id", None),
+            )
+            for msg in new_message
         )
 
     def clear_response(self):

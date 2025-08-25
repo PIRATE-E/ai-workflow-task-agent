@@ -14,18 +14,19 @@ from src.config import settings
 
 # Command registry - exactly like Gemini CLI
 COMMANDS = {
-    '/help': 'Show help information',
-    '/search': 'Search the web for information',
-    '/translate': 'Translate text to another language',
-    '/rag': 'Search in knowledge base',
-    '/clear': 'Clear the conversation',
-    '/history': 'Show conversation history',
-    '/exit': 'Exit the application',
-    '/hello': 'Say hello to the user',
-    '/health': 'Check system health status',
-    '/home': 'Navigate to home directory',
-    '/host': 'Show host information'
+    "/help": "Show help information",
+    "/search": "Search the web for information",
+    "/translate": "Translate text to another language",
+    "/rag": "Search in knowledge base",
+    "/clear": "Clear the conversation",
+    "/history": "Show conversation history",
+    "/exit": "Exit the application",
+    "/hello": "Say hello to the user",
+    "/health": "Check system health status",
+    "/home": "Navigate to home directory",
+    "/host": "Show host information",
 }
+
 
 class SmartCompleter(Completer):
     """Custom completer that shows descriptions and handles smart matching"""
@@ -34,31 +35,36 @@ class SmartCompleter(Completer):
         text = document.text_before_cursor
 
         # Only suggest commands that start with '/'
-        if text.startswith('/'):
+        if text.startswith("/"):
             for command, description in COMMANDS.items():
                 if command.startswith(text.lower()):
                     # Calculate how much to complete
-                    completion_text = command[len(text):]
+                    completion_text = command[len(text) :]
 
                     yield Completion(
                         completion_text,
                         display=f"{command} - {description}",
-                        start_position=0
+                        start_position=0,
                     )
+
 
 def print_banner():
     """Print welcome banner"""
     console = settings.console
     banner_text = Text()
     banner_text.append("🚀 Auto-Complete Demo\n", style="bold magenta")
-    banner_text.append("Type commands starting with '/' to see magic happen!\n\n", style="cyan")
+    banner_text.append(
+        "Type commands starting with '/' to see magic happen!\n\n", style="cyan"
+    )
     banner_text.append("Available commands:\n", style="yellow")
 
     for cmd, desc in list(COMMANDS.items())[:5]:
         banner_text.append(f"  {cmd}", style="bold green")
         banner_text.append(f" - {desc}\n", style="white")
 
-    banner_text.append(f"  ... and {len(COMMANDS) - 5} more commands\n\n", style="dim white")
+    banner_text.append(
+        f"  ... and {len(COMMANDS) - 5} more commands\n\n", style="dim white"
+    )
     banner_text.append("✨ Features:\n", style="yellow")
     banner_text.append("  • Real-time suggestions as you type\n", style="white")
     banner_text.append("  • Tab to complete\n", style="white")
@@ -66,6 +72,7 @@ def print_banner():
     banner_text.append("  • Command descriptions\n", style="white")
 
     console.print(Panel(banner_text, title="Welcome", border_style="blue"))
+
 
 def execute_command(command_input):
     """Execute the entered command"""
@@ -84,11 +91,11 @@ def execute_command(command_input):
             console.print(f"[yellow]Arguments:[/yellow] {' '.join(args)}")
 
         # Simulate command execution
-        if command == '/exit':
+        if command == "/exit":
             return False
-        elif command == '/help':
+        elif command == "/help":
             show_help()
-        elif command == '/clear':
+        elif command == "/clear":
             console.clear()
         else:
             console.print(f"[dim]Command '{command}' executed successfully![/dim]")
@@ -97,6 +104,7 @@ def execute_command(command_input):
         console.print("[yellow]💡 Tip:[/yellow] Type '/' to see available commands")
 
     return True
+
 
 def show_help():
     """Show help information"""
@@ -109,6 +117,7 @@ def show_help():
         help_text.append(f" - {desc}\n", style="white")
 
     console.print(Panel(help_text, title="Help", border_style="green"))
+
 
 def main():
     """Main demo loop"""
@@ -148,6 +157,7 @@ def main():
             break
         except EOFError:
             break
+
 
 if __name__ == "__main__":
     # Install required packages

@@ -7,6 +7,7 @@ from typing import Any
 # Optional google.generativeai dependency
 try:  # pragma: no cover - external dependency may be absent
     import google.generativeai as genai  # type: ignore
+
     _gemini_available = True
 except Exception:  # noqa: BLE001
     genai = None  # type: ignore
@@ -19,6 +20,7 @@ from langchain_ollama import ChatOllama
 # --- Optional neo4j dependency (graceful degradation) ---
 try:  # pragma: no cover - environment dependent
     from neo4j import GraphDatabase  # type: ignore
+
     _neo4j_available = True
 except Exception:  # neo4j not installed
     GraphDatabase = None  # type: ignore
@@ -26,18 +28,21 @@ except Exception:  # neo4j not installed
 
 from src.config import settings
 from src.utils.open_ai_integration import OpenAIIntegration
+import pathlib
 
 # Corrected path: structured_triple_prompt lives under prompts, not utils
 try:
     from src.prompts.structured_triple_prompt import Prompt  # type: ignore
 except Exception:  # Fallback minimal Prompt implementation
+
     class Prompt:  # type: ignore
         @staticmethod
         def create_structured_prompt(schema_headers, record_data):
             return (
                 "You are extracting triples from provided structured schema headers and a single record.",
-                f"Headers: {schema_headers}\nRecord: {record_data}"
+                f"Headers: {schema_headers}\nRecord: {record_data}",
             )
+
 
 SYSTEM_PROMPT_GENERATE_TRIPLE_ENHANCED = """
 You are an intelligent knowledge graph extraction system that identifies meaningful relationships between entities in text.
@@ -129,19 +134,33 @@ task_count = 0  # Global counter for tracking the number of tasks
 
 async def prompt_gemini_for_triples_cli(chunk: Document) -> dict[str, Any]:
     """Process a single chunk via Gemini CLI returning a mapping with chunk & triples."""
-    is_structured = chunk.metadata.get("source") == "google_sheets" if hasattr(chunk, 'metadata') else False
+    is_structured = (
+        chunk.metadata.get("source") == "google_sheets"
+        if hasattr(chunk, "metadata")
+        else False
+    )
 
-    if is_structured and hasattr(chunk, 'metadata') and 'structured_data' in chunk.metadata:
+    if (
+        is_structured
+        and hasattr(chunk, "metadata")
+        and "structured_data" in chunk.metadata
+    ):
         # Use structured data prompt
-        schema_headers = chunk.metadata.get('schema', [])
-        record_data = chunk.metadata.get('structured_data', {})
+        schema_headers = chunk.metadata.get("schema", [])
+        record_data = chunk.metadata.get("structured_data", {})
         prompt_tuple = Prompt.create_structured_prompt(schema_headers, record_data)
-        system_part, user_part = prompt_tuple if isinstance(prompt_tuple, (list, tuple)) and len(prompt_tuple) == 2 else (prompt_tuple, "")
+        system_part, user_part = (
+            prompt_tuple
+            if isinstance(prompt_tuple, (list, tuple)) and len(prompt_tuple) == 2
+            else (prompt_tuple, "")
+        )
         combined_prompt = f"{system_part}\n{user_part}".strip()
     else:
-        combined_prompt = SYSTEM_PROMPT_GENERATE_TRIPLE_ENHANCED + f"\nText:\n{chunk.page_content}\n"
+        combined_prompt = (
+            SYSTEM_PROMPT_GENERATE_TRIPLE_ENHANCED + f"\nText:\n{chunk.page_content}\n"
+        )
 
-    if not os.path.exists(GEMINI_CLI_PATH):
+    if not pathlib.Path(GEMINI_CLI_PATH).exists():
         raise FileNotFoundError(
             f"Gemini command not found at {GEMINI_CLI_PATH}. Please ensure it is installed and the path is correct."
         )
@@ -157,10 +176,10 @@ async def prompt_gemini_for_triples_cli(chunk: Document) -> dict[str, Any]:
     try:
         stdout, stderr = await asyncio.wait_for(
             process.communicate(input=combined_prompt.encode("utf-8")),
-            timeout=SUBPROCESS_TIMEOUT
+            timeout=SUBPROCESS_TIMEOUT,
         )
-        stdout = stdout.decode('utf-8').strip()
-        stderr = stderr.decode('utf-8').strip()
+        stdout = stdout.decode("utf-8").strip()
+        stderr = stderr.decode("utf-8").strip()
         if process.returncode != 0:
             raise RuntimeError(
                 f"Gemini command failed with return code {process.returncode}: {stderr}"
@@ -192,7 +211,9 @@ async def prompt_gemini_for_triples_cli(chunk: Document) -> dict[str, Any]:
 
 
 # 🚀 FIXED: Enhanced batch processing function keep this method to for if more batching related issue arises
-async def prompt_gemini_for_triples_batch(chunks: list[Document], batch_size: int = 3) -> list[list]:
+async def prompt_gemini_for_triples_batch(
+    chunks: list[Document], batch_size: int = 3
+) -> list[list]:
     """
     Process chunks in smaller batches to prevent resource exhaustion.
 
@@ -206,8 +227,10 @@ async def prompt_gemini_for_triples_batch(chunks: list[Document], batch_size: in
     results = []
 
     for i in range(0, len(chunks), batch_size):
-        batch = chunks[i:i + batch_size]
-        print(f"Processing batch {i // batch_size + 1}/{(len(chunks) + batch_size - 1) // batch_size}")
+        batch = chunks[i : i + batch_size]
+        print(
+            f"Processing batch {i // batch_size + 1}/{(len(chunks) + batch_size - 1) // batch_size}"
+        )
 
         batch_tasks = [prompt_gemini_for_triples_cli(chunk) for chunk in batch]
         batch_results = await asyncio.gather(*batch_tasks, return_exceptions=True)
@@ -227,25 +250,37 @@ async def prompt_gemini_for_triples_batch(chunks: list[Document], batch_size: in
     return results
 
 
-async def prompt_gemini_for_triples_api(chunk: Document) -> None | dict[str, Document | list[Any]] | dict[
-    str, Document | list]:
+async def prompt_gemini_for_triples_api(
+    chunk: Document,
+) -> None | dict[str, Document | list[Any]] | dict[str, Document | list]:
     """
     Enhanced version that detects structured vs unstructured data and uses appropriate prompts
     """
     # Check if this is structured spreadsheet data
-    is_structured = chunk.metadata.get("source") == "google_sheets" if hasattr(chunk, 'metadata') else False
+    is_structured = (
+        chunk.metadata.get("source") == "google_sheets"
+        if hasattr(chunk, "metadata")
+        else False
+    )
 
-    if is_structured and hasattr(chunk, 'metadata') and 'structured_data' in chunk.metadata:
+    if (
+        is_structured
+        and hasattr(chunk, "metadata")
+        and "structured_data" in chunk.metadata
+    ):
         # Use structured data prompt
-        schema_headers = chunk.metadata.get('schema', [])
-        record_data = chunk.metadata.get('structured_data', {})
+        schema_headers = chunk.metadata.get("schema", [])
+        record_data = chunk.metadata.get("structured_data", {})
         prompt = Prompt.create_structured_prompt(schema_headers, record_data)
     else:
         # Use original unstructured text prompt
-        prompt = SYSTEM_PROMPT_GENERATE_TRIPLE_ENHANCED + f"""\n
+        prompt = (
+            SYSTEM_PROMPT_GENERATE_TRIPLE_ENHANCED
+            + f"""\n
         Text:\n
         {chunk.page_content}
         """
+        )
     load_dotenv()
     api_key_gemini = os.getenv("GEMINI_API_KEY")
     genai.configure(api_key=api_key_gemini)
@@ -273,7 +308,9 @@ async def prompt_gemini_for_triples_api(chunk: Document) -> None | dict[str, Doc
     try:
         triples = json.loads(output)
         if not isinstance(triples, list):
-            print(f"Warning: Expected list, got {type(triples)}. Attempting to extract...")
+            print(
+                f"Warning: Expected list, got {type(triples)}. Attempting to extract..."
+            )
             raise json.JSONDecodeError("Not a list", output, 0)
         return {"chunk": chunk, "triples": triples}
     except json.JSONDecodeError:
@@ -294,7 +331,9 @@ async def prompt_gemini_for_triples_api(chunk: Document) -> None | dict[str, Doc
             return {"chunk": chunk, "triples": []}
 
 
-async def prompt_openai_for_triples(chunk: Document) -> dict[str, Document | list[Any]] | dict[str, Document | str]:
+async def prompt_openai_for_triples(
+    chunk: Document,
+) -> dict[str, Document | list[Any]] | dict[str, Document | str]:
     """
     🔧 FIXED: Enhanced async version with proper response type handling and reasoning content suppression
     """
@@ -303,11 +342,19 @@ async def prompt_openai_for_triples(chunk: Document) -> dict[str, Document | lis
     system_prompt = SYSTEM_PROMPT_GENERATE_TRIPLE_ENHANCED
     user_prompt = ""
 
-    is_structured = chunk.metadata.get("source") == "google_sheets" if hasattr(chunk, 'metadata') else False
+    is_structured = (
+        chunk.metadata.get("source") == "google_sheets"
+        if hasattr(chunk, "metadata")
+        else False
+    )
 
-    if is_structured and hasattr(chunk, 'metadata') and 'structured_data' in chunk.metadata:
-        schema_headers = chunk.metadata.get('schema', [])
-        record_data = chunk.metadata.get('structured_data', {})
+    if (
+        is_structured
+        and hasattr(chunk, "metadata")
+        and "structured_data" in chunk.metadata
+    ):
+        schema_headers = chunk.metadata.get("schema", [])
+        record_data = chunk.metadata.get("structured_data", {})
         prompt_tuple = Prompt.create_structured_prompt(schema_headers, record_data)
         system_prompt = prompt_tuple[0]
         user_prompt = prompt_tuple[1]
@@ -324,14 +371,18 @@ async def prompt_openai_for_triples(chunk: Document) -> dict[str, Document | lis
 
     try:
         client = OpenAIIntegration()
-        response = await client.generate_text_async(messages=[
-            {'role': 'system', 'content': system_prompt},
-            {'role': 'user', 'content': user_prompt}
-        ])
+        response = await client.generate_text_async(
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ]
+        )
 
         if not response or response.strip() == "" or response.strip() == "[]":
             if getattr(settings, "socket_con", None):
-                settings.socket_con.send_error("[WARNING] No response or empty response from OpenAI API.")
+                settings.socket_con.send_error(
+                    "[WARNING] No response or empty response from OpenAI API."
+                )
             return {"chunk": chunk, "triples": []}
 
         parsed_response = ModelManager.convert_to_json(response)
@@ -339,13 +390,15 @@ async def prompt_openai_for_triples(chunk: Document) -> dict[str, Document | lis
         if isinstance(parsed_response, list):
             return {"chunk": chunk, "triples": parsed_response}
         elif isinstance(parsed_response, dict):
-            if 'content' in parsed_response and isinstance(parsed_response['content'], str):
+            if "content" in parsed_response and isinstance(
+                parsed_response["content"], str
+            ):
                 try:
-                    content_json = json.loads(parsed_response['content'])
+                    content_json = json.loads(parsed_response["content"])
                     if isinstance(content_json, list):
                         return {"chunk": chunk, "triples": content_json}
                 except json.JSONDecodeError:
-                    content_str = parsed_response['content']
+                    content_str = parsed_response["content"]
                     json_start = content_str.find("[")
                     json_end = content_str.rfind("]") + 1
                     if json_start != -1 and json_end > json_start:
@@ -358,15 +411,22 @@ async def prompt_openai_for_triples(chunk: Document) -> dict[str, Document | lis
                             pass
                 return {"chunk": chunk, "triples": []}
             else:
-                return {"chunk": chunk, "triples": [parsed_response] if parsed_response else []}
+                return {
+                    "chunk": chunk,
+                    "triples": [parsed_response] if parsed_response else [],
+                }
         else:
             if getattr(settings, "socket_con", None):
-                settings.socket_con.send_error(f"[WARNING] Unexpected response type: {type(parsed_response)}")
+                settings.socket_con.send_error(
+                    f"[WARNING] Unexpected response type: {type(parsed_response)}"
+                )
             return {"chunk": chunk, "triples": []}
 
     except Exception as api_error:  # pragma: no cover
         if getattr(settings, "socket_con", None):
-            settings.socket_con.send_error(f"[ERROR] OpenAI API call failed: {api_error}")
+            settings.socket_con.send_error(
+                f"[ERROR] OpenAI API call failed: {api_error}"
+            )
         return {"chunk": chunk, "triples": [], "error": str(api_error)}
 
 
@@ -387,7 +447,11 @@ def prompt_local_llm_for_triples(chunk: Document) -> list:
         data = json.loads(output)
         if isinstance(data, dict):
             if all(isinstance(v, list) for v in data.values()):
-                for s, p, o in zip(data.get("subject", []), data.get("predicate", []), data.get("object", [])):
+                for s, p, o in zip(
+                    data.get("subject", []),
+                    data.get("predicate", []),
+                    data.get("object", []),
+                ):
                     triples.append({"subject": s, "predicate": p, "object": o})
             else:
                 triples.append(data)
@@ -413,6 +477,7 @@ def prompt_local_llm_for_triples(chunk: Document) -> list:
 def clear_database():
     """Deletes all nodes and relationships from the Neo4j database if available."""
     from src.config.settings import neo4j_driver as driver  # type: ignore
+
     if not _neo4j_available or driver is None:
         print("Neo4j not available; clear_database skipped.")
         return
@@ -440,6 +505,7 @@ def _insert_triple(tx, subject, relation, object):
 def insert_triples(triples):
     """Insert multiple triples into Neo4j if available."""
     from src.config.settings import neo4j_driver as driver  # type: ignore
+
     if not _neo4j_available or driver is None:
         return
     try:
@@ -455,6 +521,7 @@ def get_triples(cypher_query: str):
     """Retrieve triples via Cypher if Neo4j is available; else return empty list."""
     from src.config.settings import neo4j_driver as driver  # type: ignore
     from src.ui.diagnostics.debug_helpers import debug_error
+
     if not _neo4j_available or driver is None:
         return []
     try:
@@ -466,14 +533,18 @@ def get_triples(cypher_query: str):
                 o = record["o"]
                 r = record["r"]
                 if isinstance(r, list):
-                    relation_types = " -> ".join([rel.get("type", str(rel)) for rel in r])
+                    relation_types = " -> ".join(
+                        [rel.get("type", str(rel)) for rel in r]
+                    )
                 else:
                     relation_types = r.get("type", str(r)) if r else ""
-                triples.append({
-                    "subject": s.get("name", str(s)),
-                    "relation": relation_types,
-                    "object": o.get("name", str(o)),
-                })
+                triples.append(
+                    {
+                        "subject": s.get("name", str(s)),
+                        "relation": relation_types,
+                        "object": o.get("name", str(o)),
+                    }
+                )
             return triples
     except Exception as e:  # pragma: no cover
         debug_error(
@@ -483,23 +554,31 @@ def get_triples(cypher_query: str):
                 "cypher_query": cypher_query,
                 "error": str(e),
                 "neo4j_available": _neo4j_available,
-                "driver": driver is not None
-            }
+                "driver": driver is not None,
+            },
         )
         return []
 
 
 def extract_triple_text(triple):
-    if 'subject' in triple and 'relation' in triple and 'object' in triple:
+    if "subject" in triple and "relation" in triple and "object" in triple:
         return f"{triple['subject']} - {triple['relation']} - {triple['object']}"
-    elif 's' in triple and 'r' in triple and 'o' in triple:
-        s = triple['s']['name'] if isinstance(triple['s'], dict) and 'name' in triple['s'] else str(triple['s'])
-        o = triple['o']['name'] if isinstance(triple['o'], dict) and 'name' in triple['o'] else str(triple['o'])
-        r = triple['r']
+    elif "s" in triple and "r" in triple and "o" in triple:
+        s = (
+            triple["s"]["name"]
+            if isinstance(triple["s"], dict) and "name" in triple["s"]
+            else str(triple["s"])
+        )
+        o = (
+            triple["o"]["name"]
+            if isinstance(triple["o"], dict) and "name" in triple["o"]
+            else str(triple["o"])
+        )
+        r = triple["r"]
         if isinstance(r, list):
-            relation_types = "->".join([rel.get('type', str(rel)) for rel in r])
+            relation_types = "->".join([rel.get("type", str(rel)) for rel in r])
         elif isinstance(r, dict):
-            relation_types = r.get('type', str(r))
+            relation_types = r.get("type", str(r))
         else:
             relation_types = str(r)
         return f"{s} - {relation_types} - {o}"
@@ -511,6 +590,7 @@ def get_retrieve_triples(cypher_query: str):
     """Retrieve raw records via Cypher if available; else empty list."""
     from src.config.settings import neo4j_driver as driver  # type: ignore
     from src.ui.diagnostics.debug_helpers import debug_error
+
     if not _neo4j_available or driver is None:
         return []
     try:
@@ -528,8 +608,8 @@ def get_retrieve_triples(cypher_query: str):
                 "cypher_query": cypher_query,
                 "error": str(e),
                 "neo4j_available": _neo4j_available,
-                "driver": driver is not None
-            }
+                "driver": driver is not None,
+            },
         )
         return []
 
@@ -537,22 +617,35 @@ def get_retrieve_triples(cypher_query: str):
 def get_all_labels_and_names() -> dict[str, list[str]]:
     """Return labels & names if Neo4j available; else empty placeholders."""
     from src.config.settings import neo4j_driver as driver  # type: ignore
+
     if not _neo4j_available or driver is None:
         return {"labels": [], "names": []}
     with driver.session() as session:  # type: ignore
-        labels = [record["label"] for record in session.run("CALL db.labels() YIELD label RETURN label")]
-        names = [record["name"] for record in session.run("MATCH (n) RETURN DISTINCT n.name AS name") if record["name"]]
+        labels = [
+            record["label"]
+            for record in session.run("CALL db.labels() YIELD label RETURN label")
+        ]
+        names = [
+            record["name"]
+            for record in session.run("MATCH (n) RETURN DISTINCT n.name AS name")
+            if record["name"]
+        ]
     return {"labels": labels, "names": names}
 
 
 def get_all_relationship_types() -> list[str]:
     """Return relation types if Neo4j available; else empty list."""
     from src.config.settings import neo4j_driver as driver  # type: ignore
+
     if not _neo4j_available or driver is None:
         return []
     with driver.session() as session:  # type: ignore
         relationship_types = [
-            record["type"] for record in session.run("MATCH ()-[r:RELATION]-() RETURN DISTINCT r.type AS type") if record["type"]
+            record["type"]
+            for record in session.run(
+                "MATCH ()-[r:RELATION]-() RETURN DISTINCT r.type AS type"
+            )
+            if record["type"]
         ]
     return relationship_types
 

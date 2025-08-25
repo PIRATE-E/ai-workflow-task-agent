@@ -24,6 +24,13 @@ Y                  Y           Y    Y                 Y                  Y      
 
     """
     console = settings.console
-    console.print(Align.center(
-        Panel.fit(Text(banner, style="bold magenta"), title="LangGraph Chatbot", subtitle="made by pirate",
-                  style="bold blue")))
+    console.print(
+        Align.center(
+            Panel.fit(
+                Text(banner, style="bold magenta"),
+                title="LangGraph Chatbot",
+                subtitle="made by pirate",
+                style="bold blue",
+            )
+        )
+    )

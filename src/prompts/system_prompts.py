@@ -52,7 +52,9 @@ Remember: Your goal is to be as helpful as possible by providing the user with e
     # ==================== KNOWLEDGE GRAPH PROMPTS ====================
 
     @staticmethod
-    def cypher_query_generator(names: list, relationship_types: list, labels: list, query: str) -> str:
+    def cypher_query_generator(
+        names: list, relationship_types: list, labels: list, query: str
+    ) -> str:
         """
         System prompt for Cypher query generation.
         Used in: retrieve_knowledge_graph()
@@ -205,7 +207,9 @@ Return ONLY valid JSON: {{"cypher_query": "YOUR_CYPHER_HERE", "reasoning": "YOUR
 """
 
     @staticmethod
-    def knowledge_graph_explainer(query: str, triples_text: str, user_question: str) -> str:
+    def knowledge_graph_explainer(
+        query: str, triples_text: str, user_question: str
+    ) -> str:
         """
         System prompt for explaining knowledge graph results.
         Used in: retrieve_knowledge_graph()
@@ -337,7 +341,9 @@ Classify thoughtfully based on true user intent, not just keywords."""
     # ==================== AI ASSISTANT PROMPTS ====================
 
     @staticmethod
-    def ai_assistant(history: str, latest_message_content: str, available_tools: str) -> str:
+    def ai_assistant(
+        history: str, latest_message_content: str, available_tools: str
+    ) -> str:
         """
         System prompt for AI assistant responses.
         Used in: generate_llm_response()
@@ -379,8 +385,6 @@ Think about what the user really wants to know, considering everything we've dis
     # ==================== TOOL SELECTION PROMPTS ====================
 
 
-
-
 class PromptTemplates:
     """
     Template-based prompts that require dynamic content injection.
@@ -420,13 +424,21 @@ class PromptManager:
         """Get web search assistant prompt."""
         return self.system_prompts.web_search_assistant()
 
-    def get_cypher_generator_prompt(self, names: list, relationship_types: list, labels: list, query: str) -> str:
+    def get_cypher_generator_prompt(
+        self, names: list, relationship_types: list, labels: list, query: str
+    ) -> str:
         """Get Cypher query generator prompt."""
-        return self.system_prompts.cypher_query_generator(names, relationship_types, labels, query)
+        return self.system_prompts.cypher_query_generator(
+            names, relationship_types, labels, query
+        )
 
-    def get_knowledge_graph_explainer_prompt(self, query: str, triples_text: str, user_question: str) -> str:
+    def get_knowledge_graph_explainer_prompt(
+        self, query: str, triples_text: str, user_question: str
+    ) -> str:
         """Get knowledge graph explainer prompt."""
-        return self.system_prompts.knowledge_graph_explainer(query, triples_text, user_question)
+        return self.system_prompts.knowledge_graph_explainer(
+            query, triples_text, user_question
+        )
 
     def get_rag_selector_prompt(self) -> str:
         """Get RAG system selector prompt."""
@@ -436,14 +448,19 @@ class PromptManager:
         """Get message classifier prompt."""
         return self.system_prompts.message_classifier(history, content)
 
-    def get_ai_assistant_prompt(self, history: str, latest_message: str, tools: str) -> str:
+    def get_ai_assistant_prompt(
+        self, history: str, latest_message: str, tools: str
+    ) -> str:
         """Get AI assistant prompt."""
         return self.system_prompts.ai_assistant(history, latest_message, tools)
 
-    def get_tool_selector_prompt(self, tools_context: str, history: list, content: str) -> str:
+    def get_tool_selector_prompt(
+        self, tools_context: str, history: list, content: str
+    ) -> str:
         """Get tool selector prompt."""
         # Import here to avoid circular imports
         from src.prompts.system_prompt_tool_selector import get_tool_selector_prompt
+
         return get_tool_selector_prompt(tools_context, history, content)
 
 

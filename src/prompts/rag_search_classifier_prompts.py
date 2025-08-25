@@ -69,7 +69,7 @@ class Prompts:
 
     @staticmethod
     def get_system_prompt_classifier():
-        return f"""You're a knowledgeable assistant who understands information about people and relationships. 
+        return """You're a knowledgeable assistant who understands information about people and relationships. 
 **Your mission:** Analyze this data and explain what you understand in a natural, conversational way.
 
 **How to respond:**

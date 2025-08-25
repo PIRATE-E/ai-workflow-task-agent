@@ -10,7 +10,8 @@ class FileSystemWrapper:
 
     def __init__(self, **kwargs):
         from src.tools.lggraph_tools.tool_response_manager import ToolResponseManager
-        self.file_path = kwargs.get('path', None)
+
+        self.file_path = kwargs.get("path", None)
         """
         Initialize the FileSystemWrapper with a file path and action.
 
@@ -20,30 +21,33 @@ class FileSystemWrapper:
 
         # Call the filesystem tool (now returns structured response)
         result = filesystem.file_system_tool(**kwargs)
-        
+
         # Safe debug logging
         from src.ui.diagnostics.debug_helpers import debug_info
+
         debug_info(
             heading="MCP_WRAPPER • FILESYSTEM",
-            body=f"MCP server result received",
+            body="MCP server result received",
             metadata={
                 "result_preview": str(result)[:100],
-                "result_type": type(result).__name__
-            }
+                "result_type": type(result).__name__,
+            },
         )
 
-        action = kwargs.get('tool_name')  # This should match the action being performed
+        action = kwargs.get("tool_name")  # This should match the action being performed
         debug_info(
             heading="MCP_WRAPPER • ACTION",
             body=f"Action performed: {action}",
-            metadata={"action": action, "kwargs_count": len(kwargs)}
+            metadata={"action": action, "kwargs_count": len(kwargs)},
         )
 
         # Handle the result and create appropriate AI message
         if result and not str(result).startswith("Error:"):
             # Success - create clean response
             if action == "read_file":
-                content = f"📄 **File Content ({self.file_path}):**\n\n{result[0]['content']}"
+                content = (
+                    f"📄 **File Content ({self.file_path}):**\n\n{result[0]['content']}"
+                )
             elif action == "write_file":
                 content = f"✅ **File Written Successfully:** {self.file_path}"
             elif action == "delete_file":
@@ -51,9 +55,7 @@ class FileSystemWrapper:
             else:
                 content = f"✅ **{action} completed for:** {self.file_path}\n\nResult: {result}"
 
-            ToolResponseManager().set_response([
-                settings.AIMessage(content=content)
-            ])
+            ToolResponseManager().set_response([settings.AIMessage(content=content)])
         else:
             # Error handling with clean error message
             error_msg = result if result else "Unknown error occurred"
@@ -64,6 +66,4 @@ class FileSystemWrapper:
 
             content = f"❌ **Filesystem Operation Failed**\n\n**Action:** {action}\n**File:** {self.file_path}\n**Error:** {error_msg}"
 
-            ToolResponseManager().set_response([
-                settings.AIMessage(content=content)
-            ])
+            ToolResponseManager().set_response([settings.AIMessage(content=content)])

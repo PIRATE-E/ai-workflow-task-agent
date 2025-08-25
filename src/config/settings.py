@@ -1,11 +1,16 @@
 """
 Configuration settings for AI LLM project.
 """
+
 import os
 import dotenv
+
 # Load environment variables from .env file
 from pathlib import Path
-dotenv.load_dotenv(Path(__file__).resolve().parent.parent.parent  /  '.env', override=True)
+
+dotenv.load_dotenv(
+    Path(__file__).resolve().parent.parent.parent / ".env", override=True
+)
 
 # Base directory
 BASE_DIR = Path(__file__).resolve().parent.parent  # src directory
@@ -22,12 +27,18 @@ GPT_MODEL = os.getenv("GPT_MODEL", "openai/gpt-oss-120b")
 OPEN_AI_API_KEY = os.getenv("OPENAI_API_KEY", "your_openai_api_key_here")
 
 # API endpoints
-TRANSLATION_API_URL = os.getenv("TRANSLATION_API_URL", "http://localhost:5560/translate")
+TRANSLATION_API_URL = os.getenv(
+    "TRANSLATION_API_URL", "http://localhost:5560/translate"
+)
 
 # Default paths
 DEFAULT_RAG_EXAMPLE_FILE_PATH = BASE_DIR / "RAG" / "RAG_FILES" / "kafka.pdf"
-DEFAULT_RAG_FILES_HASH_TXT_PATH = BASE_DIR / "RAG" / "RAG_FILES" / "processed_hash_chunks.txt"
-DEFAULT_RAG_FILES_PROCESSED_TRIPLES_PATH = BASE_DIR / "RAG" / "RAG_FILES" / "processed_triple.json"
+DEFAULT_RAG_FILES_HASH_TXT_PATH = (
+    BASE_DIR / "RAG" / "RAG_FILES" / "processed_hash_chunks.txt"
+)
+DEFAULT_RAG_FILES_PROCESSED_TRIPLES_PATH = (
+    BASE_DIR / "RAG" / "RAG_FILES" / "processed_triple.json"
+)
 
 # Logging configuration
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
@@ -35,7 +46,9 @@ LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 
 # Feature flags
 ENABLE_SOCKET_LOGGING = os.getenv("ENABLE_SOCKET_LOGGING", "true").lower() == "true"
-ENABLE_SOUND_NOTIFICATIONS = os.getenv("ENABLE_SOUND_NOTIFICATIONS", "true").lower() == "true"
+ENABLE_SOUND_NOTIFICATIONS = (
+    os.getenv("ENABLE_SOUND_NOTIFICATIONS", "true").lower() == "true"
+)
 
 # Log display mode options:
 # 'separate_window' - Opens log server in separate console window (recommended)
@@ -49,13 +62,17 @@ DEBUG = os.getenv("DEBUG", "false").lower() == "true"
 
 # API Timeout settings (in seconds)
 OPENAI_TIMEOUT = int(os.getenv("OPENAI_TIMEOUT", 60))  # Default 60 seconds
-OPENAI_CONNECT_TIMEOUT = int(os.getenv("OPENAI_CONNECT_TIMEOUT", 10))  # Default 10 seconds
+OPENAI_CONNECT_TIMEOUT = int(
+    os.getenv("OPENAI_CONNECT_TIMEOUT", 10)
+)  # Default 10 seconds
 
 # NEO4J settings
-NEO4J_URI=os.getenv("NEO4J_URI", "bolt://localhost:7687")
-NEO4J_USER=os.getenv("NEO4J_USERNAME", "neo4j")
-NEO4J_PASSWORD=os.getenv("NEO4J_PASSWORD","your_password_here")
-neo4j_driver = None  # Placeholder for Neo4j driver, to be initialized in main_orchestrator.py
+NEO4J_URI = os.getenv("NEO4J_URI", "bolt://localhost:7687")
+NEO4J_USER = os.getenv("NEO4J_USERNAME", "neo4j")
+NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD", "your_password_here")
+neo4j_driver = (
+    None  # Placeholder for Neo4j driver, to be initialized in main_orchestrator.py
+)
 
 # SEMAPHORE SETTINGS
 SEMAPHORE_CLI = int(os.getenv("SEMAPHORE_LIMIT_CLI", 15))
@@ -65,32 +82,40 @@ SEMAPHORE_OPENAI = int(os.getenv("SEMAPHORE_LIMIT_OPENAI", 15))
 # PNG FILE PATH
 PNG_FILE_PATH = BASE_DIR.parent / "basic_logs" / "graph.png"
 
-console = None  # Placeholder for console object, to be initialized in main_orchestrator.py
-debug_console = None  # Placeholder for debug console object, to be initialized in error_transfer.py
+console = (
+    None  # Placeholder for console object, to be initialized in main_orchestrator.py
+)
+debug_console = (
+    None  # Placeholder for debug console object, to be initialized in error_transfer.py
+)
 
 # Message class placeholders - to be initialized in chat_initializer.py
 HumanMessage = None  # Placeholder for HumanMessage class
-AIMessage = None     # Placeholder for AIMessage class  
-BaseMessage = None   # Placeholder for BaseMessage class
-socket_con = None  # Placeholder for socket connection, to be initialized in main_orchestrator.py
+AIMessage = None  # Placeholder for AIMessage class
+BaseMessage = None  # Placeholder for BaseMessage class
+socket_con = (
+    None  # Placeholder for socket connection, to be initialized in main_orchestrator.py
+)
 
 # listeners
-listeners = {
-    'eval':None
-}
+listeners = {"eval": None}
 
 
-# mcp configs
+# mcp.md configs
 MCP_CONFIG = {
     "MCP_ENABLED": os.getenv("MCP_ENABLED", "true").lower() == "true",
     "MCP_HOST": os.getenv("MCP_HOST", "localhost"),
     "MCP_PORT": int(os.getenv("MCP_PORT", 5000)),
     "MCP_API_KEY": os.getenv("MCP_API_KEY", "your_api_key_here"),
     "MCP_TIMEOUT": int(os.getenv("MCP_TIMEOUT", 30)),  # Timeout in seconds
-    "MCP_CONFIG_PATH": BASE_DIR.parent / '.mcp.json',  # Path to MCP configuration file
+    "MCP_CONFIG_PATH": BASE_DIR.parent / ".mcp.json",  # Path to MCP configuration file
 }
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     # true
-    print(Path(Path().resolve().parent / "RAG" / "RAG_FILES" / "kafka.pdf").resolve().exists())
+    print(
+        Path(Path().resolve().parent / "RAG" / "RAG_FILES" / "kafka.pdf")
+        .resolve()
+        .exists()
+    )
     # print(MCP_CONFIG.get('MCP_CONFIG_PATH').exists()) # true

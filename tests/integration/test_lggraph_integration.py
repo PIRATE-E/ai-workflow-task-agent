@@ -30,6 +30,7 @@ def simulate_lggraph_startup():
         console.print("   📋 Will fall back to console logging")
         return None
 
+
 def simulate_lggraph_operations(socket_con):
     """Simulate typical lggraph.py operations with logging"""
     console = settings.console
@@ -42,7 +43,7 @@ def simulate_lggraph_operations(socket_con):
         ("User Input", "User message received: 'Hello'"),
         ("Message Classification", "Message classified as: llm"),
         ("LLM Response", "Response generated successfully"),
-        ("User Output", "Response delivered to user")
+        ("User Output", "Response delivered to user"),
     ]
 
     for operation, message in operations:
@@ -58,6 +59,7 @@ def simulate_lggraph_operations(socket_con):
 
     console.print("✅ Operations simulation complete")
 
+
 def simulate_lggraph_errors(socket_con):
     """Simulate error scenarios in lggraph.py"""
     console = settings.console
@@ -67,7 +69,7 @@ def simulate_lggraph_errors(socket_con):
         "Connection error: Could not connect to Ollama server",
         "Tool error: GoogleSearch API rate limit exceeded",
         "RAG error: Neo4j database connection timeout",
-        "Classification error: Invalid message format"
+        "Classification error: Invalid message format",
     ]
 
     for i, error in enumerate(errors, 1):
@@ -82,6 +84,7 @@ def simulate_lggraph_errors(socket_con):
         time.sleep(0.3)
 
     console.print("✅ Error simulation complete")
+
 
 def simulate_lggraph_shutdown():
     """Simulate what happens when lggraph.py shuts down"""
@@ -98,6 +101,7 @@ def simulate_lggraph_shutdown():
     console.print("   ✅ Socket connection closed")
     console.print("   ✅ Log server subprocess stopped")
     console.print("   ✅ Cleanup complete")
+
 
 def main():
     """Main integration test"""
@@ -136,6 +140,7 @@ def main():
     except Exception as e:
         console.print(f"\n❌ Test failed: {e}")
         socket_manager.close_connection()
+
 
 if __name__ == "__main__":
     main()

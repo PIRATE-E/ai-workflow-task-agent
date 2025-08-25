@@ -10,6 +10,7 @@ class TranslateToolWrapper:
 
     def __init__(self, message: str, target_language: str):
         from src.tools.lggraph_tools.tools.translate_tool import translate_text
+
         """
         Initialize the TranslateToolWrapper with a message and target language.
 

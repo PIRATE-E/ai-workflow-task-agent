@@ -8,6 +8,7 @@ class State(TypedDict):
     messages: Annotated[List[HumanMessage | AIMessage], add_messages]
     message_type: str | None
 
+
 class StateAccessor:
     _instance = None
     _current_state: State | None = None
@@ -16,7 +17,6 @@ class StateAccessor:
         if cls._instance is None:
             cls._instance = super(StateAccessor, cls).__new__(cls)
         return cls._instance
-
 
     def get_state(self) -> State:
         """
@@ -35,7 +35,6 @@ class StateAccessor:
         :param new_state: The new state to set.
         """
         self._current_state = new_state.copy()
-
 
     def sync_with_langgraph(self, langgraph_state: State) -> None:
         """
@@ -79,3 +78,4 @@ class StateAccessor:
             if isinstance(msg, HumanMessage):
                 return msg
         return None
+

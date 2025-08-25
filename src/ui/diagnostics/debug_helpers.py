@@ -44,7 +44,7 @@ _lock = threading.RLock()
 def _get_debug_sender() -> DebugMessageSender:
     """Get debug message sender - always returns a sender (with or without socket)"""
     socket_con = None
-    if hasattr(settings, 'socket_con') and settings.socket_con:
+    if hasattr(settings, "socket_con") and settings.socket_con:
         socket_con = settings.socket_con
     return DebugMessageSender(socket_con)
 
@@ -76,32 +76,56 @@ def debug_critical(heading: str, body: str, metadata: Optional[Dict[str, Any]] =
     sender.send_debug_message(heading, body, LogLevel.CRITICAL, metadata)
 
 
-def debug_tool_response(tool_name: str, status: str, response_summary: str,
-                        execution_time: float = 0.0, metadata: Optional[Dict[str, Any]] = None):
+def debug_tool_response(
+    tool_name: str,
+    status: str,
+    response_summary: str,
+    execution_time: float = 0.0,
+    metadata: Optional[Dict[str, Any]] = None,
+):
     """Send tool response information"""
     sender = _get_debug_sender()
-    sender.send_tool_response(tool_name, status, response_summary, execution_time, metadata)
+    sender.send_tool_response(
+        tool_name, status, response_summary, execution_time, metadata
+    )
 
 
-def debug_api_call(api_name: str, operation: str, status: str,
-                   duration: float = 0.0, metadata: Optional[Dict[str, Any]] = None):
+def debug_api_call(
+    api_name: str,
+    operation: str,
+    status: str,
+    duration: float = 0.0,
+    metadata: Optional[Dict[str, Any]] = None,
+):
     """Send API call information"""
     sender = _get_debug_sender()
     sender.send_api_call(api_name, operation, status, duration, metadata)
 
 
-def debug_performance_warning(operation: str, duration: float, threshold: float,
-                              context: str, metadata: Optional[Dict[str, Any]] = None):
+def debug_performance_warning(
+    operation: str,
+    duration: float,
+    threshold: float,
+    context: str,
+    metadata: Optional[Dict[str, Any]] = None,
+):
     """Send performance warning"""
     sender = _get_debug_sender()
     sender.send_performance_warning(operation, duration, threshold, context, metadata)
 
 
-def debug_error_log(error_type: str, error_message: str, context: str,
-                    traceback_summary: str = "", metadata: Optional[Dict[str, Any]] = None):
+def debug_error_log(
+    error_type: str,
+    error_message: str,
+    context: str,
+    traceback_summary: str = "",
+    metadata: Optional[Dict[str, Any]] = None,
+):
     """Send structured error log"""
     sender = _get_debug_sender()
-    sender.send_error_log(error_type, error_message, context, traceback_summary, metadata)
+    sender.send_error_log(
+        error_type, error_message, context, traceback_summary, metadata
+    )
 
 
 def debug_rich_panel(panel_content: str, title: str = "Debug Panel"):
@@ -124,8 +148,8 @@ def send_object_over_socket(obj: Any, obj_type: str = "object"):
         obj_type: Type identifier for the debug message
     """
     if isinstance(obj, dict):
-        heading = obj.get('heading', 'OBJECT')
-        body = obj.get('body', str(obj))
+        heading = obj.get("heading", "OBJECT")
+        body = obj.get("body", str(obj))
         print(f"[DEBUG {obj_type}] {heading}: {body}")
     elif isinstance(obj, str):
         print(f"[DEBUG {obj_type}] {obj}")

@@ -10,22 +10,23 @@ import sys
 import time
 
 # Add the project root to the Python path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
+
 
 def run_test_file(test_file):
     """Run a single test file and return the result"""
-    print(f"\n{'='*80}")
+    print(f"\n{'=' * 80}")
     print(f"🚀 RUNNING: {test_file}")
-    print(f"{'='*80}")
+    print(f"{'=' * 80}")
 
     try:
         # Get the full path to the test file
         test_path = os.path.join(os.path.dirname(__file__), test_file)
 
         # Run the test file
-        result = subprocess.run([sys.executable, test_path],
-                              capture_output=False,
-                              text=True)
+        result = subprocess.run(
+            [sys.executable, test_path], capture_output=False, text=True
+        )
 
         if result.returncode == 0:
             print(f"✅ {test_file} completed successfully")
@@ -38,6 +39,7 @@ def run_test_file(test_file):
         print(f"❌ Failed to run {test_file}: {e}")
         return False
 
+
 def check_prerequisites():
     """Check if prerequisites are met"""
     print("🔍 Checking Prerequisites...")
@@ -45,6 +47,7 @@ def check_prerequisites():
     # Check if config module can be imported
     try:
         import config
+
         print(f"✅ Config loaded - Socket: {config.SOCKET_HOST}:{config.SOCKET_PORT}")
         print(f"✅ Socket logging enabled: {config.ENABLE_SOCKET_LOGGING}")
     except ImportError as e:
@@ -54,6 +57,7 @@ def check_prerequisites():
     # Check if socket manager can be imported
     try:
         from utils.socket_manager import socket_manager
+
         print("✅ Socket manager imported successfully")
     except ImportError as e:
         print(f"❌ Cannot import socket manager: {e}")
@@ -62,12 +66,14 @@ def check_prerequisites():
     # Check if error_transfer can be imported
     try:
         from utils.error_transfer import SocketCon
+
         print("✅ SocketCon imported successfully")
     except ImportError as e:
         print(f"❌ Cannot import SocketCon: {e}")
         return False
 
     return True
+
 
 def main():
     """Main test runner"""
@@ -93,7 +99,7 @@ def main():
         "test_socket_connection.py",
         "test_socket_manager.py",
         "test_logging_system.py",
-        "test_subprocess_logging.py"
+        "test_subprocess_logging.py",
     ]
 
     results = []
@@ -145,6 +151,7 @@ def main():
     print("   2. Check the log server terminal for received messages")
     print("   3. Verify your socket configuration in config.py")
     print("   4. Make sure ENABLE_SOCKET_LOGGING=true")
+
 
 if __name__ == "__main__":
     try:

@@ -14,7 +14,7 @@ def get_tool_argument_schema(tool):
     :param tool: The tool object whose argument schema should be retrieved.
     :return: JSON string representing the tool's argument schema.
     """
-    if hasattr(tool.args_schema, 'model_json_schema'):
+    if hasattr(tool.args_schema, "model_json_schema"):
         # Pydantic model - use model_json_schema()
         return json.dumps(tool.args_schema.model_json_schema())
     elif isinstance(tool.args_schema, dict):

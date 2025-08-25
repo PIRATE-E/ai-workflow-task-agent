@@ -41,7 +41,7 @@ class GoogleSheetsRAG:
             strategies = [
                 self._strategy_iframe_content,
                 self._strategy_direct_selectors,
-                self._strategy_basic_wait
+                self._strategy_basic_wait,
             ]
 
             with sync_playwright() as p:
@@ -69,15 +69,17 @@ class GoogleSheetsRAG:
 
         def _strategy_iframe_content(self, page):
             """Strategy 1: Extract from iframe"""
-            iframe_element = page.wait_for_selector('iframe#pageswitcher-content', timeout=15000)
+            iframe_element = page.wait_for_selector(
+                "iframe#pageswitcher-content", timeout=15000
+            )
             iframe = iframe_element.content_frame()
-            iframe.wait_for_selector('table td', timeout=15000)
+            iframe.wait_for_selector("table td", timeout=15000)
             return iframe.content()
 
         def _strategy_direct_selectors(self, page):
             """Strategy 2: Direct selector waiting"""
-            page.wait_for_selector('table td:not(:empty)', timeout=15000)
-            page.wait_for_load_state('networkidle', timeout=15000)
+            page.wait_for_selector("table td:not(:empty)", timeout=15000)
+            page.wait_for_load_state("networkidle", timeout=15000)
             return page.content()
 
         def _strategy_basic_wait(self, page):
@@ -88,38 +90,43 @@ class GoogleSheetsRAG:
         def _validate_content(self, html_content):
             """Validate that HTML contains actual table data"""
             from bs4 import BeautifulSoup
-            soup = BeautifulSoup(html_content, 'html.parser')
-            table = soup.find('table')
+
+            soup = BeautifulSoup(html_content, "html.parser")
+            table = soup.find("table")
             if not table:
                 return False
 
             # Check for actual data (more than just headers)
-            rows = table.find_all('tr')
-            return len(rows) > 1 and any(td.get_text(strip=True) for row in rows for td in row.find_all('td'))
+            rows = table.find_all("tr")
+            return len(rows) > 1 and any(
+                td.get_text(strip=True) for row in rows for td in row.find_all("td")
+            )
 
     def _parse_html_table(self):
         """Enhanced parsing with schema awareness and structured data preservation"""
 
         html = GoogleSheetsRAG.LoadWebContent(self.sheets_url).load_web_content()
         if not html:
-            raise ValueError("Failed to load content from the provided Google Sheets URL.")
-        soup = BeautifulSoup(html, 'html.parser')
-        table = soup.find('table')
+            raise ValueError(
+                "Failed to load content from the provided Google Sheets URL."
+            )
+        soup = BeautifulSoup(html, "html.parser")
+        table = soup.find("table")
         if not table:
             raise ValueError("No table found in the provided Google Sheets URL.")
 
-        rows = table.find_all('tr')
+        rows = table.find_all("tr")
         if not rows:
             return self.data
 
         # Extract headers from first row
         header_row = rows[0]
-        header_cells = header_row.find_all(['th', 'td'])
+        header_cells = header_row.find_all(["th", "td"])
         self.headers = [cell.text.strip() for cell in header_cells if cell.text.strip()]
 
         # Process data rows
         for row in rows[1:]:  # Skip header row
-            cols = row.find_all('td')
+            cols = row.find_all("td")
             if not cols:
                 continue
 
@@ -160,8 +167,12 @@ class GoogleSheetsRAG:
         # Add relationship extraction guidance
         schema_desc += "\nEXTRACTION GUIDANCE:\n"
         schema_desc += "- Each row represents a connected entity or record\n"
-        schema_desc += "- Look for relationships between column values within the same row\n"
-        schema_desc += "- Consider hierarchical relationships (parent-child, category-item)\n"
+        schema_desc += (
+            "- Look for relationships between column values within the same row\n"
+        )
+        schema_desc += (
+            "- Consider hierarchical relationships (parent-child, category-item)\n"
+        )
         schema_desc += "- Identify attribute relationships (entity-property-value)\n"
 
         return schema_desc
@@ -204,15 +215,17 @@ class GoogleSheetsRAG:
             # Combine schema + row context
             full_content = f"{schema_description}\n\nROW DATA:\n{row_context}"
 
-            documents.append(Document(
-                page_content=full_content,
-                metadata={
-                    "row_index": i,
-                    "data_type": "structured_spreadsheet",
-                    "headers": self.headers,
-                    "raw_data": row_data
-                }
-            ))
+            documents.append(
+                Document(
+                    page_content=full_content,
+                    metadata={
+                        "row_index": i,
+                        "data_type": "structured_spreadsheet",
+                        "headers": self.headers,
+                        "raw_data": row_data,
+                    },
+                )
+            )
 
         return documents
 
@@ -253,11 +266,14 @@ class GoogleSheetsRAG:
 #
 #         return self.data
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     # working
-    url = 'https://docs.google.com/spreadsheets/d/1OOfUsC8sQmXNiHs2NQR03Tq6qVO5vJxrvLfeZAY0U4Q/edit?gid=0#gid=0'
+    url = "https://docs.google.com/spreadsheets/d/1OOfUsC8sQmXNiHs2NQR03Tq6qVO5vJxrvLfeZAY0U4Q/edit?gid=0#gid=0"
     print(url.split("https://docs.google.com/spreadsheets/")[0].lower() == "")
     g = GoogleSheetsRAG(url)
-    [print(f"{"-" * 50}\n{row}\n{"-" * 80}") for row in g.get_structured_documents_for_kg()[0:2]]
+    [
+        print(f"{'-' * 50}\n{row}\n{'-' * 80}")
+        for row in g.get_structured_documents_for_kg()[0:2]
+    ]
     # ex = timeit.timeit(g.parse_html_table, number=100)
     # print(f"Execution time: {ex} seconds")

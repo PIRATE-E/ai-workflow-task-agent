@@ -33,7 +33,7 @@ from src.ui.diagnostics.debug_message_protocol import DebugMessage, ObjectType, 
 
 class RichErrorPrint:
     """Enhanced debug message display with JSON protocol support"""
-    
+
     def __init__(self, debug_console: Console = None):
         if debug_console is None:
             # Enhanced console configuration for debug process
@@ -47,7 +47,7 @@ class RichErrorPrint:
                 emoji=True,
                 markup=True,
                 log_time=False,  # We handle timestamps in messages
-                log_path=False
+                log_path=False,
             )
         else:
             self.console = debug_console
@@ -56,13 +56,22 @@ class RichErrorPrint:
 
         # Initialize Rich Traceback for debug process
         from src.ui.diagnostics.rich_traceback_manager import RichTracebackManager
+
         RichTracebackManager.initialize_debug_process(
             debug_console=self.console,
             show_locals=False,
             max_frames=10,
             theme="monokai",
             extra_lines=1,
-            suppress_modules=["click", "rich", "__main__", "runpy", "threading", "socket", "pickle"]
+            suppress_modules=[
+                "click",
+                "rich",
+                "__main__",
+                "runpy",
+                "threading",
+                "socket",
+                "pickle",
+            ],
         )
 
     def print_rich(self, message: str):
@@ -80,7 +89,7 @@ class RichErrorPrint:
             else:
                 # Fallback to legacy string handling
                 self._handle_legacy_message(message)
-                
+
         except Exception as e:
             # Ultimate fallback for any parsing errors
             self._handle_parse_error(message, str(e))
@@ -97,7 +106,7 @@ class RichErrorPrint:
         """Check if message contains multiple concatenated JSON objects"""
         try:
             # Quick check: if it starts with { and has }{ pattern, it's likely multiple JSON
-            if message.startswith('{') and '}{' in message:
+            if message.startswith("{") and "}{" in message:
                 return True
             return False
         except Exception:
@@ -108,12 +117,12 @@ class RichErrorPrint:
         try:
             # Split the message into individual JSON objects
             json_messages = self._split_json_messages(message)
-            
+
             # Process each JSON message individually
             for json_msg in json_messages:
                 if json_msg.strip():  # Skip empty messages
                     self._handle_json_message(json_msg)
-                    
+
         except Exception as e:
             self._handle_parse_error(message, f"Multiple JSON parsing error: {e}")
 
@@ -124,51 +133,51 @@ class RichErrorPrint:
         brace_count = 0
         in_string = False
         escape_next = False
-        
+
         for char in message:
             current_message += char
-            
+
             if escape_next:
                 escape_next = False
                 continue
-                
-            if char == '\\':
+
+            if char == "\\":
                 escape_next = True
                 continue
-                
+
             if char == '"' and not escape_next:
                 in_string = not in_string
                 continue
-                
+
             if not in_string:
-                if char == '{':
+                if char == "{":
                     brace_count += 1
-                elif char == '}':
+                elif char == "}":
                     brace_count -= 1
-                    
+
                     # When brace_count reaches 0, we have a complete JSON object
                     if brace_count == 0:
                         json_messages.append(current_message.strip())
                         current_message = ""
-        
+
         # Add any remaining message
         if current_message.strip():
             json_messages.append(current_message.strip())
-            
+
         return json_messages
 
     def _handle_json_message(self, message: str):
         """Handle new JSON protocol messages"""
         try:
             debug_msg = DebugMessage.from_json(message)
-            
+
             if debug_msg.obj_type == ObjectType.STRING.value:
                 self._handle_string_message(debug_msg)
             elif debug_msg.obj_type == ObjectType.PICKLE.value:
                 self._handle_pickle_message(debug_msg)
             else:
                 self._handle_unknown_message(debug_msg)
-                
+
         except Exception as e:
             self._handle_parse_error(message, f"JSON parsing error: {e}")
 
@@ -176,25 +185,25 @@ class RichErrorPrint:
         """Handle string-based structured messages"""
         data_type = debug_msg.data_type
         timestamp = self._format_timestamp(debug_msg.timestamp)
-        
+
         if data_type == DataType.PLAIN_TEXT.value:
             self._display_plain_text(debug_msg.data, timestamp)
-            
+
         elif data_type == DataType.DEBUG_MESSAGE.value:
             self._display_debug_message(debug_msg.data, timestamp)
-            
+
         elif data_type == DataType.ERROR_LOG.value:
             self._display_error_log(debug_msg.data, timestamp)
-            
+
         elif data_type == DataType.PERFORMANCE_WARNING.value:
             self._display_performance_warning(debug_msg.data, timestamp)
-            
+
         elif data_type == DataType.TOOL_RESPONSE.value:
             self._display_tool_response(debug_msg.data, timestamp)
-            
+
         elif data_type == DataType.API_CALL.value:
             self._display_api_call(debug_msg.data, timestamp)
-            
+
         else:
             self._display_unknown_data_type(debug_msg.data, data_type, timestamp)
 
@@ -202,7 +211,7 @@ class RichErrorPrint:
         """Handle pickled object messages"""
         data_type = debug_msg.data_type
         timestamp = self._format_timestamp(debug_msg.timestamp)
-        
+
         if data_type == DataType.RICH_PANEL.value:
             self._display_rich_panel(debug_msg.data, timestamp)
         else:
@@ -219,7 +228,7 @@ class RichErrorPrint:
             border_style="bright_cyan",
             box=ROUNDED,
             padding=(0, 1),
-            width=148
+            width=148,
         )
         self.console.print(panel)
 
@@ -233,21 +242,23 @@ class RichErrorPrint:
         # Choose styling based on level
         level_styles = {
             "DEBUG": ("🔍", "bright_blue", "blue"),
-            "INFO": ("ℹ️", "bright_green", "green"), 
+            "INFO": ("ℹ️", "bright_green", "green"),
             "WARNING": ("⚠️", "bright_yellow", "yellow"),
             "ERROR": ("🚨", "bright_red", "red"),
-            "CRITICAL": ("💥", "bright_white", "red")
+            "CRITICAL": ("💥", "bright_white", "red"),
         }
-        
-        icon, title_style, border_style = level_styles.get(level, ("📝", "bright_white", "white"))
-        
+
+        icon, title_style, border_style = level_styles.get(
+            level, ("📝", "bright_white", "white")
+        )
+
         # Create title with context
         title = Text(f"{icon} {heading}", style=f"bold {title_style}")
         title.append(f" • {timestamp}", style=f"dim {title_style}")
 
         # Create content with metadata if present
         content_parts = [body]
-        
+
         if metadata:
             content_parts.append("")  # Empty line
             content_parts.append("📋 Metadata:")
@@ -262,15 +273,15 @@ class RichErrorPrint:
             border_style=border_style,
             box=HEAVY if level in ["ERROR", "CRITICAL"] else ROUNDED,
             padding=(0, 1),
-            width=148
+            width=148,
         )
-        
+
         # Add separator for errors and critical messages
         if level in ["ERROR", "CRITICAL"]:
             self.console.print(Rule(style=border_style))
-            
+
         self.console.print(panel)
-        
+
         if level in ["ERROR", "CRITICAL"]:
             self.console.print(Rule(style=border_style))
 
@@ -285,14 +296,11 @@ class RichErrorPrint:
         title = Text(f"🚨 ERROR LOG • {error_type}", style="bold bright_red")
         title.append(f" • {timestamp}", style="dim red")
 
-        content_parts = [
-            f"📍 Context: {context}",
-            f"💬 Message: {error_message}"
-        ]
-        
+        content_parts = [f"📍 Context: {context}", f"💬 Message: {error_message}"]
+
         if traceback_summary:
             content_parts.extend(["", "📚 Traceback:", traceback_summary])
-            
+
         if metadata:
             content_parts.extend(["", "📋 Metadata:"])
             for key, value in metadata.items():
@@ -307,7 +315,7 @@ class RichErrorPrint:
             border_style="bright_red",
             box=HEAVY,
             padding=(1, 1),
-            width=148
+            width=148,
         )
         self.console.print(panel)
         self.console.print(Rule(style="red"))
@@ -326,9 +334,9 @@ class RichErrorPrint:
         content_parts = [
             f"⏱️  Duration: {duration:.2f}s (threshold: {threshold:.2f}s)",
             f"📍 Context: {context}",
-            f"⚡ Exceeded by: {duration - threshold:.2f}s"
+            f"⚡ Exceeded by: {duration - threshold:.2f}s",
         ]
-        
+
         if metadata:
             content_parts.extend(["", "📋 Metadata:"])
             for key, value in metadata.items():
@@ -342,7 +350,7 @@ class RichErrorPrint:
             border_style="bright_yellow",
             box=ROUNDED,
             padding=(0, 1),
-            width=148
+            width=148,
         )
         self.console.print(panel)
 
@@ -358,22 +366,24 @@ class RichErrorPrint:
         status_styles = {
             "success": ("✅", "bright_green", "green"),
             "failed": ("❌", "bright_red", "red"),
-            "warning": ("⚠️", "bright_yellow", "yellow")
+            "warning": ("⚠️", "bright_yellow", "yellow"),
         }
-        
-        icon, title_style, border_style = status_styles.get(status, ("🔧", "bright_cyan", "cyan"))
+
+        icon, title_style, border_style = status_styles.get(
+            status, ("🔧", "bright_cyan", "cyan")
+        )
 
         title = Text(f"{icon} TOOL • {tool_name}", style=f"bold {title_style}")
         title.append(f" • {timestamp}", style=f"dim {title_style}")
 
         content_parts = [
             f"📊 Status: {status.upper()}",
-            f"📝 Response: {response_summary}"
+            f"📝 Response: {response_summary}",
         ]
-        
+
         if execution_time > 0:
             content_parts.append(f"⏱️  Execution Time: {execution_time:.2f}s")
-            
+
         if metadata:
             content_parts.extend(["", "📋 Metadata:"])
             for key, value in metadata.items():
@@ -387,7 +397,7 @@ class RichErrorPrint:
             border_style=border_style,
             box=ROUNDED,
             padding=(0, 1),
-            width=148
+            width=148,
         )
         self.console.print(panel)
 
@@ -403,19 +413,23 @@ class RichErrorPrint:
         status_styles = {
             "started": ("🚀", "bright_blue", "blue"),
             "completed": ("✅", "bright_green", "green"),
-            "failed": ("❌", "bright_red", "red")
+            "failed": ("❌", "bright_red", "red"),
         }
-        
-        icon, title_style, border_style = status_styles.get(status, ("🌐", "bright_cyan", "cyan"))
 
-        title = Text(f"{icon} API • {api_name} • {operation}", style=f"bold {title_style}")
+        icon, title_style, border_style = status_styles.get(
+            status, ("🌐", "bright_cyan", "cyan")
+        )
+
+        title = Text(
+            f"{icon} API • {api_name} • {operation}", style=f"bold {title_style}"
+        )
         title.append(f" • {timestamp}", style=f"dim {title_style}")
 
         content_parts = [f"📊 Status: {status.upper()}"]
-        
+
         if duration > 0:
             content_parts.append(f"⏱️  Duration: {duration:.2f}s")
-            
+
         if metadata:
             content_parts.extend(["", "📋 Metadata:"])
             for key, value in metadata.items():
@@ -429,7 +443,7 @@ class RichErrorPrint:
             border_style=border_style,
             box=ROUNDED,
             padding=(0, 1),
-            width=148
+            width=148,
         )
         self.console.print(panel)
 
@@ -439,18 +453,20 @@ class RichErrorPrint:
             # Deserialize the panel
             panel_bytes = base64.b64decode(data)
             panel_object = pickle.loads(panel_bytes)
-            
+
             # Add visual separator for Rich panels
             self.console.print()
-            self.console.print(Rule(f"🎨 RICH PANEL • {timestamp}", style="bold magenta"))
-            
+            self.console.print(
+                Rule(f"🎨 RICH PANEL • {timestamp}", style="bold magenta")
+            )
+
             # Display the panel
             self.console.print(panel_object)
-            
+
             # Add closing separator
             self.console.print(Rule(style="magenta"))
             self.console.print()
-            
+
         except Exception as e:
             self._display_deserialization_error(data, str(e), timestamp)
 
@@ -467,21 +483,23 @@ class RichErrorPrint:
             border_style="bright_red",
             box=HEAVY,
             padding=(0, 1),
-            width=148
+            width=148,
         )
         self.console.print(panel)
 
     def _handle_legacy_message(self, message: str):
         """Handle legacy string messages (backward compatibility)"""
         timestamp = datetime.now().strftime("%H:%M:%S")
-        
+
         # Check for legacy prefixes
         if "[debug]" in message.lower():
             self._display_plain_text(message.replace("[debug]", "").strip(), timestamp)
         elif "[info]" in message.lower():
             self._display_plain_text(message.replace("[info]", "").strip(), timestamp)
         elif "[warning]" in message.lower():
-            self._display_plain_text(message.replace("[warning]", "").strip(), timestamp)
+            self._display_plain_text(
+                message.replace("[warning]", "").strip(), timestamp
+            )
         elif "[error]" in message.lower():
             self._display_plain_text(message.replace("[error]", "").strip(), timestamp)
         elif "critical" in message.lower():
@@ -492,7 +510,7 @@ class RichErrorPrint:
     def _handle_parse_error(self, message: str, error: str):
         """Handle message parsing errors"""
         timestamp = datetime.now().strftime("%H:%M:%S")
-        
+
         title = Text("⚠️ PARSE ERROR", style="bold bright_yellow")
         title.append(f" • {timestamp}", style="dim yellow")
 
@@ -504,7 +522,7 @@ class RichErrorPrint:
             border_style="bright_yellow",
             box=ROUNDED,
             padding=(0, 1),
-            width=148
+            width=148,
         )
         self.console.print(panel)
 
@@ -512,7 +530,7 @@ class RichErrorPrint:
         """Format timestamp for display"""
         try:
             # Parse ISO format timestamp
-            dt = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+            dt = datetime.fromisoformat(timestamp_str.replace("Z", "+00:00"))
             return dt.strftime("%H:%M:%S")
         except (ValueError, AttributeError):
             # Fallback to current time
@@ -531,7 +549,7 @@ class RichErrorPrint:
             border_style="bright_magenta",
             box=ROUNDED,
             padding=(0, 1),
-            width=148
+            width=148,
         )
         self.console.print(panel)
 
@@ -540,7 +558,9 @@ class RichErrorPrint:
         title = Text(f"❓ UNKNOWN PICKLE • {data_type}", style="bold bright_magenta")
         title.append(f" • {timestamp}", style="dim magenta")
 
-        content = f"Unknown pickle type: {data_type}\nData length: {len(data)} characters"
+        content = (
+            f"Unknown pickle type: {data_type}\nData length: {len(data)} characters"
+        )
 
         panel = Panel(
             Align.left(content),
@@ -548,21 +568,25 @@ class RichErrorPrint:
             border_style="bright_magenta",
             box=ROUNDED,
             padding=(0, 1),
-            width=148
+            width=148,
         )
         self.console.print(panel)
 
     def print_startup_banner(self):
         """Print enhanced startup banner"""
-        banner_text = Text("🚀 AI-AGENT DEBUG CONSOLE v2.0", style="bold bright_magenta")
-        subtitle_text = Text("Enhanced JSON Protocol • Structured Debugging", style="dim bright_magenta")
-        
+        banner_text = Text(
+            "🚀 AI-AGENT DEBUG CONSOLE v2.0", style="bold bright_magenta"
+        )
+        subtitle_text = Text(
+            "Enhanced JSON Protocol • Structured Debugging", style="dim bright_magenta"
+        )
+
         banner_panel = Panel(
             Align.center(f"{banner_text}\n{subtitle_text}"),
             box=DOUBLE,
             border_style="bright_magenta",
             padding=(1, 2),
-            width=148
+            width=148,
         )
 
         self.console.print(Rule("🎯 DEBUG SESSION STARTED", style="bright_magenta"))
@@ -585,8 +609,8 @@ class RichErrorPrint:
     def _handle_unknown_message(self, debug_msg: DebugMessage):
         """Handle unknown message types"""
         timestamp = self._format_timestamp(debug_msg.timestamp)
-        
-        title = Text(f"❓ UNKNOWN MESSAGE TYPE", style="bold bright_magenta")
+
+        title = Text("❓ UNKNOWN MESSAGE TYPE", style="bold bright_magenta")
         title.append(f" • {timestamp}", style="dim magenta")
 
         content = f"Unknown object type: {debug_msg.obj_type}\nData type: {debug_msg.data_type}\nData: {str(debug_msg.data)[:200]}{'...' if len(str(debug_msg.data)) > 200 else ''}"
@@ -597,6 +621,6 @@ class RichErrorPrint:
             border_style="bright_magenta",
             box=ROUNDED,
             padding=(0, 1),
-            width=148
+            width=148,
         )
         self.console.print(panel)

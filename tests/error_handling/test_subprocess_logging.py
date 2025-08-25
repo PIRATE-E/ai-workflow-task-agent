@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Test script to verify that the socket manager can automatically start 
+Test script to verify that the socket manager can automatically start
 and stop the log server as a subprocess
 """
 
@@ -11,9 +11,10 @@ import time
 import psutil
 
 # Add the project root to the Python path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
 from utils.socket_manager import socket_manager
+
 
 def test_subprocess_startup():
     """Test that socket manager can start log server subprocess"""
@@ -56,6 +57,7 @@ def test_subprocess_startup():
         print("❌ Failed to establish socket connection")
         return False
 
+
 def test_message_sending():
     """Test sending messages through the subprocess-managed connection"""
     print("\n🧪 Testing Message Sending Through Subprocess...")
@@ -68,7 +70,7 @@ def test_message_sending():
             "🧪 Test message 2: Unicode support 🚀💯",
             "🧪 Test message 3: Long message " + "x" * 100,
             "🧪 Test message 4: Special chars !@#$%^&*()",
-            "🧪 Test message 5: JSON-like {\"test\": \"value\"}"
+            '🧪 Test message 5: JSON-like {"test": "value"}',
         ]
 
         success_count = 0
@@ -86,6 +88,7 @@ def test_message_sending():
     else:
         print("❌ No socket connection available for testing")
         return False
+
 
 def test_subprocess_management():
     """Test starting and stopping the subprocess"""
@@ -117,6 +120,7 @@ def test_subprocess_management():
     else:
         print("❌ Manual stop failed - subprocess still running")
         return False
+
 
 def test_automatic_restart():
     """Test that the system can recover if subprocess dies"""
@@ -165,6 +169,7 @@ def test_automatic_restart():
         print("❌ Failed to reconnect after subprocess restart")
         return False
 
+
 def test_cleanup_on_exit():
     """Test that cleanup works properly"""
     print("\n🧪 Testing Cleanup on Exit...")
@@ -191,6 +196,7 @@ def test_cleanup_on_exit():
         print("❌ Subprocess still running after cleanup")
         return False
 
+
 def run_subprocess_tests():
     """Run all subprocess-related tests"""
     print("=" * 80)
@@ -210,13 +216,13 @@ def run_subprocess_tests():
         ("Message Sending", test_message_sending),
         ("Subprocess Management", test_subprocess_management),
         ("Automatic Recovery", test_automatic_restart),
-        ("Cleanup on Exit", test_cleanup_on_exit)
+        ("Cleanup on Exit", test_cleanup_on_exit),
     ]
 
     results = []
 
     for test_name, test_func in tests:
-        print(f"\n{'='*20} {test_name} {'='*20}")
+        print(f"\n{'=' * 20} {test_name} {'=' * 20}")
         try:
             result = test_func()
             results.append((test_name, result))
@@ -233,7 +239,7 @@ def run_subprocess_tests():
         time.sleep(1)  # Pause between tests
 
     # Final cleanup
-    print(f"\n{'='*20} Final Cleanup {'='*20}")
+    print(f"\n{'=' * 20} Final Cleanup {'=' * 20}")
     try:
         socket_manager.close_connection()
         print("✅ Final cleanup completed")
@@ -267,6 +273,7 @@ def run_subprocess_tests():
     print("   ✅ Log server will be managed automatically")
     print("   ✅ Proper cleanup when application exits")
 
+
 if __name__ == "__main__":
     try:
         run_subprocess_tests()
@@ -280,4 +287,5 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"\n\n❌ Test suite crashed: {e}")
         import traceback
+
         traceback.print_exc()

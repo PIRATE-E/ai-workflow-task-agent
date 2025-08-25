@@ -3,10 +3,12 @@
 
 import sys
 import os
-sys.path.append(os.path.join(os.path.dirname(__file__), 'src'))
+
+sys.path.append(os.path.join(os.path.dirname(__file__), "src"))
 
 from src.mcp.load_config import McpConfigFile
 from src.mcp.mcp_register_structure import Command
+
 
 def test_command_enum():
     print("=== Testing Command Enum ===")
@@ -14,6 +16,7 @@ def test_command_enum():
     print(f"str(Command.NPX) = {str(Command.NPX)}")
     print(f"Type of Command.NPX: {type(Command.NPX)}")
     return True
+
 
 def test_config_loading():
     print("\n=== Testing Config Loading ===")
@@ -23,7 +26,9 @@ def test_config_loading():
             print(f"? Loaded {len(configs)} server configs")
             for i, config in enumerate(configs):
                 cmd = config.get("command")
-                print(f"  Server {i+1}: {config.get('name')} -> {cmd} (type: {type(cmd)})")
+                print(
+                    f"  Server {i + 1}: {config.get('name')} -> {cmd} (type: {type(cmd)})"
+                )
             return True
         else:
             print("? No configs loaded")
@@ -31,6 +36,7 @@ def test_config_loading():
     except Exception as e:
         print(f"? Config loading failed: {e}")
         return False
+
 
 def test_command_conversion():
     print("\n=== Testing Command Conversion ===")
@@ -43,7 +49,7 @@ def test_command_conversion():
             print(f"? Command conversion: {cmd} -> '{cmd_str}'")
             print(f"   Original type: {type(cmd)}")
             print(f"   Converted type: {type(cmd_str)}")
-            
+
             # Test command array creation like in manager.py
             args = first_config.get("args", [])
             command_array = [str(cmd)] + args
@@ -57,16 +63,17 @@ def test_command_conversion():
         print(f"? Command conversion test failed: {e}")
         return False
 
+
 if __name__ == "__main__":
     print("?? Testing MCP Fixes\n")
-    
+
     results = []
     results.append(test_command_enum())
     results.append(test_config_loading())
     results.append(test_command_conversion())
-    
+
     print(f"\n?? Test Results: {sum(results)}/{len(results)} passed")
-    
+
     if all(results):
         print("?? All tests passed! MCP fixes should work correctly.")
     else:

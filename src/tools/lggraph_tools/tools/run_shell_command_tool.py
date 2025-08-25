@@ -17,6 +17,7 @@ Author: PIRATE-E
 
 ### progress --- schema is not created, yet we are writing the code first of some basic functionality of run shell command tool
 
+
 def run_shell_command(command: str, creation_flag=False) -> str:
     """
     Run a shell command and return its output.
@@ -34,27 +35,27 @@ def run_shell_command(command: str, creation_flag=False) -> str:
     try:
         # Run the command using subprocess.Popen with proper encoding handling
         process = subprocess.Popen(
-            command, 
-            shell=True, 
-            stdout=subprocess.PIPE, 
-            stderr=subprocess.PIPE, 
+            command,
+            shell=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             text=True,
-            encoding='utf-8',  # ✅ Explicit UTF-8 encoding
-            errors='replace',  # ✅ Replace problematic characters instead of failing
-            creationflags=subprocess.CREATE_NEW_CONSOLE if creation_flag else 0
+            encoding="utf-8",  # ✅ Explicit UTF-8 encoding
+            errors="replace",  # ✅ Replace problematic characters instead of failing
+            creationflags=subprocess.CREATE_NEW_CONSOLE if creation_flag else 0,
         )
         stdout, stderr = process.communicate()
-        
+
         # ✅ Safe handling of None values
         if process.returncode == 0:
             return (stdout or "").strip() or "Command executed successfully (no output)"
         else:
             error_msg = (stderr or "").strip() or "Unknown error occurred"
             return f"Error (code {process.returncode}): {error_msg}"
-            
+
     except subprocess.CalledProcessError as e:
         # ✅ Safe handling of stderr
-        error_msg = getattr(e, 'stderr', None)
+        error_msg = getattr(e, "stderr", None)
         if error_msg:
             return f"CalledProcessError: {error_msg.strip()}"
         else:
