@@ -26,9 +26,19 @@ import re
 from datetime import datetime
 
 from src.config import settings
-from src.models.state import StateAccessor
+from src.models.state import StateAccessor, State
 from src.prompts.agent_mode_prompts import Prompt
 from src.tools.lggraph_tools.tool_assign import ToolAssign
+
+# 🔄 HIERARCHICAL AGENT INTEGRATION: Import AgentGraphCore for complex workflows
+from src.agents.agentic_orchestrator.AgentGraphCore import (
+    AgentGraphCore, 
+    TASK, 
+    REQUIRED_CONTEXT, 
+    EXECUTION_CONTEXT,
+    MAIN_STATE,
+    AgentState
+)
 
 # 🚀 Debug System Migration (v2 - Robust Protocol)
 from src.ui.diagnostics.debug_helpers import (
@@ -920,6 +930,213 @@ def save_to_db(collection, data):
     pass
 
 
+# 🔄 HIERARCHICAL AGENT INTEGRATION: Complexity Analysis and Routing Functions
+
+def _analyze_request_complexity(user_request: str, tool_chain: list, conversation_history: list) -> dict:
+    """
+    🔄 NEW: Analyze request complexity to determine if hierarchical processing is needed.
+    
+    Args:
+        user_request: The original user request
+        tool_chain: List of tools selected for execution
+        conversation_history: Previous conversation context
+        
+    Returns:
+        Dict with complexity score and reasoning
+    """
+    complexity_score = 0
+    complexity_factors = []
+    
+    # Factor 1: Tool chain length (more tools = more complex)
+    tool_count = len(tool_chain) if tool_chain else 0
+    if tool_count >= 4:
+        complexity_score += 30
+        complexity_factors.append(f"High tool count: {tool_count} tools")
+    elif tool_count >= 2:
+        complexity_score += 15
+        complexity_factors.append(f"Multi-tool workflow: {tool_count} tools")
+    
+    # Factor 2: Abstract/complex language indicators
+    abstract_keywords = [
+        'analyze', 'comprehensive', 'strategy', 'research', 'investigate', 
+        'evaluate', 'assess', 'review', 'examine', 'study', 'explore',
+        'synthesize', 'create', 'develop', 'design', 'plan', 'recommend'
+    ]
+    abstract_count = sum(1 for keyword in abstract_keywords if keyword.lower() in user_request.lower())
+    if abstract_count >= 3:
+        complexity_score += 25
+        complexity_factors.append(f"High abstract language: {abstract_count} keywords")
+    elif abstract_count >= 1:
+        complexity_score += 10
+        complexity_factors.append(f"Abstract language detected: {abstract_count} keywords")
+    
+    # Factor 3: Multi-step workflow indicators
+    multi_step_keywords = [
+        'then', 'next', 'after', 'first', 'second', 'third', 'finally',
+        'subsequently', 'following', 'once', 'when', 'if', 'based on'
+    ]
+    multi_step_count = sum(1 for keyword in multi_step_keywords if keyword.lower() in user_request.lower())
+    if multi_step_count >= 2:
+        complexity_score += 20
+        complexity_factors.append(f"Multi-step indicators: {multi_step_count} keywords")
+    
+    # Factor 4: Request length (longer requests often more complex)
+    word_count = len(user_request.split())
+    if word_count > 50:
+        complexity_score += 15
+        complexity_factors.append(f"Long request: {word_count} words")
+    elif word_count > 20:
+        complexity_score += 8
+        complexity_factors.append(f"Medium request: {word_count} words")
+    
+    # Factor 5: Conditional or contextual dependencies
+    conditional_keywords = ['if', 'when', 'unless', 'provided', 'depending', 'based on']
+    conditional_count = sum(1 for keyword in conditional_keywords if keyword.lower() in user_request.lower())
+    if conditional_count >= 1:
+        complexity_score += 15
+        complexity_factors.append(f"Conditional logic: {conditional_count} indicators")
+    
+    # Factor 6: Domain-specific complexity
+    domain_keywords = [
+        'github', 'repository', 'codebase', 'project', 'documentation',
+        'database', 'api', 'integration', 'deployment', 'architecture'
+    ]
+    domain_count = sum(1 for keyword in domain_keywords if keyword.lower() in user_request.lower())
+    if domain_count >= 2:
+        complexity_score += 20
+        complexity_factors.append(f"Domain complexity: {domain_count} technical terms")
+    
+    # Determine complexity level
+    if complexity_score >= 60:
+        complexity_level = "HIGH"
+        use_hierarchical = True
+    elif complexity_score >= 30:
+        complexity_level = "MEDIUM"
+        use_hierarchical = True  # Use hierarchical for medium complexity too
+    else:
+        complexity_level = "LOW"
+        use_hierarchical = False
+    
+    debug_info(
+        heading="AGENT_MODE • COMPLEXITY_ANALYSIS",
+        body=f"Request complexity: {complexity_level} (score: {complexity_score})",
+        metadata={
+            "complexity_score": complexity_score,
+            "complexity_level": complexity_level,
+            "use_hierarchical": use_hierarchical,
+            "factors": complexity_factors,
+            "tool_count": tool_count,
+            "word_count": word_count,
+            "context": "complexity_routing_decision"
+        }
+    )
+    
+    return {
+        "complexity_score": complexity_score,
+        "complexity_level": complexity_level,
+        "use_hierarchical": use_hierarchical,
+        "factors": complexity_factors,
+        "reasoning": f"Complexity level {complexity_level} (score: {complexity_score}) based on: {', '.join(complexity_factors)}"
+    }
+
+
+def _execute_hierarchical_workflow(user_request: str, messages: list) -> dict:
+    """
+    🔄 NEW: Execute complex request using AgentGraphCore hierarchical system.
+    
+    Args:
+        user_request: The user's request
+        messages: Full conversation messages
+        
+    Returns:
+        Dict with execution results
+    """
+    try:
+        debug_info(
+            heading="AGENT_MODE • HIERARCHICAL_EXECUTION",
+            body="Routing complex request to AgentGraphCore hierarchical system",
+            metadata={
+                "user_request_length": len(user_request),
+                "conversation_length": len(messages),
+                "execution_mode": "hierarchical",
+                "context": "hierarchical_workflow_start"
+            }
+        )
+        
+        # Create proper state for AgentGraphCore
+        state_obj = State(messages=messages, message_type="human")
+        main_state = MAIN_STATE(state=state_obj)
+        
+        # Create initial state in dict format for LangGraph
+        initial_state = {
+            'tasks': [],
+            'current_task_id': 0,
+            'executed_nodes': [],
+            'original_goal': user_request,
+            'workflow_status': 'STARTED',
+            'persona': None
+        }
+        
+        # Build and execute hierarchical graph
+        debug_info(
+            heading="AGENT_MODE • HIERARCHICAL_GRAPH_BUILD",
+            body="Building AgentGraphCore workflow graph",
+            metadata={
+                "state_keys": list(initial_state.keys()),
+                "original_goal": user_request[:100] + "..." if len(user_request) > 100 else user_request,
+                "context": "hierarchical_graph_execution"
+            }
+        )
+        
+        graph = AgentGraphCore.build_graph()
+        final_state = graph.invoke(initial_state)
+        
+        # Extract results
+        workflow_status = final_state.get('workflow_status', 'UNKNOWN')
+        final_response = final_state.get('final_response', 'No response generated')
+        tasks_executed = len(final_state.get('tasks', []))
+        
+        debug_info(
+            heading="AGENT_MODE • HIERARCHICAL_COMPLETION",
+            body=f"Hierarchical workflow completed with status: {workflow_status}",
+            metadata={
+                "workflow_status": workflow_status,
+                "tasks_executed": tasks_executed,
+                "response_length": len(final_response),
+                "success": workflow_status == 'COMPLETED',
+                "context": "hierarchical_workflow_completion"
+            }
+        )
+        
+        return {
+            "success": True,
+            "response": final_response,
+            "workflow_status": workflow_status,
+            "tasks_executed": tasks_executed,
+            "execution_mode": "hierarchical"
+        }
+        
+    except Exception as e:
+        debug_critical(
+            heading="AGENT_MODE • HIERARCHICAL_ERROR",
+            body=f"Hierarchical execution failed: {str(e)}",
+            metadata={
+                "error_type": type(e).__name__,
+                "error_message": str(e),
+                "user_request": user_request[:200],
+                "fallback_action": "route_to_legacy_agent",
+                "context": "hierarchical_execution_error"
+            }
+        )
+        
+        return {
+            "success": False,
+            "error": str(e),
+            "fallback_needed": True,
+            "execution_mode": "hierarchical_failed"
+        }
+
+
 def formated_final_response(create_display_response: str) -> str:
     """
     Formats the final response string for display, handling Windows paths and Unicode decoding issues.
@@ -1319,6 +1536,111 @@ def agent_node(state):
                 },
             )
             raise
+
+        # 🔄 HIERARCHICAL AGENT INTEGRATION: Complexity Analysis and Smart Routing
+        try:
+            # Analyze request complexity to determine execution path
+            complexity_analysis = _analyze_request_complexity(
+                user_request=last_message,
+                tool_chain=response,  # The validated tool chain
+                conversation_history=messages
+            )
+            
+            # Route to hierarchical system if complexity warrants it
+            if complexity_analysis["use_hierarchical"]:
+                debug_info(
+                    heading="AGENT_MODE • ROUTING_TO_HIERARCHICAL",
+                    body=f"Routing to hierarchical system: {complexity_analysis['reasoning']}",
+                    metadata={
+                        "complexity_score": complexity_analysis["complexity_score"],
+                        "complexity_level": complexity_analysis["complexity_level"],
+                        "factors": complexity_analysis["factors"],
+                        "execution_path": "hierarchical",
+                        "legacy_fallback_available": True,
+                        "context": "smart_routing_decision"
+                    }
+                )
+                
+                # Execute using hierarchical system
+                hierarchical_result = _execute_hierarchical_workflow(
+                    user_request=last_message,
+                    messages=messages
+                )
+                
+                if hierarchical_result["success"]:
+                    # Hierarchical execution successful
+                    final_response = hierarchical_result["response"]
+                    
+                    debug_info(
+                        heading="AGENT_MODE • HIERARCHICAL_SUCCESS",
+                        body="Hierarchical execution completed successfully",
+                        metadata={
+                            "workflow_status": hierarchical_result["workflow_status"],
+                            "tasks_executed": hierarchical_result["tasks_executed"],
+                            "response_length": len(final_response),
+                            "execution_mode": "hierarchical",
+                            "context": "hierarchical_success_path"
+                        }
+                    )
+                    
+                    # Print and return hierarchical result
+                    print_message(final_response, "ai")
+                    return {"messages": [settings.AIMessage(content=final_response)]}
+                    
+                else:
+                    # Hierarchical execution failed, fall back to legacy
+                    debug_warning(
+                        heading="AGENT_MODE • HIERARCHICAL_FALLBACK",
+                        body=f"Hierarchical execution failed, falling back to legacy: {hierarchical_result.get('error', 'Unknown error')}",
+                        metadata={
+                            "error_type": hierarchical_result.get("error", "Unknown"),
+                            "execution_mode": "fallback_to_legacy",
+                            "complexity_score": complexity_analysis["complexity_score"],
+                            "fallback_reason": "hierarchical_execution_failure",
+                            "context": "hierarchical_fallback_decision"
+                        }
+                    )
+                    # Continue to legacy execution below
+                    
+            else:
+                # Use legacy execution for simple requests
+                debug_info(
+                    heading="AGENT_MODE • ROUTING_TO_LEGACY",
+                    body=f"Using legacy execution: {complexity_analysis['reasoning']}",
+                    metadata={
+                        "complexity_score": complexity_analysis["complexity_score"],
+                        "complexity_level": complexity_analysis["complexity_level"],
+                        "execution_path": "legacy",
+                        "tool_count": len(response),
+                        "context": "legacy_routing_decision"
+                    }
+                )
+                # Continue to legacy execution below
+                
+        except Exception as routing_error:
+            # If routing fails, fall back to legacy execution
+            debug_critical(
+                heading="AGENT_MODE • ROUTING_ERROR",
+                body=f"Smart routing failed, defaulting to legacy: {str(routing_error)}",
+                metadata={
+                    "error_type": type(routing_error).__name__,
+                    "error_message": str(routing_error),
+                    "fallback_action": "use_legacy_execution",
+                    "context": "routing_error_fallback"
+                }
+            )
+            # Continue to legacy execution below
+
+        # 🔄 LEGACY AGENT EXECUTION: Original Agent class workflow (preserved for compatibility)
+        debug_info(
+            heading="AGENT_MODE • LEGACY_EXECUTION",
+            body="Executing with legacy Agent class system",
+            metadata={
+                "tool_count": len(response),
+                "execution_mode": "legacy",
+                "context": "legacy_agent_execution"
+            }
+        )
 
         # Agent execution with error handling
         try:
