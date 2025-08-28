@@ -167,4 +167,4 @@ dependencies = [
     "zstandard==0.24.0",
 ]
 [tool.ruff]
-lint.select = ["PTH", "ASYNC"]
+lint.select = ["PTH", "ASYNC", "UP028"]
