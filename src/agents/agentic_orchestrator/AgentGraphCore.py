@@ -252,14 +252,157 @@ class AgentCoreHelpers:
     Common utility functions for agent and sub-agent classes.
     todo : the all function those are not nodes should be moved here
     """
+    synthesis_tool_description = "• perform_synthesis: A virtual tool to review the results of previous tasks and synthesize them into a single, comprehensive summary or answer. Use this when you need to combine information from multiple sources before taking a final action, like writing a file. Parameters: {'instructions': 'A clear, natural language instruction on what to synthesize and how to format it.'}"
 
+    @classmethod
+    def perform_internal_synthesis(cls, current_task: TASK, full_history: list[TASK]) -> tuple[bool, str]:
+        """
+        Executes the virtual 'perform_synthesis' tool by calling an LLM.
+        """
+        debug_info("Internal Synthesis", f"Performing synthesis for task: {current_task.description}", metadata={
+            "function_name": "_perform_internal_synthesis",
+            "task_id": current_task.task_id,
+        })
+
+        # Extract the raw results from the history
+        context_from_history = "\n\n".join([
+            f"Result from Task {t.task_id} ({t.tool_name}):\n{t.execution_context.result}"
+            for t in full_history
+            if t.execution_context and t.execution_context.result
+        ])
+
+        if not context_from_history:
+            return False, "Synthesis failed: No previous results found to synthesize."
+
+        # Get the specific instructions from the current task's parameters
+        synthesis_instructions = current_task.execution_context.parameters.get("instructions", "Summarize the provided context.")
+
+        # This prompt needs to be added to hierarchical_agent_prompts.py
+        prompt_generator = HierarchicalAgentPrompt()
+        system_prompt, human_prompt = prompt_generator.generate_synthesis_execution_prompt(
+            synthesis_instructions,
+            context_from_history
+        )
+
+        try:
+            model = ModelManager(model="openai/gpt-oss-120b")
+            response = model.invoke([
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": human_prompt},
+            ])
+            synthesis_result = response.content
+            return True, synthesis_result
+        except Exception as e:
+            error_msg = f"Internal synthesis LLM call failed: {e}"
+            debug_error("Internal Synthesis", error_msg, metadata={"exception": str(e)})
+            return False, error_msg
+
+# ----------- these are tool list helpers -----------
     @classmethod
     def get_safe_tools_list(cls):
         """Get a safe list of tools, raising an error if no tools are available."""
+        # todo virtual tools could add up here
         tools = ToolAssign.get_tools_list()
         if not tools:
             raise RuntimeError("No tools available - system cannot function")
         return tools
+
+    @classmethod
+    def get_detailed_tool_context(cls, recommended_tools: list[str]) -> str:
+        """Get detailed context (name, description, schema) for only the recommended tools.
+        Uses the same approach as main_orchestrator.py
+        """
+        try:
+            all_tools = AgentCoreHelpers.get_safe_tools_list()
+            tool_context = []
+
+            # --- INJECT VIRTUAL TOOL ---
+            if "perform_synthesis" in recommended_tools:
+                tool_context.append(cls.synthesis_tool_description)
+            # --- END INJECTION ---
+
+            for tool in all_tools:
+                if tool.name in recommended_tools:
+                    # Get name and description
+                    name = getattr(tool, "name", "N/A")
+                    desc = getattr(tool, "description", "No description available")
+
+                    # Get arguments using the same function as main_orchestrator.py
+                    args_schema = get_tool_argument_schema(tool)
+
+                    tool_context.append(f"• {name}: {desc}\n  Parameters: {args_schema}")
+
+            return "\n\n".join(tool_context)
+
+        except Exception as e:
+            # print_log_message(f"Failed to get detailed tool context: {e}", "Tool Context")
+            debug_warning("Tool Context", f"Failed to get detailed tool context: {e}", metadata={
+                "function name": "get_detailed_tool_context",
+                "exception": str(e),
+            })
+            return "Tool context unavailable"
+
+    @classmethod
+    def recommend_tools_for_task(cls, task_description: str, max_tools: int = 10) -> list[str]:
+        """Use LLM to recommend 5-10 most relevant tools for a specific task.
+        This is the pre-filtering step that makes the system much more efficient.
+        """
+        try:
+            # Get all available tool names
+            all_tools = AgentCoreHelpers.get_safe_tools_list()
+            all_tool_names = [tool.name for tool in all_tools]
+
+            # Create a concise tool list for the recommender, including the virtual tool
+            tool_list_for_prompt = [f"• {tool.name}" for tool in all_tools]
+            tool_list_for_prompt.append("• perform_synthesis")  # Make the virtual tool visible
+            tool_list = "\n".join(tool_list_for_prompt)
+
+
+            recommend_prompt = f"""
+                TOOL RECOMMENDATION SYSTEM
+
+                Task: "{task_description}"
+
+                Available Tools:
+                {tool_list}
+
+                Select up to {max_tools} tools from the list above that are most relevant for this task.
+                Consider broad categories such as: file operations (e.g., list/read/write), web research, analysis, shell/OS commands, and memory/graph operations and others.
+                Do not invent tool names — return only names that appear in the Available Tools section and match them exactly.
+
+                Respond with ONLY a JSON array of tool names, for example:
+                ["tool1", "tool2", "tool3"]
+                """
+
+            model = ModelManager(model="openai/gpt-oss-120b")
+            response = model.invoke([
+                {"role": "system",
+                 "content": "You are a tool recommendation expert. Select the most relevant tools for the given task."},
+                {"role": "user", "content": recommend_prompt},
+            ])
+
+            recommended_tools = ModelManager.convert_to_json(response.content)
+
+            # Validate and filter
+            if isinstance(recommended_tools, list):
+                # Also consider the virtual tool as valid
+                valid_tools = [tool for tool in recommended_tools if tool in all_tool_names or tool == "perform_synthesis"]
+                return valid_tools[:max_tools]
+            # Fallback to common tools
+            return ["list_directory", "GoogleSearch", "write_file"]
+
+        except Exception as e:
+            # Use module-level debug_warning (fallback defined earlier) instead of re-importing
+            debug_warning("Tool Recommender", f"Tool recommendation failed: {e}", metadata={
+                'function name': "recommend_tools_for_task",
+                "task_description": task_description,
+                "max_tools": max_tools,
+            })
+            # Safe fallback
+            return ["list_directory", "GoogleSearch", "write_file", "perform_synthesis"]
+
+# ^^^^^^^^^^^^^^ these are tool list helpers ^^^^^^^^^^^^^^^^^^
+
 
     class ErrorFallbackHelpers:
         """Helper functions for error fallback node."""
@@ -304,9 +447,9 @@ class AgentCoreHelpers:
                                "task_id": task.task_id,
                            })
                 return "GoogleSearch"
-            
-            if "summarize" in task.description.lower() and task.tool_name != "sequentialthinking":
-                return "sequentialthinking"
+
+            if "summarize" in task.description.lower() and task.tool_name != "perform_synthesis":
+                return "perform_synthesis"
 
             return None
 
@@ -409,41 +552,47 @@ class AgentCoreHelpers:
 
                 if tool_name == "RunShellCommand":
                     content = last_response.content
-                    # Check for various error patterns more comprehensively
-                    error_indicators = [
-                        "Error (code",  # Handles "Error (code 1):" format
-                        "Error:",
-                        "Stderr:",
-                        "command not found",
-                        "is not recognized as an internal or external command",
-                        "'if' is not recognized",
-                        "The syntax of the command is incorrect",
-                        "Access is denied",
-                        "No such file or directory",
-                        "Permission denied",
-                        "was unexpected at this time"  # Windows batch error
-                    ]
+                    is_logical_success = True # Assume success unless proven otherwise
+                    logical_failure_message = ""
 
-                    # Check for any error indicators
-                    for error_indicator in error_indicators:
-                        if error_indicator.lower() in content.lower():
-                            is_logical_success = False
-                            logical_failure_message = content
-                            break
+                    # Priority 1: Check for a non-zero exit code. This is the most reliable indicator.
+                    try:
+                        import re
+                        exit_code_match = re.search(r"Exit Code:\s*(\d+)", content)
+                        if exit_code_match:
+                            exit_code = int(exit_code_match.group(1))
+                            if exit_code != 0:
+                                is_logical_success = False
+                                logical_failure_message = f"Command failed with non-zero exit code {exit_code}. Full output: {content}"
+                    except Exception:
+                        pass # Ignore parsing errors, will rely on string checks
 
-                    # Also check for non-zero exit codes if no explicit error found
-                    if is_logical_success and "Exit Code:" in content:
-                        try:
-                            # Extract exit code
-                            import re
-                            exit_code_match = re.search(r"Exit Code:\s*(\d+)", content)
-                            if exit_code_match:
-                                exit_code = int(exit_code_match.group(1))
-                                if exit_code != 0:
+                    # Priority 2: If exit code is 0 or absent, check for common error strings in output.
+                    if is_logical_success:
+                        error_indicators = [
+                            "Error (code",
+                            "Error:",
+                            "Stderr:", # Check if Stderr has content
+                            "command not found",
+                            "is not recognized as an internal or external command",
+                            "The syntax of the command is incorrect",
+                            "Access is denied",
+                            "No such file or directory",
+                            "Permission denied",
+                            "was unexpected at this time"
+                        ]
+                        # Check for Stderr content specifically
+                        import re
+                        stderr_match = re.search(r"Stderr:\s*(.+)", content, re.DOTALL)
+                        if stderr_match and stderr_match.group(1).strip() and stderr_match.group(1).strip() != "(empty)":
+                             is_logical_success = False
+                             logical_failure_message = f"Command produced output on Stderr. Full output: {content}"
+                        else:
+                            for error_indicator in error_indicators:
+                                if error_indicator.lower() in content.lower():
                                     is_logical_success = False
-                                    logical_failure_message = content
-                        except Exception:
-                            pass
+                                    logical_failure_message = f"Command output contained error indicator '{error_indicator}'. Full output: {content}"
+                                    break
 
                 elif tool_name in ["read_file", "read_text_file", "write_file"]:
                     # Enhanced error detection for file operations
@@ -508,30 +657,35 @@ class AgentCoreHelpers:
             - Use `multiprocessing` or `concurrent.futures.ProcessPoolExecutor` to isolate execution.
             - Ensure proper cleanup of processes and robust exception handling to avoid resource leaks.
             """
-
             from concurrent.futures import ThreadPoolExecutor, TimeoutError
 
-            with ThreadPoolExecutor(max_workers=1) as executor:
-                future = executor.submit(AgentCoreHelpers.ToolExecutionHelpers._tool_executor, tool_name, parameters)
-                try:
-                    success, result = future.result(timeout=timeout)
-                    return success, result
-                except TimeoutError:
-                    future.cancel()
-                    debug_error("Tool Executor", f"Tool '{tool_name}' execution timed out after {timeout} seconds.",
-                                metadata={
-                                    "function name": "exeCuteTool",
-                                    "tool_name": tool_name,
-                                    "timeout": timeout,
-                                })
-                    return False, f"Tool execution timed out after {timeout} seconds"
-                except Exception as e:
-                    debug_error("Tool Executor", f"Exception during tool execution: {str(e)}", metadata={
-                        "function name": "exeCuteTool",
-                        "tool_name": tool_name,
-                        "exception": str(e),
-                    })
-                    return False, f"Error executing tool {tool_name}: {e!s}"
+            executor = ThreadPoolExecutor(max_workers=1)
+            future = executor.submit(AgentCoreHelpers.ToolExecutionHelpers._tool_executor, tool_name, parameters)
+            try:
+                success, result = future.result(timeout=timeout)
+                executor.shutdown(wait=True)  # Wait for the future to complete if it finishes on time.
+                return success, result
+            except TimeoutError:
+                # The future timed out. Don't wait for it to complete.
+                # This will leave a zombie thread if the underlying tool call is stuck,
+                # but it will prevent the main workflow from hanging.
+                executor.shutdown(wait=False)
+                debug_error("Tool Executor", f"Tool '{tool_name}' execution timed out after {timeout} seconds.",
+                            metadata={
+                                "function name": "exeCuteTool",
+                                "tool_name": tool_name,
+                                "timeout": timeout,
+                            })
+                return False, f"Tool execution timed out after {timeout} seconds"
+            except Exception as e:
+                # Handle other exceptions during execution.
+                executor.shutdown(wait=True)
+                debug_error("Tool Executor", f"Exception during tool execution: {str(e)}", metadata={
+                    "function name": "exeCuteTool",
+                    "tool_name": tool_name,
+                    "exception": str(e),
+                })
+                return False, f"Error executing tool {tool_name}: {e!s}"
 
 
 
@@ -572,118 +726,12 @@ class AgentGraphCore:
     # :-- current_task = next((task for task in updated_tasks if task.task_id == current_task_id), None)
 
 
-    @classmethod
-    def recommend_tools_for_task(cls, task_description: str, max_tools: int = 10) -> list[str]:
-        """Use LLM to recommend 5-10 most relevant tools for a specific task.
-        This is the pre-filtering step that makes the system much more efficient.
-        """
-        try:
-            # Get all available tool names
-            all_tools = AgentCoreHelpers.get_safe_tools_list()
-            all_tool_names = [tool.name for tool in all_tools]
 
-            # --- START SEMANTIC TOOL FIX ---
-            # If the task involves synthesis, ensure the correct tool is available.
-            synthesis_keywords = ["summarize", "analyze", "synthesize", "review", "combine", "report"]
-            if any(keyword in task_description.lower() for keyword in synthesis_keywords):
-                if "sequentialthinking" not in all_tool_names:
-                    # This case should ideally not happen if the tool is registered, but as a safeguard:
-                    debug_warning("Tool Recommender",
-                                  "Synthesis task detected but 'sequentialthinking' tool is not available.",
-                                  metadata={'function_name': 'recommend_tools_for_task'})
-                # We will ensure it's considered by the LLM later.
-            # --- END SEMANTIC TOOL FIX ---
-
-            # Create a concise tool list for the recommender
-            tool_list = "\n".join([f"• {tool.name}" for tool in all_tools])
-
-            recommend_prompt = f"""
-            TOOL RECOMMENDATION SYSTEM
-            
-            Task: "{task_description}"
-            
-            Available Tools:
-            {tool_list}
-            
-            Select up to {max_tools} tools from the list above that are most relevant for this task.
-            Consider broad categories such as: file operations (e.g., list/read/write), web research, analysis, shell/OS commands, and memory/graph operations and others.
-            Do not invent tool names — return only names that appear in the Available Tools section and match them exactly.
-            
-            Respond with ONLY a JSON array of tool names, for example:
-            ["tool1", "tool2", "tool3"]
-            """
-
-            model = ModelManager(model="openai/gpt-oss-120b")
-            response = model.invoke([
-                {"role": "system",
-                 "content": "You are a tool recommendation expert. Select the most relevant tools for the given task."},
-                {"role": "user", "content": recommend_prompt},
-            ])
-
-            recommended_tools = ModelManager.convert_to_json(response.content)
-
-            # Validate and filter
-            if isinstance(recommended_tools, list):
-                valid_tools = [tool for tool in recommended_tools if tool in all_tool_names]
-                
-                # --- START SEMANTIC TOOL FIX 2 ---
-                # If it's a synthesis task, ensure sequentialthinking is in the final list.
-                if any(keyword in task_description.lower() for keyword in synthesis_keywords):
-                    if "sequentialthinking" not in valid_tools:
-                        valid_tools.append("sequentialthinking")
-                        debug_info("Tool Recommender",
-                                   "Added 'sequentialthinking' to recommended tools for synthesis task.",
-                                   metadata={'function_name': 'recommend_tools_for_task'})
-                # --- END SEMANTIC TOOL FIX 2 ---
-                
-                return valid_tools[:max_tools]
-            # Fallback to common tools
-            return ["list_directory", "GoogleSearch", "write_file"]
-
-        except Exception as e:
-            # Use module-level debug_warning (fallback defined earlier) instead of re-importing
-            debug_warning("Tool Recommender", f"Tool recommendation failed: {e}", metadata={
-                'function name': "recommend_tools_for_task",
-                "task_description": task_description,
-                "max_tools": max_tools,
-            })
-            # Safe fallback
-            return ["list_directory", "GoogleSearch", "write_file", "sequentialthinking"]
-
-    @classmethod
-    def __get_detailed_tool_context(cls, recommended_tools: list[str]) -> str:
-        """Get detailed context (name, description, schema) for only the recommended tools.
-        Uses the same approach as main_orchestrator.py
-        """
-        try:
-            all_tools = AgentCoreHelpers.get_safe_tools_list()
-            tool_context = []
-
-            for tool in all_tools:
-                if tool.name in recommended_tools:
-                    # Get name and description
-                    name = getattr(tool, "name", "N/A")
-                    desc = getattr(tool, "description", "No description available")
-
-                    # Get arguments using the same function as main_orchestrator.py
-                    args_schema = get_tool_argument_schema(tool)
-
-                    tool_context.append(f"• {name}: {desc}\n  Parameters: {args_schema}")
-
-            return "\n\n".join(tool_context)
-
-        except Exception as e:
-            # print_log_message(f"Failed to get detailed tool context: {e}", "Tool Context")
-            debug_warning("Tool Context", f"Failed to get detailed tool context: {e}", metadata={
-                "function name": "get_detailed_tool_context",
-                "exception": str(e),
-            })
-            return "Tool context unavailable"
 
     @classmethod
     def __subAGENT_initial_planner(cls, state: "WorkflowStateModel") -> dict:
         """Creates high-level plan using tool pre-filtering and self-healing for efficiency."""
-        # AgentStatusUpdater.update_status('Initial Planner')
+        AgentStatusUpdater.update_status('Initial Planner')
         goal = state.original_goal
         debug_info("--- NODE: Initial Planner ---", f"Decomposing goal: {goal}", metadata={
             "function name": "__subAGENT_initial_planner",
@@ -699,8 +747,8 @@ class AgentGraphCore:
             debug_info("Initial Planner", f"Planning attempt {attempt + 1}", metadata={"attempt": attempt + 1})
 
             # STEP 1 & 2: Recommend and get tool context
-            recommended_tools = cls.recommend_tools_for_task(goal)
-            detailed_tool_context = cls.get_detailed_tool_context(recommended_tools)
+            recommended_tools = AgentCoreHelpers.recommend_tools_for_task(goal)
+            detailed_tool_context = AgentCoreHelpers.get_detailed_tool_context(recommended_tools)
 
             # STEP 3: Generate plan, providing feedback on failure
             prompt_generator = HierarchicalAgentPrompt()
@@ -726,25 +774,45 @@ class AgentGraphCore:
             current_validated_tasks = []
             has_invalid_tool = False
             invalid_tool_name = None
-            
+
             # Using a safe list of tool names for case-insensitive comparison
             safe_tool_names = [tool.name.lower() for tool in AgentCoreHelpers.get_safe_tools_list()]
-            
+            # Add our virtual tool to the list of valid names for the planner's validation step
+            safe_tool_names.append("perform_synthesis")
+
             for item in llm_returned:
                 if not (isinstance(item, dict) and "tool_name" in item and "description" in item):
                     has_invalid_tool = True
                     invalid_tool_name = f"Task object missing required keys: {item}"
                     break
 
-                tool_name_lower = item["tool_name"].lower()
+                original_tool_name = item.get("tool_name") # Use .get() for safety
+                if not original_tool_name:
+                    has_invalid_tool = True
+                    invalid_tool_name = "None" # Handle case where tool_name key is missing or None
+                    break
+                    
+                tool_name_lower = original_tool_name.lower()
+
                 if tool_name_lower not in safe_tool_names:
                     has_invalid_tool = True
-                    invalid_tool_name = item["tool_name"]
+                    invalid_tool_name = original_tool_name
                     break
+
+                # Handle case correction and virtual tool
+                if tool_name_lower == "perform_synthesis":
+                    item["tool_name"] = "perform_synthesis"
+                else:
+                    # It's a real tool, find the correct case-sensitive name
+                    correct_tool_name = next((t.name for t in AgentCoreHelpers.get_safe_tools_list() if t.name.lower() == tool_name_lower), None)
+                    item["tool_name"] = correct_tool_name
                 
-                # Find the correct capitalization and correct it in the plan
-                correct_tool_name = next((t.name for t in AgentCoreHelpers.get_safe_tools_list() if t.name.lower() == tool_name_lower), None)
-                item["tool_name"] = correct_tool_name
+                # Final check to ensure a valid tool name was assigned before appending
+                if item["tool_name"] is None:
+                    has_invalid_tool = True
+                    invalid_tool_name = original_tool_name # Use the original name in the error
+                    break
+
                 current_validated_tasks.append(item)
 
             if not has_invalid_tool:
@@ -814,7 +882,7 @@ class AgentGraphCore:
         a graduated response system for handling task failures.
         """
         current_task_id = state.current_task_id
-        # AgentStatusUpdater.update_status("complexity_analysis", task_id=current_task_id, extra_info="Analyzing task")
+        AgentStatusUpdater.update_status("complexity_analysis", task_id=current_task_id, extra_info="Analyzing task")
         debug_info("--- NODE: Classifier ---", "Deciding next action based on task status and failure history",
                    metadata={
                        "function name": "__subAGENT_classifier",
@@ -834,8 +902,8 @@ class AgentGraphCore:
         elif current_task and current_task.failure_context:
             # Check if we've exceeded retry limits to prevent infinite loops
             if current_task.failure_context.fail_count > 3:
-                # AgentStatusUpdater.update_status("complexity_analysis", task_id=current_task_id,
-                #                                  extra_info="FAILED: Exceeded retry limit")
+                AgentStatusUpdater.update_status("complexity_analysis", task_id=current_task_id,
+                                                 extra_info="FAILED: Exceeded retry limit")
                 debug_error("Classifier",
                             f"Task {current_task_id} has failed {current_task.failure_context.fail_count} times. Exceeded retry limit. Marking as permanently failed.",
                             metadata={
@@ -971,8 +1039,7 @@ class AgentGraphCore:
             "create_directory": {"directory_path": "new_directory"},
             "GoogleSearch": {"query": task_description[:100], "num_results": 5},
             "RunShellCommand": {"command": 'echo "Command execution for task"'},
-            "sequentialthinking": {"thought": task_description, "nextThoughtNeeded": False, "thoughtNumber": 1,
-                                   "totalThoughts": 1},
+            "perform_synthesis": {"instructions": f"Synthesize the context related to: {task_description}"},
         }
         return fallback_patterns.get(tool_name, {"task_description": task_description})
 
@@ -1048,7 +1115,7 @@ class AgentGraphCore:
         current_task_id = state.current_task_id
         updated_tasks = state.tasks
         current_task = next((task for task in updated_tasks if task.task_id == current_task_id), None)
-        # AgentStatusUpdater.update_status("task_execution", task_id=current_task_id)
+        AgentStatusUpdater.update_status("task_execution", task_id=current_task_id)
 
         if not current_task:
             debug_error("Task Executor", f"Could not find current task with ID {current_task_id}", metadata={
@@ -1057,11 +1124,29 @@ class AgentGraphCore:
             })
             return {"workflow_status": "FAILED"}
 
+        # --- VIRTUAL TOOL INTERCEPTION ---
+        if current_task.tool_name == "perform_synthesis":
+            debug_info("Task Executor", "Intercepted virtual tool 'perform_synthesis'.", metadata={"task_id": current_task.task_id})
+            context_data = current_task.required_context.pre_execution_context or {}
+            full_history = context_data.get("completed_tasks_history", [])
+            success, result = AgentCoreHelpers.perform_internal_synthesis(current_task, full_history)
+            if success:
+                current_task.status = "completed"
+                current_task.execution_context.result = result
+            else:
+                current_task.status = "failed"
+                current_task.failure_context = FAILURE_CONTEXT(
+                    error_message=result,
+                    error_type="SynthesisFailed",
+                )
+            return {"tasks": updated_tasks, "executed_nodes": state.executed_nodes + ["subAGENT_task_executor"]}
+        # --- END VIRTUAL TOOL INTERCEPTION ---
+
         try:
             complexity_analysis = cls.__analyze_task_complexity(current_task)
 
             if complexity_analysis.get("requires_decomposition"):
-                # AgentStatusUpdater.update_status("task complexity analysis", task_id=current_task_id, extra_info="Decomposing complex task")
+                AgentStatusUpdater.update_status("task complexity analysis", task_id=current_task_id, extra_info="Decomposing complex task")
                 debug_info("Task Executor", f"Task {current_task_id} is complex - triggering spawning", metadata={
                     "function name": "__subAGENT_task_executor",
                     "task_id": current_task_id,
@@ -1070,10 +1155,9 @@ class AgentGraphCore:
 
                 # *** FIX: Gather context BEFORE spawning ***
                 completed_tasks = [t for t in updated_tasks if t.status == "completed" and t.execution_context and t.execution_context.result]
-                context_summary = [f"Task {t.task_id} ({t.tool_name}): {t.execution_context.result}" for t in completed_tasks]
                 parent_context = {
                     "original_goal": state.original_goal,
-                    "completed_task_results": context_summary,
+                    "completed_tasks_history": completed_tasks, # FIX: Use correct key and pass full task objects
                     "workflow_progress": f"{len(completed_tasks)}/{len(updated_tasks)} tasks completed"
                 }
 
@@ -1101,7 +1185,7 @@ class AgentGraphCore:
                     "executed_nodes": state.executed_nodes + ["subAGENT_task_executor"],
                 }
 
-            # AgentStatusUpdater.update_status("task_execution", task_id=current_task_id, extra_info="Executing tool")
+            AgentStatusUpdater.update_status("task_execution", task_id=current_task_id, extra_info="Executing tool")
             debug_info("Task Executor", f"Task {current_task_id} is atomic - executing directly", metadata={
                 "function name": "__subAGENT_task_executor",
                 "task_id": current_task_id,
@@ -1149,7 +1233,7 @@ class AgentGraphCore:
                 })
 
                 if current_task.failure_context.fail_count > 3:
-                    # AgentStatusUpdater.update_status("task_execution", task_id=current_task_id, extra_info="failed: exceeded retries")
+                    AgentStatusUpdater.update_status("task_execution", task_id=current_task_id, extra_info="failed: exceeded retries")
                     debug_error("Task Executor",
                                 f"Task {current_task_id} has failed {current_task.failure_context.fail_count} times. Exceeded retry limit of 3.",
                                 metadata={
@@ -1284,7 +1368,7 @@ class AgentGraphCore:
     @classmethod
     def __subAGENT_error_fallback(cls, state: "WorkflowStateModel") -> dict:
         """Handle task failures with a tiered, state-driven recovery system."""
-        # AgentStatusUpdater.update_status("error_recovery", task_id=state.current_task_id)
+        AgentStatusUpdater.update_status("error_recovery", task_id=state.current_task_id)
         debug_info("--- NODE: Error Fallback ---", "Handling task failure with tiered recovery strategies", metadata={
             "function name": "__subAGENT_error_fallback",
         })
@@ -1337,9 +1421,9 @@ class AgentGraphCore:
             error_type = current_task.failure_context.error_type
             failed_parameters = current_task.failure_context.failed_parameters
 
-            recovery_tools = cls.recommend_tools_for_task(
+            recovery_tools = AgentCoreHelpers.recommend_tools_for_task(
                 f"Fix error: {error_message} for task: {current_task.description}")
-            detailed_recovery_context = cls.__get_detailed_tool_context(recovery_tools)
+            detailed_recovery_context = AgentCoreHelpers.get_detailed_tool_context(recovery_tools)
             current_os = sys.platform
 
             prompt_generator = HierarchicalAgentPrompt()
@@ -1493,7 +1577,7 @@ class AgentGraphCore:
             if task.execution_context and task.execution_context.result:
                 # Clean up the task result to remove raw Python representations
                 result_content = task.execution_context.result
-                
+
                 # If the result contains Python list/dict representations, clean them up
                 try:
                     import json as _json
@@ -1509,12 +1593,12 @@ class AgentGraphCore:
                                 # Unescape newlines and clean up
                                 extracted_text = extracted_text.replace('\\n', '\n').replace("\'", "'")
                                 result_content = extracted_text
-                    
+
                     all_results.append(f"Task {task.task_id} ({task.tool_name}): {result_content}")
                 except Exception as e:
                     # Fallback to original content if parsing fails
                     all_results.append(f"Task {task.task_id} ({task.tool_name}): {task.execution_context.result}")
-                    
+
             elif task.failure_context:
                 all_results.append(
                     f"Task {task.task_id} ({task.tool_name}) failed: {task.failure_context.error_message}")
@@ -1829,36 +1913,6 @@ class AgentGraphCore:
         return graph_builder.compile()
 
 
-    @classmethod
-    def get_detailed_tool_context(cls, recommended_tools: list[str]) -> str:
-        """Get detailed context (name, description, schema) for only the recommended tools.
-        Uses the same approach as main_orchestrator.py
-        """
-        try:
-            from ...utils.argument_schema_util import get_tool_argument_schema
-            all_tools = AgentCoreHelpers.get_safe_tools_list()
-            tool_context = []
-
-            for tool in all_tools:
-                if tool.name in recommended_tools:
-                    # Get name and description
-                    name = getattr(tool, "name", "N/A")
-                    desc = getattr(tool, "description", "No description available")
-
-                    # Get arguments using the same function as main_orchestrator.py
-                    args_schema = get_tool_argument_schema(tool)
-
-                    tool_context.append(f"• {name}: {desc}\n  Parameters: {args_schema}")
-
-            return "\n\n".join(tool_context)
-
-        except Exception as e:
-            # print_log_message(f"Failed to get detailed tool context: {e}", "Tool Context")
-            debug_warning("Tool Context", f"Failed to get detailed tool context: {e}", metadata={
-                "function name": "get_detailed_tool_context",
-                "exception": str(e),
-            })
-            return "Tool context unavailable"
 
 
 # ================================================================================================================
@@ -1971,7 +2025,7 @@ class Spawn_subAgent:
         try:
             if parent_task.depth < 1:
                 # only if depth is 1
-                recommended_tools = AgentGraphCore.recommend_tools_for_task(
+                recommended_tools = AgentCoreHelpers.recommend_tools_for_task(
                     f"Break down complex task: {parent_task.description}", max_tools=8,
                 )
             else:
@@ -1980,14 +2034,16 @@ class Spawn_subAgent:
                 all_tools = AgentCoreHelpers.get_safe_tools_list()
                 recommended_tools = [tool.name for tool in all_tools]
 
-            available_tools_str = AgentGraphCore.get_detailed_tool_context(recommended_tools)
+            available_tools_str = AgentCoreHelpers.get_detailed_tool_context(recommended_tools)
         except Exception as e:
-            debug_warning("SubAgent Spawner", f"Tool pre-filtering failed, using fallback: {e}", metadata={
+            # This is a critical internal error, not just a planning choice.
+            debug_error("SubAgent Spawner", f"CRITICAL: Failed to generate sub-task prompt due to an internal error: {e}", metadata={
                 "function name": "decompose_task_for_subAgent",
                 "task_id": parent_task.task_id,
+                "exception_type": type(e).__name__,
                 "exception": str(e),
             })
-            return []
+            return [] # Return empty list to signal decomposition failure to the caller.
 
         prompt_generator = HierarchicalAgentPrompt()
         system_prompt, human_prompt = prompt_generator.generate_task_decomposition_prompt(

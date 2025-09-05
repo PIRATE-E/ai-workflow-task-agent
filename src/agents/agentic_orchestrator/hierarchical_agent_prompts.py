@@ -118,9 +118,9 @@ class HierarchicalAgentPrompt:
         
         📋 NEW RULE: THE "COLLECTOR" PATTERN
         If a future sub-task requires the combined output of several previous sub-tasks, you MUST insert a dedicated "Collector" task right before it.
-        - The "Collector" task MUST use the `sequentialthinking` tool.
+        - The "Collector" task MUST use the `perform_synthesis` tool.
         - Its `description` MUST clearly state its job: to gather and synthesize the results from the previous steps.
-        - Example: {{'description': 'Review raw results from previous search sub-tasks and synthesize into a single comprehensive summary.', 'tool_name': 'sequentialthinking'}}
+        - Example: {{'description': 'Review raw results from previous search sub-tasks and synthesize into a single comprehensive summary.', 'tool_name': 'perform_synthesis'}}
         """
 
         human_prompt = f"""
@@ -136,7 +136,7 @@ class HierarchicalAgentPrompt:
 
         return system_prompt, human_prompt
 
-    def generate_schema_aware_parameter_prompt(self, task_description: str, tool_name: str,
+    def generate_schema_aware_parameter_prompt(self, task_description: str, tool_name: str, 
                                              tool_schema: dict, context: str | None = None, full_history: list[Any] | None = None, depth: int = 0) -> tuple[str, str]:
         """Generate parameters with full knowledge of tool schema and dual context.
         """
@@ -146,15 +146,15 @@ class HierarchicalAgentPrompt:
 
         # --- NEW: Depth-Aware System Prompt ---
         if depth >= 1:
-            mode_prompt = """
+            mode_prompt = '''
         --- ⚙️ FOCUSED WORKER MODE ---
         You are generating parameters for a focused sub-task. Be direct and literal. Do not infer complex logic or file paths. If context is missing, use simple defaults.
-        """
+        '''
         else:
-            mode_prompt = """
+            mode_prompt = '''
         ---  STRATEGIST MODE ---
         You are generating parameters for a high-level task. You can use the context to infer logical parameters.
-        """
+        '''
 
         system_prompt = f"""
         😎 DUAL CONTEXT & SCHEMA-AWARE PARAMETER GENERATOR
@@ -173,7 +173,7 @@ class HierarchicalAgentPrompt:
 
         --- ✍️ RULE FOR CONTENT-BASED PARAMETERS ---
         If you are generating parameters for a tool that requires a large block of text content (e.g., the 'content' parameter for the `write_file` tool), you MUST check the `CONTEXT FROM PREVIOUS STEP SUMMARIES`.
-        If a preceding task used the `sequentialthinking` tool and its purpose was to "summarize", "collect", or "synthesize" information, you MUST use the `FULL RAW RESULT` of THAT specific `sequentialthinking` task as the value for the 'content' parameter.
+        If a preceding task used the `perform_synthesis` tool and its purpose was to "summarize", "collect", or "synthesize" information, you MUST use the `FULL RAW RESULT` of THAT specific `perform_synthesis` task as the value for the 'content' parameter.
         Do not try to re-summarize or use the results of other, earlier tasks. Use the output of the dedicated Collector task.
 
         😡 CRITICAL RULE: For parameters like `content`, `text`, or `data`, you must reference the full, raw result of a previous task, NOT the summary. For parameters like `file_path` or `query`, you can infer them from the task description and the context summaries.
@@ -189,24 +189,24 @@ class HierarchicalAgentPrompt:
             raw_history_preview = []
             for task in full_history:
                 if hasattr(task, 'execution_context') and task.execution_context and hasattr(task.execution_context, 'result') and task.execution_context.result:
-                    raw_history_preview.append(f"- Task {task.task_id} ({task.tool_name}) Raw Result (Truncated): {task.execution_context.result[:200]}...")
+                    raw_history_preview.append(f"- Task {task.task_id} ({task.tool_name}) Raw Result: {task.execution_context.result}...")
             if raw_history_preview:
+                joint_preview = "\n".join(raw_history_preview)
                 raw_history_section = f"""
         --- FULL RAW RESULTS OF PREVIOUS TASKS (for data sourcing) ---
         (You have access to the full, untruncated results of these tasks)
-        {"\n".join(raw_history_preview)}
+        {joint_preview}
         """
 
-        # Specific instruction for Collector tasks using sequentialthinking
+        # Specific instruction for Collector tasks using perform_synthesis
         collector_instruction = ""
-        if tool_name == "sequentialthinking" and "Collector" in task_description:
+        if tool_name == "perform_synthesis" and "Collector" in task_description:
             collector_instruction = f"""
         --- COLLECTOR TASK INSTRUCTION ---
         This is a "Collector" task. Your goal is to synthesize the raw results from previous tasks into a single, comprehensive output.
         You MUST review the `FULL RAW RESULTS OF PREVIOUS TASKS` section. For each relevant task (e.g., `GoogleSearch`, `read_text_file`), extract the *full, raw text content* of its `result` field.
-        Concatenate ALL extracted raw text content into the `thought` parameter.
-        Do NOT summarize or extract only specific fields (like 'summary') unless explicitly instructed by the task description.
-        Ensure the `thought` parameter contains the complete, aggregated raw data from all relevant previous tasks.
+        Do NOT paste raw content into parameters; instead, set the `instructions` to clearly state how to aggregate and summarize the data (for example, "Summarize each topic into 10 lines").
+        If needed, include `per_item_lines` and `output_format` to constrain the output.
         """
 
         human_prompt = f"""
@@ -230,14 +230,14 @@ class HierarchicalAgentPrompt:
         # --- NEW: Depth-Aware System Prompt ---
         if depth >= 1:
             # For sub-tasks, the summary is for the machine, so be technical.
-            system_prompt = """
+            system_prompt = '''
         You are a technical analysis AI. Your job is to take the raw output from a tool and create a factual, one-sentence summary of its outcome for machine processing.
         Be factual and brief. Example: "Tool 'search_issues' ran, returned 15 items."
         🚨 CRITICAL: Your response MUST be a single, concise sentence.
-        """
+        '''
         else:
             # For parent tasks, the summary can be more descriptive for the user.
-            system_prompt = """
+            system_prompt = '''
         You are an expert analysis AI. Your job is to take the raw output from a tool execution and create a concise, one-sentence summary of its outcome.
         The summary should be in the past tense and clearly state what was accomplished.
 
@@ -247,7 +247,7 @@ class HierarchicalAgentPrompt:
         - Your Summary: "The directory was listed, revealing two python files and a 'src' directory."
 
         🚨 CRITICAL: Your response MUST be a single, concise sentence.
-        """
+        '''
 
         human_prompt = f"""
         TOOL EXECUTED: {tool_name}
@@ -264,7 +264,7 @@ class HierarchicalAgentPrompt:
         return system_prompt, human_prompt
 
     def generate_final_response_prompt(self, task_results: list[str], original_goal: str) -> tuple[str, str]:
-        system_prompt = """
+        system_prompt = '''
         🚨 CRITICAL: YOU MUST RETURN EXACTLY ONE JSON OBJECT MATCHING THE SCHEMA BELOW.
 
         You are an AI assistant that creates a comprehensive final response based on the provided task execution results.
@@ -291,7 +291,7 @@ class HierarchicalAgentPrompt:
         PURPOSE:
         - This structured response will be rendered directly to the user. Follow the schema precisely so the caller
           can extract `user_response.message` for display and `user_response.next_steps` for guidance.
-        """
+        '''
         results_text = "\n".join(task_results) if task_results else "No task results available."
         human_prompt = f"""
         ORIGINAL USER GOAL: {original_goal}
@@ -307,13 +307,13 @@ class HierarchicalAgentPrompt:
         return system_prompt, human_prompt
 
     def generate_tool_aware_initial_plan_prompt(self, goal: str, available_tools_context: str, error_feedback: str | None = None) -> tuple[str, str]:
-        feedback_section = """
+        feedback_section = '''
         --- PREVIOUS ATTEMPT FAILED ---
         Your last attempt to create a plan failed for the following reason:
         {error_feedback}
         Please analyze this feedback and generate a new, corrected plan that resolves this issue.
         ---
-        """ if error_feedback else ""
+        ''' if error_feedback else ""
 
         system_prompt = f"""
         🚨 CRITICAL: YOU MUST RETURN A JSON ARRAY OF TASKS USING ONLY REAL, AVAILABLE TOOLS.
@@ -328,7 +328,7 @@ class HierarchicalAgentPrompt:
 
         --- 📋 STRICT RULES FOR TOOL SELECTION ---
         1.  **Semantic Match is CRITICAL:** The tool you choose MUST be able to perform the action in the description. Do not assign a tool that cannot logically achieve the task's goal.
-        2.  **Synthesis/Analysis Task Rule:** For any task that involves summarizing, analyzing, reviewing, combining, or creating a report from previous results, you MUST use the `sequentialthinking` tool. This is the designated "Collector" and "Synthesizer" tool.
+        2.  **Synthesis/Analysis Task Rule:** For any task that involves summarizing, analyzing, reviewing, combining, or creating a report from previous results, you MUST use the `perform_synthesis` tool. This is the designated "Collector" and "Synthesizer" tool.
         3.  **File System Task Rule:** Tools like `list_directory`, `read_text_file`, and `write_file` can ONLY be used for their specific file system purpose. They CANNOT be used to analyze or summarize content.
 
         --- ❌ EXAMPLES OF INCORRECT ASSIGNMENTS (DO NOT DO THIS) ---
@@ -338,16 +338,16 @@ class HierarchicalAgentPrompt:
         --- ✅ EXAMPLES OF CORRECT ASSIGNMENTS ---
         - {{'description': 'List the files in the root directory', 'tool_name': 'list_directory'}}
         - {{'description': 'Read the content of the README.md file', 'tool_name': 'read_text_file'}}
-        - {{'description': 'Review the search results and create a summary report', 'tool_name': 'sequentialthinking'}}
+        - {{'description': 'Review the search results and create a summary report', 'tool_name': 'perform_synthesis'}}
 
         ✅ REQUIRED OUTPUT FORMAT:
         [{{"task_id": 1, "description": "Specific description of what this tool will accomplish", "tool_name": "exact_tool_name_from_available_list"}}]
 
         📋 NEW RULE: THE "COLLECTOR" PATTERN
         If a future task requires the combined output of several previous tasks (e.g., writing a final report, summarizing multiple sources), you MUST insert a dedicated "Collector" task right before it.
-        - The "Collector" task MUST use the `sequentialthinking` tool.
+        - The "Collector" task MUST use the `perform_synthesis` tool.
         - Its `description` MUST clearly state its job: to gather and synthesize the results from the previous steps.
-        - Example: {{'description': 'Review raw results from previous search tasks and synthesize into a single comprehensive summary.', 'tool_name': 'sequentialthinking'}}
+        - Example: {{'description': 'Review raw results from previous search tasks and synthesize into a single comprehensive summary.', 'tool_name': 'perform_synthesis'}}
         """
         human_prompt = f"""
         USER GOAL: "{goal}" 
@@ -365,7 +365,7 @@ class HierarchicalAgentPrompt:
         # --- NEW: Depth-Aware System Prompt ---
         if depth >= 1:
             # This is a sub-task. Be strict and avoid further recursion.
-            system_prompt = f"""
+            system_prompt = f'''
         🎯 FOCUSED SUB-TASK ANALYZER (Strict Mode)
 
         You are analyzing a SUB-TASK that was already created to solve a more complex parent task.
@@ -382,12 +382,17 @@ class HierarchicalAgentPrompt:
         - Required Parameters: {list(schema_props.keys())}
         
         ✅ OUTPUT FORMAT:
-        {{"requires_decomposition": boolean, "reasoning": "Specific analysis", "atomic_tool_name": "{tool_name}" or null, "estimated_subtasks": number_if_complex}}
-        """
+        {{ 
+            "requires_decomposition": boolean,
+            "reasoning": "Specific analysis",
+            "atomic_tool_name": "{tool_name}" or null,
+            "estimated_subtasks": number_if_complex
+        }}
+        '''
         else:
             # This is a parent task. Standard analysis is fine.
-            system_prompt = f"""
-        🎯 TOOL-SCHEMA-AWARE COMPLEXITY ANALYZER (Standard Mode)
+            system_prompt = f'''
+        🎯 TOOL-SCHEMA-AWARE COMPLEXITY ANALYZER (Standard Mode) 
         
         You are analyzing whether a task can be completed with a single tool call or requires decomposition.
         
@@ -397,12 +402,17 @@ class HierarchicalAgentPrompt:
         - Required Parameters: {list(schema_props.keys())}
 
         ✅ OUTPUT FORMAT:
-        {{"requires_decomposition": boolean, "reasoning": "Specific analysis", "atomic_tool_name": "{tool_name}" or null, "estimated_subtasks": number_if_complex}}
-        """
+        {{
+            "requires_decomposition": boolean,
+            "reasoning": "Specific analysis",
+            "atomic_tool_name": "{tool_name}" or null,
+            "estimated_subtasks": number_if_complex
+        }}
+        '''
         # --- END OF NEW LOGIC ---
 
         human_prompt = f"""
-        ANALYZE THIS TASK:
+        ANALYZE THIS TASK: 
         
         Task: "{task_description}"
         Assigned Tool: "{tool_name}"
@@ -415,7 +425,7 @@ class HierarchicalAgentPrompt:
     def generate_parameter_prompt(self, task_description: str, atomic_tool_name: str, previous_results_str: str | None) -> tuple[str, str]:
         """Generates prompts for the parameter generator node for a confirmed atomic task.
         """
-        system_prompt = """
+        system_prompt = '''
         🚨 CRITICAL ALERT: YOU MUST RETURN EXACTLY ONE JSON OBJECT FOR THE TOOL'S PARAMETERS.
 
         You are an AI assistant that generates the exact JSON parameters for a given tool and task, using the provided context from previous steps.
@@ -430,7 +440,7 @@ class HierarchicalAgentPrompt:
         - LLM operations: {{"content": "text to process", "task": "specific instruction"}}
 
         Analyze the task description and the context from previous results to determine the correct values for the parameters.
-        """
+        '''
 
         context_info = f"CONTEXT FROM PREVIOUS TASK RESULTS:\n{previous_results_str}" if previous_results_str else "CONTEXT: No previous results are available. Generate parameters based on the task description alone."
 
@@ -438,7 +448,7 @@ class HierarchicalAgentPrompt:
         {context_info}
 
         GENERATE PARAMETERS FOR THIS TASK:
-        Task: \"{task_description}\"\nTool: \"{atomic_tool_name}\"\n        
+        Task: \"{task_description}\"\nTool: \"{atomic_tool_name}\"        
         Create specific, actionable parameters that will accomplish this task.
         Use context from previous results when available.
         
@@ -453,11 +463,11 @@ class HierarchicalAgentPrompt:
         # --- NEW: Depth-Aware System Prompt ---
         if depth >= 1:
             # For sub-tasks, strongly discourage further decomposition.
-            strategy_prompt = """
+            strategy_prompt = '''
         --- ⚙️ FOCUSED WORKER RECOVERY MODE ---
         This is a sub-task failure. Your primary goal is to recover with a simple, alternative tool or by retrying with corrected parameters.
         You should strongly AVOID decomposing the task further (`DECOMPOSE_FAILURE`) unless it is the only possible option.
-        """
+        '''
         else:
             strategy_prompt = ""
 
@@ -486,7 +496,7 @@ class HierarchicalAgentPrompt:
 
     def generate_parameter_repair_prompt(self, task_description: str, tool_name: str, tool_schema: dict, failed_parameters: dict, error_message: str) -> tuple[str, str]:
         """Generates a prompt to ask the LLM to repair failed parameters."""
-        system_prompt = f"""
+        system_prompt = f'''
         You are a parameter correction expert. A tool failed due to bad parameters.
         Your job is to analyze the tool's schema, the failed parameters, and the error message, then provide a corrected set of parameters.
 
@@ -497,7 +507,7 @@ class HierarchicalAgentPrompt:
         {{
             "repaired_parameters": {{ "param1": "new_value", ... }}
         }}
-        """
+        '''
         human_prompt = f"""
         --- FAILURE ANALYSIS ---
         Task: "{task_description}"
@@ -512,7 +522,7 @@ class HierarchicalAgentPrompt:
 
     def generate_alternative_tool_prompt(self, task_description: str, failed_tool: str, error_message: str, available_tools_str: str) -> tuple[str, str]:
         """Generates a prompt to ask the LLM for a safer, alternative tool."""
-        system_prompt = f"""
+        system_prompt = f'''
         You are a strategic recovery expert. A task failed. Your job is to suggest a single, safer, alternative tool that might accomplish the task's goal without causing the same error.
 
         AVAILABLE TOOLS:
@@ -523,7 +533,7 @@ class HierarchicalAgentPrompt:
             "alternative_tool": "tool_name_from_list_or_null",
             "reasoning": "A brief explanation for your choice."
         }}
-        """
+        '''
         human_prompt = f"""
         --- FAILURE ANALYSIS ---
         Task: "{task_description}"
@@ -535,53 +545,70 @@ class HierarchicalAgentPrompt:
         """
         return system_prompt, human_prompt
 
-    def generate_goal_achievement_prompt(self, original_goal :str, plan_created: str, task_description: str, tool_result: str, analysis: str) -> tuple[str, str]:
+    def generate_goal_achievement_prompt(self, original_goal: str, plan_created: str, task_description: str, tool_result: str, analysis: str) -> tuple[str, str]:
         """Generates prompts for the goal achievement validation node."""
-        system_prompt = """
-                You are a pragmatic validation expert. Your job is to determine if a task's goal was reasonably achieved based on two independent signals: the adequacy of the plan used and the success of the tool execution.
-        
+        system_prompt = '''
+                You are a meticulous Quality Assurance expert. Your job is to determine if a task's execution was successful and if its output is semantically aligned with the user's original goal.
+
                 ✅ REQUIRED OUTPUT FORMAT (EXACT JSON OBJECT):
                 {{
                     "goal_achieved": boolean,
                     "reasoning": "A brief, clear explanation for your decision."
                 }}
-        
-                --- DECISION RULES (PREVENT PREMATURE VERIFICATION) ---
-                - Evaluate TWO dimensions separately:
-                  1. Plan adequacy: Was the plan or chosen approach appropriate and sufficient to accomplish the task goal?
-                  2. Tool execution: Did the tool run successfully (no errors) and produce results consistent with the task's intent?
-                - Set `goal_achieved` to `true` **ONLY IF BOTH**:
-                  - the plan is appropriate for the goal, and
-                  - the tool executed successfully and produced reasonable, relevant output.
-                - Set `goal_achieved` to `false` if **EITHER**:
-                  - the plan is clearly unsuitable or wrong for achieving the goal (even if the tool ran), or
-                  - the tool execution failed, returned an error, or returned no usable data (even if the plan was appropriate).
-                - Do NOT mark `true` based on assumptions, partial outputs, or formatting fixes. Require explicit evidence for both plan correctness and execution success.
-                - In `reasoning`, briefly state which dimension(s) passed or failed (e.g., "plan failed: wrong approach" or "execution failed: tool error 'X' "), then one-line justification.
-                """
+
+                --- DECISION RULES ---
+                1.  **Primary Check (Task Goal):** First, determine if the `TOOL RESULT` and `RESULT ANALYSIS` successfully accomplish the specific `TASK GOAL`. A technical success (e.g., tool ran without error) is not enough. The output must be relevant and useful for the task.
+                2.  **Secondary Check (Overall Goal Context):** If the primary check passes, then consider the `OVERALL USER GOAL` and the `ORIGINAL PLAN`. Is the output of the task not just correct, but also appropriate in style, format, and content for the user's final objective?
+                3.  **Final Decision:** Set `goal_achieved` to `true` ONLY if both checks pass. If the tool output is technically correct but not useful or appropriate for the overall goal, set it to `false`.
+                4.  **Reasoning:** In your reasoning, you MUST state which checks passed or failed. For example: "Execution passed, but the output style was too simplistic for the user's goal of a technical report." or "Execution failed: the tool returned an error."
+                '''
 
         human_prompt = f"""
                 --- TASK VALIDATION ---
-                
-                USER GOAL:
+
+                OVERALL USER GOAL:
                 `{original_goal}`
-        
+
                 ORIGINAL PLAN:
                 `{plan_created}`
-        
+
+                ---
+                CURRENT TASK TO VALIDATE:
+
                 TASK GOAL:
                 `{task_description}`
-        
+
                 TOOL RESULT:
                 `{tool_result}`
-        
+
                 RESULT ANALYSIS:
                 `{analysis}`
-        
+
                 --- QUESTION ---
-                Considering both the ORIGINAL PLAN and the TOOL RESULT above, did the tool execute successfully in order to accomplish the user final goal and was the chosen plan adequate so the task goal was achieved?
-        
+                Based on the rules in the system prompt, was this specific task's goal truly and usefully achieved in the context of the overall goal?
+
                 🚨 RESPOND WITH ONLY THE JSON OBJECT - NO OTHER TEXT.
                 """
 
+        return system_prompt, human_prompt
+
+    def generate_synthesis_execution_prompt(self, instructions: str, context: str) -> tuple[str, str]:
+        """Generates the prompt for executing the internal synthesis LLM call.
+        """
+        system_prompt = '''
+        You are a data synthesis expert. Your job is to follow the user's instructions to process a given context, which is composed of the results from previous tasks.
+        You must follow the instructions precisely to aggregate, summarize, or transform the context into the desired output.
+        The output should be a single, coherent block of text.
+        '''
+
+        human_prompt = f"""
+        --- INSTRUCTIONS ---
+        {instructions}
+
+        --- CONTEXT TO PROCESS ---
+        {context}
+        ---
+
+        Based on the instructions, process the context and provide the synthesized result.
+        """
         return system_prompt, human_prompt
