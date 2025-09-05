@@ -1,13 +1,11 @@
-"""
-?? REAL INTEGRATION TEST: AgentGraphCore + agent_mode_node + Real Tools
+""" REAL INTEGRATION TEST: AgentGraphCore + agent_mode_node + Real Tools
 This test demonstrates the complete hierarchical agent system working with actual tools
 """
 
-import sys
 import os
+import sys
 import tempfile
 import time
-from pathlib import Path
 
 # Add the project root to Python path
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
@@ -27,13 +25,12 @@ try:
     # Import supporting systems
     from src.models.state import State, StateAccessor
     from src.tools.lggraph_tools.tool_assign import ToolAssign
-    from src.tools.lggraph_tools.tool_response_manager import ToolResponseManager
     from src.config import settings
     
     MODULES_AVAILABLE = True
-    print("? All modules imported successfully")
+    print(" All modules imported successfully")
 except ImportError as e:
-    print(f"? Import error: {e}")
+    print(f" Import error: {e}")
     MODULES_AVAILABLE = False
 
 
@@ -48,11 +45,11 @@ class HierarchicalAgentIntegration:
         self.execution_log = []
         self.results = {}
         
-        print(f"?? Integration test initialized with output: {self.output_dir}")
+        print(f" Integration test initialized with output: {self.output_dir}")
 
     def convert_tasks_to_agent_format(self, tasks: list[TASK]) -> list[dict]:
         """
-        ?? INTEGRATION BRIDGE: Convert AgentGraphCore TASK objects to agent_mode_node format.
+         INTEGRATION BRIDGE: Convert AgentGraphCore TASK objects to agent_mode_node format.
         
         This is the critical bridge between hierarchical planning and actual execution.
         """
@@ -75,7 +72,7 @@ class HierarchicalAgentIntegration:
                 "status": "converted"
             })
         
-        print(f"?? Converted {len(tasks)} hierarchical tasks to agent execution format")
+        print(f" Converted {len(tasks)} hierarchical tasks to agent execution format")
         return agent_exe_array
 
     def create_real_state_for_agent_node(self, user_goal: str) -> dict:
@@ -93,30 +90,30 @@ class HierarchicalAgentIntegration:
         # Initialize StateAccessor with the messages
         try:
             StateAccessor().add_message(human_message)
-            print(f"? Created real state for agent_node with user goal: {user_goal[:100]}...")
+            print(f" Created real state for agent_node with user goal: {user_goal[:100]}...")
         except Exception as e:
-            print(f"?? StateAccessor initialization issue: {e}")
+            print(f" StateAccessor initialization issue: {e}")
         
         return state
 
     def execute_hierarchical_workflow(self, user_goal: str) -> dict:
         """
-        ?? MAIN INTEGRATION: Execute complete hierarchical workflow with real tools.
+         MAIN INTEGRATION: Execute complete hierarchical workflow with real tools.
         
         Flow:
-        1. User goal ? AgentGraphCore planning
-        2. Task decomposition ? Real tasks
-        3. Task execution ? agent_mode_node + real tools
-        4. Results collection ? Real output
+        1. User goal  AgentGraphCore planning
+        2. Task decomposition  Real tasks
+        3. Task execution  agent_mode_node + real tools
+        4. Results collection  Real output
         """
         print("\n" + "="*80)
-        print("?? EXECUTING REAL HIERARCHICAL AGENT WORKFLOW")
+        print(" EXECUTING REAL HIERARCHICAL AGENT WORKFLOW")
         print("="*80)
         
         start_time = time.time()
         
         # === PHASE 1: Hierarchical Planning ===
-        print("\n?? PHASE 1: Hierarchical Task Planning")
+        print("\n PHASE 1: Hierarchical Task Planning")
         print("-" * 50)
         
         try:
@@ -131,15 +128,15 @@ class HierarchicalAgentIntegration:
             }
             
             # Build and execute hierarchical graph
-            print("   ??? Building hierarchical agent graph...")
+            print(" Building hierarchical agent graph...")
             graph = AgentGraphCore.build_graph()
             
-            print("   ?? Executing initial planning...")
+            print(" Executing initial planning...")
             final_state = graph.invoke(initial_state)
             
             # Extract planned tasks
             planned_tasks = final_state.get('tasks', [])
-            print(f"   ? Hierarchical planning complete: {len(planned_tasks)} tasks generated")
+            print(f" Hierarchical planning complete: {len(planned_tasks)} tasks generated")
             
             for i, task in enumerate(planned_tasks, 1):
                 print(f"      Task {i}: {task.description} (tool: {task.tool_name})")
@@ -152,12 +149,12 @@ class HierarchicalAgentIntegration:
                 })
                 
         except Exception as e:
-            print(f"   ? Hierarchical planning failed: {e}")
+            print(f" Hierarchical planning failed: {e}")
             self.results['planning_error'] = str(e)
             return self.results
         
         # === PHASE 2: Task Execution with Real Tools ===
-        print("\n?? PHASE 2: Real Tool Execution")
+        print("\n PHASE 2: Real Tool Execution")
         print("-" * 50)
         
         try:
@@ -167,8 +164,8 @@ class HierarchicalAgentIntegration:
             # Create real state for agent_node
             agent_state = self.create_real_state_for_agent_node(user_goal)
             
-            print(f"   ?? Executing {len(agent_exe_array)} tasks with real tools...")
-            
+            print(f"Executing {len(agent_exe_array)} tasks with real tools...")
+            from src.tools.lggraph_tools.tool_response_manager import ToolResponseManager
             # Clear any previous responses
             ToolResponseManager().clear_response()
             
@@ -177,7 +174,7 @@ class HierarchicalAgentIntegration:
             agent = Agent(agent_exe_array=agent_exe_array)
             
             for i in range(len(agent.agent_exe_array)):
-                print(f"      ? Executing task {i+1}: {agent.agent_exe_array[i]['tool_name']}")
+                print(f"Executing task {i+1}: {agent.agent_exe_array[i]['tool_name']}")
                 
                 try:
                     # Execute the task
@@ -195,10 +192,10 @@ class HierarchicalAgentIntegration:
                         "status": "completed"
                     })
                     
-                    print(f"      ? Task {i+1} completed successfully")
+                    print(f"Task {i+1} completed successfully")
                     
                 except Exception as task_error:
-                    print(f"      ? Task {i+1} failed: {task_error}")
+                    print(f"Task {i+1} failed: {task_error}")
                     executed_results.append({
                         "task_index": i,
                         "tool_name": agent.agent_exe_array[i]['tool_name'],
@@ -208,12 +205,12 @@ class HierarchicalAgentIntegration:
                     continue
                     
         except Exception as e:
-            print(f"   ? Tool execution failed: {e}")
+            print(f"Tool execution failed: {e}")
             self.results['execution_error'] = str(e)
             return self.results
         
         # === PHASE 3: Results Consolidation ===
-        print("\n?? PHASE 3: Results Analysis")
+        print("\n PHASE 3: Results Analysis")
         print("-" * 50)
         
         execution_time = time.time() - start_time
@@ -253,21 +250,21 @@ class HierarchicalAgentIntegration:
             'integration_status': 'SUCCESS' if len(successful_tasks) > 0 else 'PARTIAL_SUCCESS' if executed_results else 'FAILED'
         }
         
-        print(f"   ?? Execution Summary:")
-        print(f"      Total time: {execution_time:.2f} seconds")
-        print(f"      Tasks planned: {len(planned_tasks)}")
-        print(f"      Tasks executed: {len(executed_results)}")
-        print(f"      Success rate: {self.results['execution_phase']['success_rate']:.1%}")
-        print(f"      Integration status: {self.results['integration_status']}")
+        print(f"Execution Summary:")
+        print(f"Total time: {execution_time:.2f} seconds")
+        print(f"Tasks planned: {len(planned_tasks)}")
+        print(f"Tasks executed: {len(executed_results)}")
+        print(f"Success rate: {self.results['execution_phase']['success_rate']:.1%}")
+        print(f"Integration status: {self.results['integration_status']}")
         
         return self.results
 
     def demonstrate_real_workflow(self):
         """
-        ?? DEMONSTRATION: Show the hierarchical agent working on a real task.
+         DEMONSTRATION: Show the hierarchical agent working on a real task.
         """
         print("\n" + "="*80)
-        print("?? HIERARCHICAL AGENT REAL WORKFLOW DEMONSTRATION")
+        print(" HIERARCHICAL AGENT REAL WORKFLOW DEMONSTRATION")
         print("="*80)
         
         # Real-world test scenario
@@ -287,17 +284,17 @@ class HierarchicalAgentIntegration:
         results = {}
         
         for scenario in test_scenarios:
-            print(f"\n?? Testing Scenario: {scenario['name']}")
+            print(f"\n Testing Scenario: {scenario['name']}")
             print(f"Goal: {scenario['goal']}")
             
             try:
                 scenario_results = self.execute_hierarchical_workflow(scenario['goal'])
                 results[scenario['name']] = scenario_results
                 
-                print(f"? Scenario '{scenario['name']}' completed with status: {scenario_results['integration_status']}")
+                print(f" Scenario '{scenario['name']}' completed with status: {scenario_results['integration_status']}")
                 
             except Exception as e:
-                print(f"? Scenario '{scenario['name']}' failed: {e}")
+                print(f" Scenario '{scenario['name']}' failed: {e}")
                 results[scenario['name']] = {'error': str(e), 'integration_status': 'FAILED'}
         
         return results
@@ -307,23 +304,23 @@ def run_real_integration_test():
     """Main function to run the real integration test."""
     
     if not MODULES_AVAILABLE:
-        print("? Cannot run integration test - modules not available")
+        print(" Cannot run integration test - modules not available")
         return None
     
-    print("?? STARTING REAL HIERARCHICAL AGENT INTEGRATION TEST")
+    print(" STARTING REAL HIERARCHICAL AGENT INTEGRATION TEST")
     print("=" * 80)
     
     # Check if tools are available
     try:
         available_tools = ToolAssign.get_tools_list()
-        print(f"?? Available tools: {len(available_tools)}")
+        print(f" Available tools: {len(available_tools)}")
         for tool in available_tools[:5]:  # Show first 5 tools
-            print(f"   - {tool.name}: {getattr(tool, 'description', 'No description')[:50]}...")
+            print(f"- {tool.name}: {getattr(tool, 'description', 'No description')[:50]}...")
         if len(available_tools) > 5:
-            print(f"   ... and {len(available_tools) - 5} more tools")
+            print(f"... and {len(available_tools) - 5} more tools")
             
     except Exception as e:
-        print(f"? Tool system not available: {e}")
+        print(f"Tool system not available: {e}")
         return None
     
     # Run the integration test
@@ -332,43 +329,43 @@ def run_real_integration_test():
         results = integration.demonstrate_real_workflow()
         
         print("\n" + "="*80)
-        print("?? INTEGRATION TEST RESULTS SUMMARY")
+        print(" INTEGRATION TEST RESULTS SUMMARY")
         print("="*80)
         
         for scenario_name, scenario_results in results.items():
-            print(f"\n?? {scenario_name}:")
+            print(f"\n {scenario_name}:")
             if 'error' in scenario_results:
-                print(f"   ? Error: {scenario_results['error']}")
+                print(f" Error: {scenario_results['error']}")
             else:
                 status = scenario_results.get('integration_status', 'UNKNOWN')
-                print(f"   Status: {status}")
-                print(f"   Execution time: {scenario_results.get('execution_time', 0):.2f}s")
+                print(f"Status: {status}")
+                print(f"Execution time: {scenario_results.get('execution_time', 0):.2f}s")
                 
                 planning = scenario_results.get('planning_phase', {})
                 execution = scenario_results.get('execution_phase', {})
-                print(f"   Tasks planned: {planning.get('tasks_planned', 0)}")
-                print(f"   Tasks executed: {execution.get('tasks_executed', 0)}")
-                print(f"   Success rate: {execution.get('success_rate', 0):.1%}")
+                print(f"Tasks planned: {planning.get('tasks_planned', 0)}")
+                print(f"Tasks executed: {execution.get('tasks_executed', 0)}")
+                print(f"Success rate: {execution.get('success_rate', 0):.1%}")
         
-        print(f"\n?? INTEGRATION TEST COMPLETED!")
+        print(f"\n INTEGRATION TEST COMPLETED!")
         print(f"Results saved to: {integration.output_dir}")
         
         return results
         
     except Exception as e:
-        print(f"? Integration test failed: {e}")
+        print(f"Integration test failed: {e}")
         import traceback
         traceback.print_exc()
         return None
 
 
 if __name__ == '__main__':
-    print("?? Starting Real Integration Test...")
+    print(" Starting Real Integration Test...")
     results = run_real_integration_test()
     
     if results:
-        print("\n? Real integration test completed successfully!")
+        print("\n Real integration test completed successfully!")
         print("The hierarchical agent system is working with real tools!")
     else:
-        print("\n? Real integration test failed!")
+        print("\n Real integration test failed!")
         print("Check the error messages above for debugging.")

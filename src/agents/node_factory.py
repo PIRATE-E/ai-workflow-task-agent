@@ -1,5 +1,4 @@
-"""
-Node Factory: Creates LangGraph-compatible node functions with dependency injection
+"""Node Factory: Creates LangGraph-compatible node functions with dependency injection
 """
 
 from src.agents.chat_llm import generate_llm_response
@@ -45,7 +44,7 @@ class NodeFactory:
 
         def tool_wrapper(state):
             return tool_selection_agent(
-                state, self.state_accessor, self.console, self.tools
+                state, self.state_accessor, self.console, self.tools,
             )
 
         return tool_wrapper

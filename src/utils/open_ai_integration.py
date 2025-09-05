@@ -1,5 +1,6 @@
 ﻿import asyncio
 import gc
+import json
 import threading
 import time
 from typing import Any, Optional, Iterator, Union, overload, List, Dict
@@ -9,7 +10,6 @@ from openai import OpenAI, AsyncOpenAI
 
 from src.config.settings import OPEN_AI_API_KEY, OPENAI_TIMEOUT
 from src.utils.listeners.rich_status_listen import RichStatusListener
-import json
 
 
 class OpenAIIntegration:
@@ -24,7 +24,7 @@ class OpenAIIntegration:
 
     instance: Optional["OpenAIIntegration"] = None
     _async_lock: Optional[AsyncOpenAI] = None
-    _requests_count: int = 0
+    requests_count: int = 0
     _last_request_time: Optional[float] = None
 
     # 🔧 FIX: Add error handling attributes for circuit breaker pattern
@@ -46,7 +46,7 @@ class OpenAIIntegration:
         return cls.instance
 
     def __init__(
-        self, api_key: Optional[str] = None, model: Optional[str] = None
+            self, api_key: Optional[str] = None, model: Optional[str] = None
     ) -> None:
         """
         Initialize the OpenAIIntegration instance.
@@ -101,26 +101,30 @@ class OpenAIIntegration:
                 self._async_lock = None
 
     @overload
-    def generate_text(self, prompt: str, stream: bool = False) -> str: ...
+    def generate_text(self, prompt: str, stream: bool = False) -> str:
+        ...
 
     @overload
-    def generate_text(self, prompt: str, stream: bool = True) -> Iterator[str]: ...
-
-    @overload
-    def generate_text(
-        self, messages: list[dict[str, str]], stream: bool = False
-    ) -> str: ...
+    def generate_text(self, prompt: str, stream: bool = True) -> Iterator[str]:
+        ...
 
     @overload
     def generate_text(
-        self, messages: list[dict[str, str]], stream: bool = True
-    ) -> Iterator[str]: ...
+            self, messages: list[dict[str, str]], stream: bool = False
+    ) -> str:
+        ...
+
+    @overload
+    def generate_text(
+            self, messages: list[dict[str, str]], stream: bool = True
+    ) -> Iterator[str]:
+        ...
 
     def generate_text(
-        self,
-        prompt: Optional[str] = None,
-        messages: Optional[list[dict[str, str]]] = None,
-        stream: bool = False,
+            self,
+            prompt: Optional[str] = None,
+            messages: Optional[list[dict[str, str]]] = None,
+            stream: bool = False,
     ) -> Union[str, Iterator[str]]:
         """
         Generate text from the OpenAI API.
@@ -215,7 +219,7 @@ class OpenAIIntegration:
                     status="completed",
                     metadata={
                         "stream_mode": stream,
-                        "request_count": OpenAIIntegration._requests_count,
+                        "request_count": OpenAIIntegration.requests_count,
                     },
                 )
 
@@ -277,9 +281,9 @@ class OpenAIIntegration:
                         return self._get_fallback_response("502")
 
                 elif (
-                    "BadRequestError" in error_str
-                    or "500" in error_str
-                    or "400" in error_str
+                        "BadRequestError" in error_str
+                        or "500" in error_str
+                        or "400" in error_str
                 ):
                     debug_error(
                         heading="OPENAI • API_ERROR",
@@ -314,7 +318,7 @@ class OpenAIIntegration:
         return self._get_fallback_response("max_attempts")
 
     async def generate_text_async(
-        self, prompt: str = None, messages: Optional[List[Dict[str, str]]] = None
+            self, prompt: str = None, messages: Optional[List[Dict[str, str]]] = None
     ) -> str:
         """
         Asynchronously generate text from the OpenAI API with enhanced error handling.
@@ -395,7 +399,7 @@ class OpenAIIntegration:
             raise Exception(f"OpenAI async API call failed: {e}")
 
     async def generate_text_async_streaming(
-        self, prompt: str, messages: Optional[List[Dict[str, str]]] = None
+            self, prompt: str, messages: Optional[List[Dict[str, str]]] = None
     ) -> Iterator[str]:
         """
         Asynchronously generate streaming text from the OpenAI API.
@@ -448,9 +452,9 @@ class OpenAIIntegration:
 
             async for chunk in completion:
                 if (
-                    chunk.choices
-                    and chunk.choices[0].delta
-                    and chunk.choices[0].delta.content
+                        chunk.choices
+                        and chunk.choices[0].delta
+                        and chunk.choices[0].delta.content
                 ):
                     yield chunk.choices[0].delta.content
 
@@ -557,7 +561,7 @@ class OpenAIIntegration:
                 metadata={"error_type": type(streaming_error).__name__},
             )
             # Record failure for circuit breaker
-            OpenAIIntegration._requests_count += 1  # Ensure request is counted
+            OpenAIIntegration.requests_count += 1  # Ensure request is counted
             instance = OpenAIIntegration()
             instance._record_failure()
 
@@ -790,8 +794,8 @@ class OpenAIIntegration:
 
             # Get the extracted content
             if (
-                extraction_completion.choices
-                and extraction_completion.choices[0].message
+                    extraction_completion.choices
+                    and extraction_completion.choices[0].message
             ):
                 extracted = extraction_completion.choices[0].message.content
                 from src.ui.diagnostics.debug_helpers import debug_info
@@ -885,20 +889,20 @@ class OpenAIIntegration:
         from src.config import settings
 
         with cls._thread_lock:
-            OpenAIIntegration._requests_count += 1
-            eval_listener: RichStatusListener = settings.listeners.get("eval", None)
-            if eval_listener is not None:
-                eval_listener.emit_on_variable_change(
-                    OpenAIIntegration,
-                    "status",
-                    f"{eval_listener.get_last_event().meta_data.get('new_value')}",
-                    f"{eval_listener.get_last_event().meta_data.get('new_value')} @"
-                    f"request count :- {cls._requests_count}",
-                )
-            if OpenAIIntegration._requests_count == 1:
+            OpenAIIntegration.requests_count += 1
+            # eval_listener: RichStatusListener = settings.listeners.get("eval", None)
+            # if eval_listener is not None:
+            #     eval_listener.emit_on_variable_change(
+            #         OpenAIIntegration,
+            #         "status",
+            #         f"{eval_listener.get_last_event().meta_data.get('new_value')}",
+            #         f"{eval_listener.get_last_event().meta_data.get('new_value')} @"
+            #         f"request count :- {cls.requests_count}",
+            #     )
+            if OpenAIIntegration.requests_count == 1:
                 OpenAIIntegration._last_request_time = time.perf_counter()
             current_time = time.perf_counter()
-            if OpenAIIntegration._requests_count >= 30:
+            if OpenAIIntegration.requests_count >= 30:
                 elapsed_time = current_time - OpenAIIntegration._last_request_time
                 if elapsed_time < 60:
                     wait_time = 60 - elapsed_time
@@ -918,13 +922,13 @@ class OpenAIIntegration:
                             "None",
                             "None",
                             f"Rate limit hit - waiting for reset {wait_time} seconds"
-                            f"no of requests :- {cls._requests_count}",
+                            f"no of requests :- {cls.requests_count}",
                         )
                     time.sleep(wait_time)
-                    OpenAIIntegration._requests_count = 0
+                    OpenAIIntegration.requests_count = 0
                     OpenAIIntegration._last_request_time = time.perf_counter()
                 else:
-                    OpenAIIntegration._requests_count = 0
+                    OpenAIIntegration.requests_count = 0
                     OpenAIIntegration._last_request_time = time.perf_counter()
 
     @classmethod
@@ -941,23 +945,23 @@ class OpenAIIntegration:
 
         # Use proper async lock instead of sync lock
         async with cls._client_lock:
-            OpenAIIntegration._requests_count += 1
+            OpenAIIntegration.requests_count += 1
             eval_listener: RichStatusListener = settings.listeners.get("eval", None)
 
             if eval_listener is not None:
                 eval_listener.emit_on_variable_change(
                     OpenAIIntegration,
                     "status",
-                    f"Processing request {cls._requests_count}",
-                    f"API request {cls._requests_count} in progress",
+                    f"Processing request {cls.requests_count}",
+                    f"API request {cls.requests_count} in progress",
                 )
 
-            if OpenAIIntegration._requests_count == 1:
+            if OpenAIIntegration.requests_count == 1:
                 OpenAIIntegration._last_request_time = time.perf_counter()
 
             current_time = time.perf_counter()
 
-            if OpenAIIntegration._requests_count >= 30:
+            if OpenAIIntegration.requests_count >= 30:
                 elapsed_time = current_time - OpenAIIntegration._last_request_time
                 if elapsed_time < 60:
                     wait_time = 60 - elapsed_time
@@ -978,14 +982,14 @@ class OpenAIIntegration:
                             OpenAIIntegration,
                             "None",
                             "None",
-                            f"Rate limit hit - waiting for reset {wait_time} seconds, requests: {cls._requests_count}",
+                            f"Rate limit hit - waiting for reset {wait_time} seconds, requests: {cls.requests_count}",
                         )
 
                     await asyncio.sleep(wait_time)
-                    OpenAIIntegration._requests_count = 0
+                    OpenAIIntegration.requests_count = 0
                     OpenAIIntegration._last_request_time = time.perf_counter()
                 else:
-                    OpenAIIntegration._requests_count = 0
+                    OpenAIIntegration.requests_count = 0
                     OpenAIIntegration._last_request_time = time.perf_counter()
 
     @classmethod
@@ -1078,8 +1082,8 @@ class OpenAIIntegration:
 
         # Check if circuit timeout has expired
         if (
-            OpenAIIntegration._circuit_open_until
-            and time.time() > OpenAIIntegration._circuit_open_until
+                OpenAIIntegration._circuit_open_until
+                and time.time() > OpenAIIntegration._circuit_open_until
         ):
             OpenAIIntegration._circuit_open = False
             OpenAIIntegration._circuit_open_until = None
@@ -1113,7 +1117,7 @@ class OpenAIIntegration:
         if OpenAIIntegration._failure_count >= OpenAIIntegration._max_failures:
             OpenAIIntegration._circuit_open = True
             OpenAIIntegration._circuit_open_until = (
-                time.time() + OpenAIIntegration._circuit_timeout
+                    time.time() + OpenAIIntegration._circuit_timeout
             )
             from src.ui.diagnostics.debug_helpers import debug_critical
 
@@ -1134,6 +1138,31 @@ class OpenAIIntegration:
                 metadata={"previous_failures": OpenAIIntegration._failure_count},
             )
             OpenAIIntegration._failure_count = 0
+
+    @property
+    def requests_count_property(self) -> int:
+        """
+        Property to get the current requests count.
+        """
+        return OpenAIIntegration.requests_count
+
+    @requests_count_property.setter
+    def requests_count_property(self, value: int) -> None:
+        """
+        Setter for the requests_count property.
+        Emits an event to listeners when the value changes.
+        """
+        old_value = OpenAIIntegration.requests_count
+        OpenAIIntegration.requests_count = value
+
+        # Emit event to listeners
+        # eval_listener: RichStatusListener = settings.listeners.get('eval', None)
+        # if eval_listener is not None:
+        #     new_value = (f"{eval_listener.get_last_event().meta_data.get('new_value')!s}"
+        #                  .split('@'))[0] + f"@request count :- {value}"
+        #     eval_listener.emit_on_variable_change(OpenAIIntegration, "status",
+        #                                           f"{eval_listener.get_last_event().meta_data.get('new_value')}",
+        #                                           new_value)
 
 
 if __name__ == "__main__":

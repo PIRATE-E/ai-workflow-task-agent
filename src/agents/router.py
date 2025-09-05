@@ -3,8 +3,7 @@ from src.models.state import StateAccessor
 
 
 def route_message(state):
-    """
-    Determines the next node in the workflow based on the classified message type.
+    """Determines the next node in the workflow based on the classified message type.
     """
     console = settings.console
     state_accessor = StateAccessor()

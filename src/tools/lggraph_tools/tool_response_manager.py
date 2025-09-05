@@ -4,14 +4,15 @@ description:
             -this is most likely to the manager of the tools, the calling and the final response from the tool will be handled by this class
 """
 
-from typing import Optional, List
+from __future__ import annotations
+from typing import Optional, List, Union
 
 from src.config import settings
 
 
 class ToolResponseManager:
     instance = None
-    _tool_response: Optional[List[settings.HumanMessage | settings.AIMessage]] = (
+    _tool_response: Optional[List[Union[settings.HumanMessage, settings.AIMessage]]] = (
         None  # because the response always be human or AI message list
     )
 

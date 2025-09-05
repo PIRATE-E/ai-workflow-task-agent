@@ -39,6 +39,42 @@ from typing import Dict, Any, Optional, Union
 from rich.console import RenderableType
 
 
+# Helper: robust JSON serializer to handle datetimes, Enums, dataclasses, and other objects
+def _default_json_serializer(obj):
+    """Return a JSON-serializable representation for objects that json.dumps can't handle.
+
+    - datetime -> ISO string
+    - Enum -> value
+    - dataclass instances -> asdict()
+    - objects with __dict__ -> their dict
+    - fallback -> str(obj)
+    """
+    try:
+        # datetimes
+        if isinstance(obj, datetime):
+            return obj.isoformat()
+
+        # Enums
+        if isinstance(obj, Enum):
+            return getattr(obj, "value", str(obj))
+
+        # dataclass instances
+        from dataclasses import is_dataclass
+
+        if is_dataclass(obj):
+            return asdict(obj)
+
+        # objects with __dict__ (simple fallback)
+        if hasattr(obj, "__dict__"):
+            return obj.__dict__
+
+    except Exception:
+        pass
+
+    # Last resort: stringify
+    return str(obj)
+
+
 class ObjectType(Enum):
     """Types of objects that can be transmitted"""
 
@@ -183,7 +219,8 @@ class DebugMessage:
             "timestamp": self.timestamp,
             "data": self.data,
         }
-        return json.dumps(message_dict, ensure_ascii=False)
+        # Use a default serializer to handle datetimes and other non-JSON-native types.
+        return json.dumps(message_dict, ensure_ascii=False, default=_default_json_serializer)
 
     @classmethod
     def from_json(cls, json_str: str) -> "DebugMessage":

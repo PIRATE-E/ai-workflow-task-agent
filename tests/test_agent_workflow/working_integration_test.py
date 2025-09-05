@@ -17,7 +17,7 @@ if project_root not in sys.path:
 try:
     # Import hierarchical agent system
     from src.agents.agentic_orchestrator.AgentGraphCore import (
-        AgentGraphCore, TASK, REQUIRED_CONTEXT, EXECUTION_CONTEXT
+        AgentGraphCore, TASK, REQUIRED_CONTEXT, EXECUTION_CONTEXT, MAIN_STATE
     )
     
     # Import chat initializer to properly set up tools

@@ -1,15 +1,15 @@
 import inspect
+
 from src.config import settings
 from src.prompts.system_prompt_tool_selector import get_tool_selector_prompt
 from src.tools.lggraph_tools.tool_assign import ToolAssign
 from src.ui.print_message_style import print_message
-from src.utils.model_manager import ModelManager
 from src.utils.argument_schema_util import get_tool_argument_schema
+from src.utils.model_manager import ModelManager
 
 
 def tool_selection_agent(state) -> dict:
-    """
-    Selects and invokes the most appropriate tool for the user's request, or returns a message if no tool is needed.
+    """Selects and invokes the most appropriate tool for the user's request, or returns a message if no tool is needed.
     """
     console = settings.console
     console.print("\t\t----[bold][green]Node is tool_agent[/bold][/green]")
@@ -26,7 +26,7 @@ def tool_selection_agent(state) -> dict:
             [
                 f"Tool: {tool.name}\nDescription: {tool.description}\nParameters: {get_tool_argument_schema(tool)}"
                 for tool in tools
-            ]
+            ],
         )
         if tools
         else settings.socket_con.send_error("[ERROR] No tools available for selection.")
@@ -36,7 +36,7 @@ def tool_selection_agent(state) -> dict:
 
     # Use the centralized tool selector prompt
     system_prompt = get_tool_selector_prompt(
-        tools_context=tools_context, history=history, content=content
+        tools_context=tools_context, history=history, content=content,
     )
 
     try:
@@ -68,7 +68,7 @@ If no tool is needed, use "none" as the tool_name and empty object {} for parame
                 [
                     settings.HumanMessage(content=enhanced_system_prompt),
                     settings.HumanMessage(content=content),
-                ]
+                ],
             )
 
         # Use the new JSON conversion method
@@ -76,13 +76,13 @@ If no tool is needed, use "none" as the tool_name and empty object {} for parame
 
         # Create ToolSelection object from JSON
         from dataclasses import dataclass
-        from typing import Dict, Any
+        from typing import Any
 
         @dataclass
         class ToolSelection:
             tool_name: str
             reasoning: str = ""
-            parameters: Dict[str, Any] = None
+            parameters: dict[str, Any] = None
 
             def __post_init__(self):
                 if self.parameters is None:
@@ -104,8 +104,8 @@ If no tool is needed, use "none" as the tool_name and empty object {} for parame
             print(f"[ERROR] Exception in tool_agent: {e}")
         return {
             "messages": [
-                settings.AIMessage(content=f"Error processing tool selection: {str(e)}")
-            ]
+                settings.AIMessage(content=f"Error processing tool selection: {e!s}"),
+            ],
         }
     parameters = selection.parameters
     if isinstance(parameters, str):
@@ -114,11 +114,10 @@ If no tool is needed, use "none" as the tool_name and empty object {} for parame
         except Exception as e:
             if settings.socket_con:
                 settings.socket_con.send_error(
-                    f"[ERROR] Could not parse parameters: {e}"
+                    f"[ERROR] Could not parse parameters: {e}",
                 )
             else:
                 print(f"[ERROR] Could not parse parameters: {e}")
-            pass
     #     -------- tool selection and parameter handling --------
     # ( this is still in development, so it may not work as expected )
     if selection.tool_name and selection.tool_name.lower() != "none":
@@ -128,7 +127,7 @@ If no tool is needed, use "none" as the tool_name and empty object {} for parame
             if tool.name.lower() == selection.tool_name.lower():
                 try:
                     parameters.update(
-                        {"tool_name": tool.name}
+                        {"tool_name": tool.name},
                     )  # Ensure tool_name is included in parameters
                     tool.invoke(parameters)
                     result = (
@@ -138,40 +137,40 @@ If no tool is needed, use "none" as the tool_name and empty object {} for parame
                     print_message(result, sender="tool")
                     if settings.socket_con:
                         settings.socket_con.send_error(
-                            f"[RESULT] Result from {tool.name}: {result}"
+                            f"[RESULT] Result from {tool.name}: {result}",
                         )
                     return {
                         "messages": [
                             settings.AIMessage(
-                                content=f"Result from {tool.name}: {result}"
-                            )
-                        ]
+                                content=f"Result from {tool.name}: {result}",
+                            ),
+                        ],
                     }
                 except Exception as e:
                     if settings.socket_con:
                         settings.socket_con.send_error(
-                            f"[ERROR] Error using tool {tool.name}: {e} function: {tool.func.__name__} {inspect.trace()}"
+                            f"[ERROR] Error using tool {tool.name}: {e} function: {tool.func.__name__} {inspect.trace()}",
                         )
                     else:
                         print(
-                            f"[ERROR] Error using tool {tool.name}: {e} function: {tool.func.__name__}"
+                            f"[ERROR] Error using tool {tool.name}: {e} function: {tool.func.__name__}",
                         )
                     return {
                         "messages": [
                             settings.AIMessage(
-                                content=f"Error using {tool.name}: {str(e)}"
-                            )
-                        ]
+                                content=f"Error using {tool.name}: {e!s}",
+                            ),
+                        ],
                     }
         if settings.socket_con:
             settings.socket_con.send_error(
-                f"[ERROR] Tool '{selection.tool_name}' not found."
+                f"[ERROR] Tool '{selection.tool_name}' not found.",
             )
         else:
             print(f"[ERROR] Tool '{selection.tool_name}' not found.")
         return {
             "messages": [
-                settings.AIMessage(content=f"Tool '{selection.tool_name}' not found.")
-            ]
+                settings.AIMessage(content=f"Tool '{selection.tool_name}' not found."),
+            ],
         }
     return {"messages": [settings.AIMessage(content="No tool was used.")]}

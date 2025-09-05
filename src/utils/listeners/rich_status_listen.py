@@ -374,7 +374,7 @@ class RichStatusListener:
         return None
 
     def emit_on_variable_change(
-        self, source_class, variable_name, old_value, new_value
+            self, source_class, variable_name, old_value, new_value
     ):
         """
         Emits a variable change event to update the status display.

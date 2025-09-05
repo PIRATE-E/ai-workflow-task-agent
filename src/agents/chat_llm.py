@@ -1,4 +1,4 @@
-from langchain_core.messages import HumanMessage, AIMessage
+from langchain_core.messages import AIMessage, HumanMessage
 
 from src.config import settings
 from src.tools.lggraph_tools.tool_assign import ToolAssign
@@ -7,8 +7,7 @@ from src.utils.model_manager import ModelManager
 
 
 def generate_llm_response(state) -> dict:
-    """
-    Generates a response using the LLM based on the conversation history and the latest user message.
+    """Generates a response using the LLM based on the conversation history and the latest user message.
     Shows a spinner while generating the response.
     """
     console = settings.console
@@ -22,7 +21,7 @@ def generate_llm_response(state) -> dict:
 
     tools_context = (
         "\n\n".join(
-            [f"Tool: {tool.name}\nDescription: {tool.description}" for tool in tools]
+            [f"Tool: {tool.name}\nDescription: {tool.description}" for tool in tools],
         )
         if tools
         else "No tools available."
