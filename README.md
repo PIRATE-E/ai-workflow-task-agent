@@ -483,28 +483,6 @@ AI-Agent-Workflow/
 
 ---
 
-## 🛠️ Tool Ecosystem
-
-### Fundamental Tools (3)
-- **GoogleSearch** - Web search capabilities for current information
-- **RAGSearch** - Knowledge retrieval from local database using Neo4j
-- **Translate** - Language translation services
-
-### Dynamic MCP Tools (14)
-- **Filesystem Operations** - File reading, writing, directory management
-- **Git Integration** - Version control operations
-- **Memory Management** - Persistent knowledge storage
-- **GitHub Integration** - Repository management and operations
-- **And more** - Expandable through MCP server configuration
-
-### Tool Management
-- **Dynamic Registration** - Tools are discovered and registered automatically
-- **Type-Safe Execution** - Comprehensive schema validation
-- **Error Recovery** - Graceful handling of tool failures
-- **Unified Interface** - Consistent tool invocation across all types
-
----
-
 ## 🤖 Agent Mode
 
 Advanced multi-tool orchestration system with AI-powered parameter generation.
@@ -532,285 +510,50 @@ Agent will automatically:
 
 ---
 
-## 🎨 Rich Traceback System
+Addendum: Dedicated Agent Workflow (new)
 
-Enterprise-grade error handling with visual debugging capabilities.
+A new dedicated agent workflow has been added as an internal orchestrator package. This provides a self-contained workflow for hierarchical task decomposition, just-in-time parameter generation, and robust sub-agent spawning.
 
-### Features
-- **Visual Tracebacks** - Beautiful, readable error displays with syntax highlighting
-- **Context Preservation** - Detailed error context with variable inspection
-- **Socket Integration** - Error routing to separate debug window
-- **Performance Monitoring** - Error statistics and debugging insights
-- **Decorator System** - Automatic error handling across major functions
+- New package (visible in the project):
+  - src/agents/agentic_orchestrator/
+    - AgentGraphCore.py            # Core hierarchical agent workflow (planner, classifier, parameter generator, executor, synthesizer, validator, planner, finalizer)
+    - hierarchical_agent_prompts.py# Depth-aware, strict prompt templates for agent nodes
 
-### Benefits
-- 50-80% faster error resolution
-- 90% better error understanding
-- Professional error presentation
-- Comprehensive debugging context
+Note: These files implement the "Agent Workflow" used by Agent Mode. They are internal implementation details and are invoked when `/agent` triggers multi-step orchestration.
 
-### Debug Window Routing
-- **Main Window** - User notifications and application interface
-- **Debug Panel** - Error tracebacks and debugging information
-- **Socket-Based** - Clean separation of concerns
+Agent Workflow (visualization)
 
----
+Below is a high-level visualization of the internal agent workflow (the main orchestrator graph) so you can see how the agent decomposes and executes tasks:
 
-## 🔗 Event-Driven Architecture
+```mermaid
+flowchart TD
+    A[subAGENT_initial_planner]
+    B[subAGENT_classifier]
+    C[subAGENT_parameter_generator]
+    D[subAGENT_task_executor]
+    E[subAGENT_context_synthesizer]
+    F[subAGENT_goal_validator]
+    G[subAGENT_task_planner]
+    H[subAGENT_finalizer]
 
-Complete event system with Rich status integration for responsive user experience.
+    A --> B
+    B --> C
+    C --> D
+    D --> E
+    E --> F
+    F -->|if task failed| B
+    F -->|if more pending| G
+    G --> B
+    G --> H
 
-### Components
-- **EventManager Singleton** - Central event coordination with thread safety
-- **RichStatusListener** - Automatic Rich status updates
-- **Metadata-Driven Events** - Flexible event structure using universal EventData
-- **Thread-Safe Operations** - Concurrent event processing with proper locking
+    %% Spawning path for complex tasks or repeated failures
+    D -->|requires decomposition| SPAWN[Spawn_subAgent]
+    SPAWN --> A
 
-### Features
-- **Perfect Listener Isolation** - No broadcast events, only targeted communication
-- **Memory-Efficient Design** - WeakKeyDictionary for automatic cleanup
-- **Enterprise Patterns** - Following Netflix, Discord, AWS EventBridge patterns
-- **Variable Change Detection** - Automatic event emission when object properties change
+    style SPAWN fill:#f9f,stroke:#333,stroke-width:2px
+``` 
 
-### Architecture Benefits
-- **Zero Memory Leaks** - Automatic garbage collection of event data
-- **Performance Optimized** - Memory location targeting for fastest comparisons
-- **Scalable Design** - Ready for unlimited events with persistent listeners
-
----
-
-## ⚙️ OpenAI/NVIDIA Integration
-
-Hybrid API integration with enterprise-grade reliability features.
-
-### Features
-- **Circuit Breaker Pattern** - Automatic failure detection and recovery
-- **Rate Limiting** - Compliance with API limits (30 requests/minute)
-- **Retry Logic** - Exponential backoff for failed requests
-- **Fallback Responses** - Graceful degradation when API unavailable
-- **Model Switching** - Seamless switching between OpenAI and NVIDIA APIs
-- **Streaming Support** - Robust handling of streaming and non-streaming responses
-
-### Configuration
-```env
-# OpenAI/NVIDIA API Configuration
-OPEN_AI_API_KEY=your_nvidia_api_key_here
-OPENAI_TIMEOUT=30
-
-# Local Model Configuration (Ollama)
-OLLAMA_HOST=http://localhost:11434
-GPT_MODEL=llama3.2:latest
-```
-
-### Reliability Features
-- **502 Error Handling** - Specific handling for NVIDIA API gateway issues
-- **Response Validation** - Comprehensive null checking and validation
-- **Graceful Degradation** - Maintains functionality when APIs are unavailable
-
----
-
-## 🔧 MCP Integration
-
-Model Context Protocol for external tool integration with dynamic registration.
-
-### Features
-- **JSON-RPC Protocol** - Standard communication with external tools
-- **Dynamic Registration** - Automatic tool discovery and registration from .mcp.json
-- **Server Management** - Lifecycle management of MCP servers
-- **Type Safety** - Comprehensive schema validation
-- **Universal Routing** - UniversalMCPWrapper for seamless tool access
-
-### Configuration
-Create `.mcp.json` in project root:
-```json
-{
-  "servers": {
-    "filesystem": {
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-filesystem@latest", "/path/to/directory"]
-    },
-    "memory": {
-      "command": "npx", 
-      "args": ["-y", "@modelcontextprotocol/server-memory@latest"]
-    }
-  }
-}
-```
-
-### Supported Servers
-- **Filesystem** - File operations and directory management
-- **Memory** - Persistent knowledge storage
-- **GitHub** - Repository management and operations
-- **Git** - Version control operations
-- **Custom** - Extensible through MCP server protocol
-
----
-
-## 🚀 Getting Started
-
-### Prerequisites
-- **Python 3.13.3 or higher** (recommended)
-- **Virtual environment** (strongly recommended)
-- **Node.js** (for MCP servers)
-- **Git** (for version control)
-
-### Installation
-
-1. **Clone the repository**
-```bash
-git clone https://github.com/PIRATE-E/AI-Agent-Workflow-Project.git
-cd AI-Agent-Workflow-Project
-```
-
-2. **Set up virtual environment**
-```bash
-python -m venv .venv
-.venv\Scripts\activate  # Windows
-# source .venv/bin/activate  # Linux/Mac
-```
-
-3. **Install dependencies**
-```bash
-pip install -r requirements.txt
-```
-
-4. **Configure environment**
-Create `.env` file in the project root:
-```env
-# OpenAI/NVIDIA API Configuration (Optional - for cloud models)
-OPEN_AI_API_KEY=your_nvidia_api_key_here
-OPENAI_TIMEOUT=30
-
-# Sentry Monitoring (Optional)
-SENTRY_DSN=your_sentry_dsn_here
-
-# Local Model Configuration (Ollama)
-OLLAMA_HOST=http://localhost:11434
-GPT_MODEL=llama3.2:latest  # or your preferred local model
-
-# MCP Configuration
-MCP_CONFIG_PATH=.mcp.json  # Path to MCP configuration file
-```
-
-5. **Configure MCP servers**
-Create `.mcp.json` file in the project root:
-```json
-{
-  "servers": {
-    "filesystem": {
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-filesystem@latest", "/path/to/your/directory"]
-    }
-  }
-}
-```
-
-6. **Run the application**
-```bash
-python src/main_orchestrator.py
-```
-
----
-
-## 📊 Development Status
-
-### Completed Features ✅
-- **LangGraph Multi-Agent Architecture** - Production-ready conversation orchestration
-- **Rich Traceback System** - Enterprise-grade error handling with visual debugging
-- **OpenAI/NVIDIA Hybrid Integration** - Circuit breaker, rate limiting, fallback responses
-- **Dynamic MCP Tool Registration** - 17 tools with JSON-RPC protocol
-- **Event-Driven Architecture** - Complete event listener system with Rich status
-- **Agent Mode** - AI-powered parameter generation and multi-tool orchestration
-- **Comprehensive Error Handling** - Socket-based logging and monitoring
-- **Professional Git Workflow** - File-based commits and detailed documentation
-
-### Current Development Focus 🔄
-- **Performance Optimization** - Reducing latency and improving responsiveness
-- **Advanced Agent Features** - Enhanced reasoning and tool coordination
-- **Production Deployment** - Container orchestration and scalability
-- **Extended Tool Ecosystem** - Additional MCP servers and custom tools
-
-### Production Readiness Assessment
-- **95% Complete** - Enterprise-grade architecture implemented
-- **Monitoring** - Comprehensive logging, error tracking, and performance metrics
-- **Reliability** - Circuit breaker patterns, retry logic, graceful degradation
-- **Scalability** - Event-driven architecture with proper resource management
-- **Security** - Input validation, safe execution environments, error isolation
-
----
-
-## 🧪 Testing
-
-### Running Tests
-```bash
-# Run all tests
-python tests/run_tests.py
-
-# Run specific test categories
-python tests/event_listener/test_event_listener_realistic.py
-python tests/event_listener/quick_validation.py
-
-# Run integration tests
-python tests/integration/test_mcp_integration.py
-python tests/integration/test_agent_mode.py
-```
-
-### Test Coverage
-- **Unit Tests** - Core components and individual functions
-- **Integration Tests** - MCP tools and system interactions
-- **Error Handling Validation** - Rich Traceback and error recovery
-- **Event System Verification** - Event listeners and status updates
-- **Agent Mode Testing** - Multi-tool orchestration and parameter generation
-
-### Testing Infrastructure
-- **Realistic Scenarios** - Tests mimic real-world usage patterns
-- **Comprehensive Coverage** - All major system components tested
-- **Automated Validation** - Continuous testing during development
-- **Performance Testing** - Response time and resource usage validation
-
----
-
-## 📚 Documentation
-
-### Additional Resources
-- **`copilot_instructions/`** - Development guidelines and best practices
-- **`examples/`** - Working code examples and demonstrations
-- **`tests/`** - Test cases and validation examples
-- **`reports/`** - Analysis reports and technical documentation
-
-### Key Concepts Documentation
-- **LangGraph Architecture** - Multi-agent conversation orchestration patterns
-- **MCP Protocol** - External tool integration standard and best practices
-- **Rich Traceback** - Advanced error handling and debugging techniques
-- **Event-Driven Design** - Responsive user experience patterns and implementation
-
-### Development Guidelines
-- **Code Standards** - Enterprise Python patterns and conventions
-- **Architecture Principles** - Separation of concerns and modular design
-- **Testing Strategies** - Comprehensive test coverage and validation approaches
-- **Documentation Standards** - Clear, maintainable, and comprehensive documentation
-
----
-
-## 🤝 Contributing
-
-### Development Workflow
-1. **Create feature branch** from `develop`
-2. **Implement changes** with comprehensive tests
-3. **Update documentation** to reflect changes
-4. **Submit pull request** with detailed description and testing results
-
-### Code Standards
-- **Enterprise Python Patterns** - Follow professional development practices
-- **Type Hints and Documentation** - Comprehensive code documentation
-- **Error Handling** - Implement robust error handling and recovery
-- **Testing Requirements** - Write tests for all new features
-
-### Contribution Guidelines
-- **Code Review Process** - All changes require review and approval
-- **Documentation Updates** - Keep documentation current with code changes
-- **Testing Standards** - Maintain high test coverage and quality
-- **Performance Considerations** - Ensure changes don't degrade performance
+This visualization reflects the main internal loop: plan → classify → generate parameters → execute → synthesize → validate → plan/finish. Spawning creates recursive, scoped sub-agents that are injected into the same unified workflow state (preserving Dual Context: raw results + analysis).
 
 ---
 
