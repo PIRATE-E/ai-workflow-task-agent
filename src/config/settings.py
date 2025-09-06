@@ -24,6 +24,7 @@ DEFAULT_MODEL = os.getenv("DEFAULT_MODEL", "llava-llama3:latest")
 CYPHER_MODEL = os.getenv("CYPHER_MODEL", "deepseek-r1:8b")
 CLASSIFIER_MODEL = os.getenv("CLASSIFIER_MODEL", "llama3.1:8b")
 GPT_MODEL = os.getenv("GPT_MODEL", "openai/gpt-oss-120b")
+KIMI_MODEL = os.getenv("KIMI_MODEL", "moonshotai/kimi-k2-instruct")
 OPEN_AI_API_KEY = os.getenv("OPENAI_API_KEY", "your_openai_api_key_here")
 
 # API endpoints

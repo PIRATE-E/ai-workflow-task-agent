@@ -49,7 +49,7 @@ class ModelManager(ChatOllama):
         settings.CYPHER_MODEL,
         settings.CLASSIFIER_MODEL,
     ]
-    api_model_list: ClassVar[list[str]] = [settings.GPT_MODEL]
+    api_model_list: ClassVar[list[str]] = [settings.GPT_MODEL, settings.KIMI_MODEL]
 
     def __new__(cls, *args: Any, **kwargs: Any) -> "ModelManager":
         """

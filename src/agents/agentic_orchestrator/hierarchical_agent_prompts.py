@@ -548,7 +548,9 @@ class HierarchicalAgentPrompt:
     def generate_goal_achievement_prompt(self, original_goal: str, plan_created: str, task_description: str, tool_result: str, analysis: str) -> tuple[str, str]:
         """Generates prompts for the goal achievement validation node."""
         system_prompt = '''
-                You are a meticulous Quality Assurance expert. Your job is to determine if a task's execution was successful and if its output is semantically aligned with the user's original goal.
+                🚨 CRITICAL: YOU ARE ONLY VALIDATING IMMEDIATE TOOL EXECUTION SUCCESS - NOT THE ENTIRE WORKFLOW!
+
+                You are a TOOL EXECUTION validator. Your ONLY job is to determine if the specific tool executed successfully and produced the output it was supposed to produce for its immediate task.
 
                 ✅ REQUIRED OUTPUT FORMAT (EXACT JSON OBJECT):
                 {{
@@ -556,36 +558,50 @@ class HierarchicalAgentPrompt:
                     "reasoning": "A brief, clear explanation for your decision."
                 }}
 
-                --- DECISION RULES ---
-                1.  **Primary Check (Task Goal):** First, determine if the `TOOL RESULT` and `RESULT ANALYSIS` successfully accomplish the specific `TASK GOAL`. A technical success (e.g., tool ran without error) is not enough. The output must be relevant and useful for the task.
-                2.  **Secondary Check (Overall Goal Context):** If the primary check passes, then consider the `OVERALL USER GOAL` and the `ORIGINAL PLAN`. Is the output of the task not just correct, but also appropriate in style, format, and content for the user's final objective?
-                3.  **Final Decision:** Set `goal_achieved` to `true` ONLY if both checks pass. If the tool output is technically correct but not useful or appropriate for the overall goal, set it to `false`.
-                4.  **Reasoning:** In your reasoning, you MUST state which checks passed or failed. For example: "Execution passed, but the output style was too simplistic for the user's goal of a technical report." or "Execution failed: the tool returned an error."
+                --- SIMPLIFIED DECISION RULES ---
+                1.  **ONLY Check: Did the tool execute successfully?** Look at the `TOOL RESULT` and `RESULT ANALYSIS`. Did the tool run without errors and produce relevant output for the specific `TASK GOAL`?
+                2.  **IGNORE the bigger picture.** Do NOT consider if the output fits the overall user goal, style preferences, or workflow completeness. That's not your job.
+                3.  **LIBERAL SUCCESS CRITERIA:** If the tool ran and produced ANY reasonable output related to the task (even if minimal), mark it as successful.
+                4.  **ONLY FAIL if:** The tool errored out, returned nothing, or the output is completely unrelated to the immediate task.
+
+                --- CONTEXT IS FOR REFERENCE ONLY ---
+                The `OVERALL USER GOAL` and `ORIGINAL PLAN` are provided for context only. Do NOT use them to judge success.
+                Your job is NOT to validate the entire workflow - just this one tool execution.
+
+                --- EXAMPLES OF CORRECT VALIDATION ---
+                ✅ Task: "List files in directory" → Tool returned file list → SUCCESS (even if list is empty)
+                ✅ Task: "Read file content" → Tool returned file content → SUCCESS (even if content is simple)
+                ✅ Task: "Write report to file" → Tool wrote file successfully → SUCCESS (don't judge report quality)
+                ❌ Task: "Search for data" → Tool returned error or crash → FAILURE
+                ❌ Task: "Create summary" → Tool returned completely unrelated content → FAILURE
+
+                --- CRITICAL RULE ---
+                DO NOT FAIL a tool execution just because you think the output should be "better" or "more complete".
+                If the tool did what it was asked to do without errors, mark it as successful.
                 '''
 
         human_prompt = f"""
-                --- TASK VALIDATION ---
+                --- TOOL EXECUTION VALIDATION (IGNORE BROADER CONTEXT) ---
 
-                OVERALL USER GOAL:
-                `{original_goal}`
-
-                ORIGINAL PLAN:
-                `{plan_created}`
+                CONTEXT FOR REFERENCE ONLY (DO NOT USE FOR VALIDATION):
+                Overall User Goal: `{original_goal}`
+                Original Plan: `{plan_created}`
 
                 ---
-                CURRENT TASK TO VALIDATE:
+                VALIDATE ONLY THIS SPECIFIC TOOL EXECUTION:
 
-                TASK GOAL:
+                IMMEDIATE TASK:
                 `{task_description}`
 
-                TOOL RESULT:
+                TOOL EXECUTION RESULT:
                 `{tool_result}`
 
                 RESULT ANALYSIS:
                 `{analysis}`
 
                 --- QUESTION ---
-                Based on the rules in the system prompt, was this specific task's goal truly and usefully achieved in the context of the overall goal?
+                Did this specific tool execution complete successfully and produce reasonable output for its immediate task?
+                IGNORE whether it fits the bigger picture - just validate the tool execution itself.
 
                 🚨 RESPOND WITH ONLY THE JSON OBJECT - NO OTHER TEXT.
                 """
