@@ -285,7 +285,7 @@ class AgentCoreHelpers:
         )
 
         try:
-            model = ModelManager(model="openai/gpt-oss-120b")
+            model = ModelManager(model="moonshotai/kimi-k2-instruct")
             response = model.invoke([
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": human_prompt},
@@ -374,7 +374,7 @@ class AgentCoreHelpers:
                 ["tool1", "tool2", "tool3"]
                 """
 
-            model = ModelManager(model="openai/gpt-oss-120b")
+            model = ModelManager(model="moonshotai/kimi-k2-instruct")
             response = model.invoke([
                 {"role": "system",
                  "content": "You are a tool recommendation expert. Select the most relevant tools for the given task."},
@@ -758,7 +758,7 @@ class AgentGraphCore:
                 error_feedback=error_feedback # Pass feedback from previous failed attempt
             )
 
-            model = ModelManager(model="openai/gpt-oss-120b")
+            model = ModelManager(model="moonshotai/kimi-k2-instruct")
             response = model.invoke([
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": human_prompt},
@@ -947,13 +947,41 @@ class AgentGraphCore:
             tool_schema = cls.get_tool_schema(current_task.tool_name)
             context_data = current_task.required_context.pre_execution_context or {}
             full_history = context_data.get("completed_tasks_history", [])
+            # Ensure full_history is a list of TASK objects
+            failed_tasks_with_feedback_raw = context_data.get("failed_tasks_with_validator_feedback", [])
+            failed_tasks_with_feedback: list[TASK] = []
+            for item in failed_tasks_with_feedback_raw:
+                if isinstance(item, TASK):
+                    failed_tasks_with_feedback.append(item)
+                elif isinstance(item, dict):
+                    try:
+                        failed_tasks_with_feedback.append(TASK(**item))
+                    except Exception:
+                        # Skip entries that can't be converted to TASK
+                        continue
 
             analysis_summary = [
                 f"Task {t.task_id} ({t.tool_name}): {t.execution_context.analysis}"
                 for t in full_history
                 if t.execution_context and t.execution_context.analysis
             ]
-            context_string = "\n".join(analysis_summary) if analysis_summary else None
+            
+            # Build validator feedback context from failed tasks
+            validator_feedback_summary = []
+            for failed_task in failed_tasks_with_feedback:
+                if failed_task.failure_context and failed_task.failure_context.error_type == "GoalValidationFailure":
+                    validator_feedback_summary.append(
+                        f"VALIDATOR REJECTED Task {failed_task.task_id} ({failed_task.tool_name}): {failed_task.failure_context.error_message}"
+                    )
+            
+            # Combine completed task analysis and validator feedback
+            context_parts = []
+            if analysis_summary:
+                context_parts.append("COMPLETED TASKS:\n" + "\n".join(analysis_summary))
+            if validator_feedback_summary:
+                context_parts.append("VALIDATOR FEEDBACK (avoid these patterns):\n" + "\n".join(validator_feedback_summary))
+            
+            context_string = "\n\n".join(context_parts) if context_parts else None
 
             prompt_generator = HierarchicalAgentPrompt()
             system_prompt, human_prompt = prompt_generator.generate_schema_aware_parameter_prompt(
@@ -965,7 +993,7 @@ class AgentGraphCore:
                 depth=current_task.depth,
             )
 
-            model = ModelManager(model="openai/gpt-oss-120b")
+            model = ModelManager(model="moonshotai/kimi-k2-instruct")
             response = model.invoke([
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": human_prompt},
@@ -1066,7 +1094,7 @@ class AgentGraphCore:
             task.description, task.tool_name, tool_schema,task.depth
         )
 
-        model = ModelManager(model="openai/gpt-oss-120b")
+        model = ModelManager(model="moonshotai/kimi-k2-instruct")
         response = model.invoke([
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": human_prompt},
@@ -1278,7 +1306,7 @@ class AgentGraphCore:
                 depth=current_task.depth
             )
 
-            model = ModelManager(model="openai/gpt-oss-120b")
+            model = ModelManager(model="moonshotai/kimi-k2-instruct")
             response = model.invoke([
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": human_prompt},
@@ -1327,7 +1355,7 @@ class AgentGraphCore:
                 analysis=current_task.execution_context.analysis or "N/A"
             )
 
-            model = ModelManager(model="openai/gpt-oss-120b")
+            model = ModelManager(model="moonshotai/kimi-k2-instruct")
             response = model.invoke([
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": human_prompt},
@@ -1349,6 +1377,24 @@ class AgentGraphCore:
                         fail_count=(current_task.failure_context.fail_count + 1) if current_task.failure_context else 1,
                         error_type="GoalValidationFailure",
                     )
+                    # Persist validator feedback into pre_execution_context so retries and parameter generator see corrective hints
+                    try:
+                        if not getattr(current_task, 'required_context', None):
+                            current_task.required_context = REQUIRED_CONTEXT(source_node="subAGENT_goal_validator")
+                        ctx = current_task.required_context.pre_execution_context or {}
+                        failed_feedback = ctx.get("failed_tasks_with_validator_feedback", [])
+                        failed_feedback.append({
+                            "task_id": current_task.task_id,
+                            "tool_name": current_task.tool_name,
+                            "failure_reason": validation_result.get("reasoning", "No reasoning provided."),
+                            "validator_payload": validation_result,
+                        })
+                        ctx["failed_tasks_with_validator_feedback"] = failed_feedback
+                        ctx.setdefault("original_goal", state.original_goal)
+                        current_task.required_context.pre_execution_context = ctx
+                    except Exception:
+                        # Defensive: avoid raising from validator persistence
+                        pass
             else:
                 debug_warning("Goal Validator", f"Invalid response from validation LLM for Task {current_task_id}. Defaulting to goal not achieved.", metadata={
                     "function name": "__subAGENT_goal_validator",
@@ -1400,9 +1446,25 @@ class AgentGraphCore:
 
         # Tier 3: Automatic Decomposition on repeated failure
         if current_task.failure_context.fail_count > 1:
+            # Build parent context with completed tasks and failure context
+            completed_tasks = [t for t in updated_tasks if t.status == "completed" and t.execution_context and t.execution_context.result]
+            parent_context = {
+                "original_goal": state.original_goal,
+                "completed_tasks_history": completed_tasks,
+                "workflow_progress": f"{len(completed_tasks)}/{len(updated_tasks)} tasks completed",
+                "failed_task_context": {
+                    "task_id": current_task.task_id,
+                    "description": current_task.description,
+                    "failure_reason": current_task.failure_context.error_message,
+                    "fail_count": current_task.failure_context.fail_count,
+                    "error_type": current_task.failure_context.error_type,
+                    "failed_parameters": current_task.failure_context.failed_parameters
+                }
+            }
+            
             spawn_result = Spawn_subAgent.spawn_subAgent_recursive(state, current_task,
                                                                    "Decomposing complex task after repeated failures.",
-                                                                   None)
+                                                                   parent_context)
             if spawn_result.get("spawn_triggered"):
                 return {
                     "tasks": spawn_result["tasks"],
@@ -1439,7 +1501,7 @@ class AgentGraphCore:
                 depth=current_task.depth
             )
 
-            model = ModelManager(model="openai/gpt-oss-120b")
+            model = ModelManager(model="moonshotai/kimi-k2-instruct")
             response = model.invoke([
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": human_prompt},
@@ -1459,8 +1521,24 @@ class AgentGraphCore:
                 else:
                     current_task.status = "failed"
             elif strategy == "DECOMPOSE_FAILURE":
+                # Build parent context with completed tasks and failure context
+                completed_tasks = [t for t in updated_tasks if t.status == "completed" and t.execution_context and t.execution_context.result]
+                parent_context = {
+                    "original_goal": state.original_goal,
+                    "completed_tasks_history": completed_tasks,
+                    "workflow_progress": f"{len(completed_tasks)}/{len(updated_tasks)} tasks completed",
+                    "failed_task_context": {
+                        "task_id": current_task.task_id,
+                        "description": current_task.description,
+                        "failure_reason": current_task.failure_context.error_message,
+                        "fail_count": current_task.failure_context.fail_count,
+                        "error_type": current_task.failure_context.error_type,
+                        "failed_parameters": current_task.failure_context.failed_parameters
+                    }
+                }
+                
                 spawn_result = Spawn_subAgent.spawn_subAgent_recursive(state, current_task,
-                                                                       "Decomposition suggested by LLM.", None)
+                                                                       "Decomposition suggested by LLM.", parent_context)
                 if spawn_result.get("spawn_triggered"):
                     return {
                         "tasks": spawn_result["tasks"],
@@ -1530,8 +1608,9 @@ class AgentGraphCore:
                         parent_task.status = "completed"
                         parent_task.execution_context.analysis = f"Successfully completed {len(sibling_tasks)} subtasks."
 
-        # 🌉 DUAL CONTEXT BRIDGE: Collect the full history of completed tasks
+        # 🌉 DUAL CONTEXT BRIDGE: Collect the full history of completed tasks AND failed tasks with validator feedback
         completed_tasks = [t for t in tasks if t.status == "completed"]
+        failed_tasks_with_context = [t for t in tasks if t.status == "failed" and t.failure_context and t.failure_context.error_type == "GoalValidationFailure"]
 
         # Find the next pending task
         pending_tasks = sorted([t for t in tasks if t.status == "pending"], key=lambda x: x.task_id)
@@ -1541,12 +1620,14 @@ class AgentGraphCore:
             next_task = pending_tasks[0]
             next_task_id = next_task.task_id
 
-            # 🆕 INJECT DUAL CONTEXT: Pass the *entire list* of completed TASK objects.
-            # This gives the next node access to both raw .result and summarized .analysis.
+            # 🆕 INJECT DUAL CONTEXT: Pass the *entire list* of completed TASK objects AND validator feedback from failed tasks.
+            # This gives the next node access to both raw .result and summarized .analysis from completed tasks,
+            # PLUS validator reasoning from failed tasks to avoid repeating the same mistakes.
             # We also include the original goal for full context.
             accumulated_context = {
                 "original_goal": state.original_goal,
                 "completed_tasks_history": completed_tasks,
+                "failed_tasks_with_validator_feedback": failed_tasks_with_context,
             }
 
             next_task.required_context.pre_execution_context = accumulated_context
@@ -1608,7 +1689,7 @@ class AgentGraphCore:
             all_results, state.original_goal,
         )
 
-        model = ModelManager(model="openai/gpt-oss-120b")
+        model = ModelManager(model="moonshotai/kimi-k2-instruct")
         response = model.invoke([
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": human_prompt},
@@ -1674,7 +1755,7 @@ class AgentGraphCore:
                 '}\n\nReturn only the JSON object, nothing else.'
             )
 
-            model = ModelManager(model="openai/gpt-oss-120b")
+            model = ModelManager(model="moonshotai/kimi-k2-instruct")
             repair_resp = model.invoke([
                 {"role": "system", "content": repair_system},
                 {"role": "user", "content": repair_human},
@@ -1978,7 +2059,7 @@ class Spawn_subAgent:
             parent_task.description, parent_task.tool_name, tool_schema, parent_task.depth
         )
 
-        model = ModelManager(model="openai/gpt-oss-120b")
+        model = ModelManager(model="moonshotai/kimi-k2-instruct")
         response = model.invoke([
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": human_prompt},
@@ -2054,7 +2135,7 @@ class Spawn_subAgent:
             depth=parent_task.depth
         )
 
-        model = ModelManager(model="openai/gpt-oss-120b")
+        model = ModelManager(model="moonshotai/kimi-k2-instruct")
         response = model.invoke([
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": human_prompt},
@@ -2097,6 +2178,7 @@ class Spawn_subAgent:
                         required_context=REQUIRED_CONTEXT(
                             source_node="subAgent_decomposer",
                             triggering_task_id=parent_task.task_id,
+                            pre_execution_context=parent_context,  # Pass parent's context (completed history + failure info)
                         ),
                     ),
                 )
