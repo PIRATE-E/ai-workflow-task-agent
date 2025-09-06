@@ -178,7 +178,7 @@ class OpenAIIntegration:
 
         # 🔧 FIX: Enhanced error handling for NVIDIA API issues
         attempt = 1
-        max_attempts = 3
+        max_attempts = 5
 
         while attempt <= max_attempts:
             try:
