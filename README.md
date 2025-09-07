@@ -14,7 +14,7 @@
 - ✅ **Universal MCP Routing** - UniversalMCPWrapper with static+dynamic tool→server mapping
 - ✅ **Robust MCP Manager** - ServerConfig/Command enum, safer subprocess I/O, encoding fallbacks
 - ✅ **OpenAI Circuit Breaker** - Automatic failure detection, retry/backoff, fallback responses
-- ✅ **Docker artifacts included (initial)** - Dockerfile and docker-compose.yml are included as starting points; full containerized support (API surface) is planned in a future release
+- ✅ **Dockerization** - Dockerfile + docker-compose for simple container runs
 - ✅ **Python 3.13** - Updated target via pyproject.toml
 - ✅ **Enhanced Diagnostics** - Expanded logging and tests for MCP routing and circuit breaker
 
@@ -22,7 +22,7 @@
 - **Production Readiness**: 95% → Stability improved via circuit breaker + MCP hardening
 - **MCP**: Fully dynamic via .mcp.json at project root (path set in settings.MCP_CONFIG.MCP_CONFIG_PATH)
 - **Agent Mode**: More reliable parameter generation and MCP tool execution
-- **DevOps**: Container artifacts included, but full container-first deployment (API surface) is planned — Docker is not yet a supported runtime for production
+- **DevOps**: Container-first workflow supported (build and run via docker-compose)
 - **Compatibility**: Python 3.13 baseline; legacy 3.11 works with requirements.txt
 
 ---
@@ -33,7 +33,7 @@ This is a **production-ready consumer desktop AI assistant** with enterprise-gra
 
 - **🤖 Hybrid AI Integration**: Seamless switching between local Ollama models and OpenAI/NVIDIA API with intelligent rate limiting (30 requests/minute)
 - **⚡ Agent Mode**: Revolutionary `/agent` command triggering multi-tool orchestration with AI-powered parameter generation
-- **🛠️ Tool Ecosystem**: 3 fundamental tools + dynamic MCP-exposed tools (see below). The repository's current .mcp.json registers 6 MCP servers (github, git, filesystem, memory, puppeteer, sequential-thinking); the filesystem MCP provides a set of dynamic filesystem tools when running.
+- **🛠️ 17-Tool Ecosystem**: 3 fundamental tools + 14 dynamic MCP filesystem tools
 - **🎨 Rich Traceback System**: Enterprise-grade error handling with visual debugging and separate debug windows
 - **📡 Event-Driven Architecture**: Complete listener system with Rich.status integration for real-time updates
 - **🔒 Privacy-First Design**: Local processing with optional cloud model integration
@@ -55,14 +55,18 @@ This is a **production-ready consumer desktop AI assistant** with enterprise-gra
 - **Tool Fallback Support**: Automatic recovery with alternative tools when primary tools fail
 - **Simplified Final Evaluation**: Streamlined workflow quality assessment (v4.0)
 
-### 🛠️ **Comprehensive Tool System (overview)**
+### 🛠️ **Comprehensive Tool System (17 Total)**
 
-#### **Fundamental Tools (examples)**
+#### **Fundamental Tools (3)**
 - **GoogleSearch**: Web search capabilities for current information
 - **RAGSearch**: Knowledge base search using retrieval-augmented generation
 - **Translate**: Language translation services
 
-> Note: In addition to these fundamental tools, the project uses MCP servers (configured via .mcp.json) to expose many dynamic tools (filesystem, memory, github, etc.). See the `.mcp.json` in the repo root for the exact servers currently registered.
+#### **MCP Filesystem Tools (14)**
+- **File Operations**: Read, write, create, delete files with proper encoding
+- **Directory Management**: List, create, navigate directory structures
+- **Search Capabilities**: Find files and content across the filesystem
+- **JSON-RPC Protocol**: Professional MCP integration with dynamic tool discovery
 
 ### 🎨 **Rich Traceback & Debugging System**
 - **Visual Error Handling**: Beautiful tracebacks with syntax highlighting and variable inspection
@@ -84,75 +88,15 @@ This is a **production-ready consumer desktop AI assistant** with enterprise-gra
 
 The AI-Agent-Workflow now supports **dynamic MCP server registration** through a simple `.mcp.json` configuration file placed at the project root.
 
-### Repository MCP configuration (current)
-The repository's .mcp.json currently registers the following MCP servers: github, git, filesystem, memory, puppeteer, sequential-thinking (6 servers). The filesystem server is configured to point at the repository root on this machine (Windows path in the example).
-
-### Example (.mcp.json from this repo)
+### Configuration
+Place `.mcp.json` at repo root. Example:
 ```json
 {
-	"inputs": [
-		{
-			"id": "GITHUB_TOKEN",
-			"description": "GitHub personal access token",
-			"type": "promptString",
-			"password": true
-		}
-	],
-	"servers": {
-		"github": {
-			"type": "stdio",
-			"command": "npx",
-			"args": [
-				"-y",
-				"@modelcontextprotocol/server-github@latest"
-			],
-			"env": {
-				"GITHUB_TOKEN": "%GITHUB_TOKEN%"
-			}
-		},
-		"git": {
-			"type": "stdio",
-			"command": "uvx",
-			"args": [
-				"mcp-server-git"
-			],
-			"env": {}
-		},
-		"filesystem": {
-			"type": "stdio",
-			"command": "npx",
-			"args": [
-				"-y",
-				"@modelcontextprotocol/server-filesystem@latest",
-				"C:\\Users\\pirat\\PycharmProjects\\AI_llm"
-			],
-			"env": {}
-		},
-		"memory": {
-			"type": "stdio",
-			"command": "npx",
-			"args": [
-				"-y",
-				"@modelcontextprotocol/server-memory@latest"
-			]
-		},
-		"puppeteer": {
-			"type": "stdio",
-			"command": "npx",
-			"args": [
-				"-y",
-				"@modelcontextprotocol/server-puppeteer@latest"
-			]
-		},
-		"sequential-thinking": {
-			"type": "stdio",
-			"command": "npx",
-			"args": [
-				"-y",
-				"@modelcontextprotocol/server-sequential-thinking"
-			]
-		}
-	}
+  "servers": {
+    "filesystem": { "command": "npx", "args": ["-y","@modelcontextprotocol/server-filesystem@latest","<ABS_PATH>"] },
+    "memory": { "command": "npx", "args": ["-y","@modelcontextprotocol/server-memory@latest"] },
+    "github": { "command": "npx", "args": ["-y","@modelcontextprotocol/server-github@latest"] }
+  }
 }
 ```
 
@@ -178,18 +122,16 @@ Enhanced OpenAI integration with enterprise-grade reliability features:
 
 ## 🐳 Dockerization
 
-Note: Docker support is NOT fully supported yet. While the repository contains Docker-related files (Dockerfile and docker-compose.yml), the application is currently designed as a desktop/orchestrator application rather than an API service. Because of that, it is not yet fully dockerizable or intended to be run as a containerized API service out-of-the-box.
+Container-first workflow for simplified deployment:
 
-Planned: we intend to refactor and expose an API surface in a future release (v1.9.0+), at which point a supported Docker image and docker-compose configuration will be provided with clear runtime instructions.
+```bash
+# Quick start with docker-compose
+docker compose up --build
 
-If you want to experiment locally before official Docker support is added, consider the following notes:
-- The Dockerfile in the repo is a starting point and may require adjustments to entrypoints, mounted volumes, and MCP server availability.
-- The docker-compose.yml file is present but not guaranteed to boot all required MCP servers or to match your local .mcp.json configuration.
-- Integration tests and MCP-based features expect local Node-based MCP servers to be started; these are not automatically managed inside the current containers.
-
-Recommended immediate workflow:
-- Run the application locally using the Quick Start instructions (python src/main_orchestrator.py) while MCP servers are started via npx/uvx as needed.
-- When you're ready to containerize, I can prepare a dedicated API wrapper and a production-ready docker-compose configuration that launches required MCP servers and configures environment secrets.
+# Or build and run manually
+docker build -t ai-agent .
+docker run --rm -it -p 8000:8000 -v ./src:/app/src ai-agent
+```
 
 ---
 
@@ -200,7 +142,7 @@ Recommended immediate workflow:
 Python 3.13+ (recommended)
 Virtual environment (recommended)
 Node.js (for MCP servers)
-Docker (optional, planned; not fully supported yet)
+Docker (optional, for containerized deployment)
 ```
 
 ### **Installation**
@@ -214,19 +156,15 @@ python -m venv .venv
 .venv\Scripts\activate  # Windows
 # source .venv/bin/activate  # Linux/Mac
 
-# Install dependencies (recommended):
-# Option A (recommended) - install from top-level requirements.txt (keeps quick pip install path):
+# Install dependencies
 pip install -r requirements.txt
-
-# Option B (canonical) - use pyproject.toml as canonical dependency list
-pip install -e .
 ```
 
 ### **Configuration**
 Create `.env` file in the project root:
 ```env
 # OpenAI/NVIDIA API Configuration (Optional - for cloud models)
-OPENAI_API_KEY=your_openai_api_key_here
+OPEN_AI_API_KEY=your_nvidia_api_key_here
 OPENAI_TIMEOUT=30
 
 # Sentry Monitoring (Optional)
@@ -238,110 +176,14 @@ GPT_MODEL=llama3.2:latest  # or your preferred local model
 
 # MCP Configuration
 MCP_CONFIG_PATH=.mcp.json  # Path to MCP configuration file
-MCP_API_KEY=your_mcp_api_key_here  # Optional: used by protected MCP servers
-
-# GitHub (for github MCP server)
-GITHUB_TOKEN=your_github_personal_access_token_here
 ```
 
-Add a new section for Authentication & MCP startup:
+Create `.mcp.json` file in the project root (see Dynamic MCP Integration section for examples).
 
----
-
-## 🔐 Authentication & MCP Server Startup (prevent auth errors)
-
-This project requires several credentials for optional cloud integrations and for some MCP servers. Common causes of "authentication" or "permission" errors are misnamed environment variables, missing tokens, or MCP servers not running.
-
-Required/optional credentials and env variables
-- OPENAI_API_KEY (optional) — used for cloud OpenAI/NVIDIA models. Make sure this key is valid and has remaining quota.
-- GITHUB_TOKEN (optional) — used by the MCP GitHub server to access private repositories. The token must have repo/read permissions for repository operations.
-- MCP_API_KEY (optional) — used by MCP servers that require an API key. If your MCP servers are configured to require a key, set this environment variable and ensure the same key is used by the server and client.
-- OLLAMA_HOST (optional) — only if you run a local Ollama model service.
-
-How to start the MCP servers used by this repository (local testing)
-
-The repo ships a `.mcp.json` that defines how to start MCP servers. Below are commands to start each server manually (run in a separate terminal for each server). These are the commands that correspond to the `.mcp.json` in this repo — adjust paths and env vars as needed.
-
-# Example commands (open separate terminals):
-# 1) Filesystem server (exposes local filesystem tools)
-npx -y @modelcontextprotocol/server-filesystem@latest "C:\\Users\\pirat\\PycharmProjects\\AI_llm"
-
-# 2) Memory server
-npx -y @modelcontextprotocol/server-memory@latest
-
-# 3) GitHub server (requires GITHUB_TOKEN in environment)
-# Unix/macOS:
-export GITHUB_TOKEN=your_github_token_here && npx -y @modelcontextprotocol/server-github@latest
-# Windows (PowerShell):
-$env:GITHUB_TOKEN="your_github_token_here"; npx -y @modelcontextprotocol/server-github@latest
-
-# 4) Puppeteer server
-npx -y @modelcontextprotocol/server-puppeteer@latest
-
-# 5) Sequential-thinking server
-npx -y @modelcontextprotocol/server-sequential-thinking
-
-# 6) Git server (uses uvx wrapper as in .mcp.json; if uvx is unavailable, install/replace accordingly)
-uvx mcp-server-git
-
-Notes and troubleshooting for auth/permission errors
-- "Unauthorized" or 401 errors for OpenAI: verify OPENAI_API_KEY is set and not expired; check OPENAI_TIMEOUT in `.env` if requests time out.
-- "Forbidden" or 403 from GitHub MCP server: ensure GITHUB_TOKEN has the correct scopes (repo/read or repo for private repo access) and is exported to the terminal where you start the server.
-- If an MCP server requires an API key and you get permission errors, set MCP_API_KEY in your `.env` and export it in the shell used to start both the MCP server and the Python application.
-- Filesystem MCP returns path errors if the provided path is not accessible or is not absolute. Use absolute paths (Windows example shown in `.mcp.json`).
-- If MCP discovery fails at startup, check that `settings.MCP_CONFIG.MCP_CONFIG_PATH` points to the correct `.mcp.json` and that `MCP_ENABLED` is set to true in `.env` (if you disabled MCP via env, nothing will be registered).
-
-Quick workflow to avoid auth errors
-1. Create and populate `.env` with OPENAI_API_KEY, GITHUB_TOKEN (if needed), and MCP_API_KEY (if your servers require it).
-2. Start required MCP servers (see commands above) in separate terminals, ensuring relevant env vars are present in those terminals.
-3. Start the Python application:
-```
+### **Run the Application**
+```bash
 python src/main_orchestrator.py
 ```
-
-If you still see authentication errors, copy the exact error text and I will analyze it and propose the precise fix.
-
----
-
-## 🧪 Running Tests
-
-This project includes both unit and integration tests. Some tests require external services (MCP servers, log server) to be running. Follow these steps to run tests reliably.
-
-1) Quick unit tests (no external MCP servers required):
-```bash
-# From project root
-pytest tests/unit -q
-```
-
-2) Integration tests (MCP servers required):
-- Start the MCP servers defined in `.mcp.json` (see Authentication & MCP Server Startup section). Launch each server in its own terminal so they stay running.
-- Ensure any required tokens (GITHUB_TOKEN, MCP_API_KEY, OPENAI_API_KEY) are exported in the terminals where you start the MCP servers and in the terminal where you run tests.
-
-Example:
-```bash
-# Start filesystem server (example)
-npx -y @modelcontextprotocol/server-filesystem@latest "C:\\Users\\pirat\\PycharmProjects\\AI_llm"
-# Start other servers as needed (memory, github, puppeteer, sequential-thinking)
-
-# Then run integration tests
-pytest tests/integration -q
-```
-
-3) Error-handling / socket-based tests:
-- Some tests expect a log server (socket) to be available. Start the log server before running these tests:
-```bash
-python src/utils/error_transfer.py  # or python src/utils/error_transfer.py --help
-```
-
-4) Alternative: run the custom runner
-```bash
-python tests/run_tests.py
-```
-This runner provides an interactive menu and guidance if some services are missing.
-
-Notes:
-- If an integration test fails with authentication/permission errors, confirm the relevant environment variables are set and that the MCP server was started from the terminal that has the environment variables exported.
-- For CI, make sure to mock or provision MCP servers and secrets appropriately.
 
 ---
 
@@ -402,37 +244,21 @@ The AI-Agent-Workflow Project follows a modular, enterprise-grade architecture w
 │   ├── 💬 chat_llm.py                        # LLM communication and response handling
 │   ├── 🔍 classify_agent.py                  # Message classification for /agent detection
 │   ├── 🧭 router.py                          # Message routing between processing nodes
-│   ├── 🧰 node_factory.py                    # Node factory for dynamic agent node creation
-│   └── 🏗️ agentic_orchestrator/              # Dedicated hierarchical agent workflow package
-│       ├── AgentGraphCore.py                # Core hierarchical agent planner & executor
-│       ├── hierarchical_agent_prompts.py    # Depth-aware prompts for agent nodes
-│       └── __init__.py                      # Agent orchestrator package init
+│   └── 🛠️ tool_selector.py                   # Tool selection logic based on user input
 ├── 📁 config/                                # Configuration management
 │   ├── ⚙️ settings.py                        # Application settings and configuration variables
-│   ├── 📝 configure_logging.py               # Logging configuration and setup helpers
-│   └── 🔐 .env.example                       # Example environment variables template
+│   └── 📝 configure_logging.py               # Logging configuration and setup helpers
 ├── 📁 core/                                  # Core system components
 │   ├── 🎬 chat_initializer.py                # Chat system initialization and setup
-│   ├── 🗑️ chat_destructor.py                 # Graceful chat teardown and cleanup helpers
 │   └── 📁 graphs/                            # LangGraph workflow definitions
-│       └── node_assign.py                   # Node assignment helpers for LangGraph
 ├── 📁 models/                                # Data models and state management
 │   └── 🔄 state.py                           # State management with StateAccessor singleton
 ├── 📁 prompts/                               # AI prompt templates
 │   ├── 🎯 agent_mode_prompts.py              # Prompts for agent mode operations
-│   ├── 💭 open_ai_prompt.py                  # OpenAI-specific prompt templates
-│   ├── 📚 rag_prompts.py                     # RAG prompt templates
-│   ├── 🧩 rag_search_classifier_prompts.py   # RAG classifier prompt templates
-│   ├── 🧾 structured_triple_prompt.py        # Triple extraction & structured prompts
-│   ├── ⚙️ system_prompts.py                  # System-level prompts and defaults
-│   ├── 🧭 system_prompt_tool_selector.py     # Tool-selector prompts
-│   └── 🌐 web_search_prompts.py              # Prompts used for web/search operations
+│   └── 💭 open_ai_prompt.py                  # OpenAI-specific prompt templates
 └── 📁 utils/                                 # Utility modules and services
     ├── 🔀 model_manager.py                   # Hybrid model management (Ollama/OpenAI)
     ├── 🌐 open_ai_integration.py             # OpenAI/NVIDIA API integration with circuit breaker
-    ├── 🔌 socket_manager.py                 # Subprocess log server management with legacy bridge
-    ├── 🧾 argument_schema_util.py            # Tool argument schema utilities
-    ├── 🚨 error_transfer.py                 # Raw socket server for debug messages and logs
     └── 📁 listeners/                         # Event-driven architecture
         ├── 📡 event_listener.py              # Core event management system
         └── 🎨 rich_status_listen.py          # Rich status integration
@@ -445,36 +271,32 @@ The AI-Agent-Workflow Project follows a modular, enterprise-grade architecture w
 ├── 📤 tool_response_manager.py               # Response handling from tool executions
 ├── 📁 tools/                                # Core tool implementations
 │   ├── 🔍 google_search_tool.py             # Google search functionality
-│   ├── 🧠 rag_search_classifier_tool.py     # Knowledge base search / RAG (classifier variant)
+│   ├── 🧠 rag_search_tool.py                # Knowledge base search (RAG)
 │   ├── 🌐 translate_tool.py                 # Translation services
 │   ├── 💻 run_shell_command_tool.py         # Shell command execution
 │   └── 📁 mcp_integrated_tools/             # MCP filesystem integration
-│       ├── 📂 filesystem.py                 # File operations (exposes 14 MCP filesystem actions)
-│       └── 📂 universal.py                  # Universal MCP adapter for dynamic tool routing
+│       └── 📂 filesystem.py                 # File operations (14 dynamic tools)
 └── 📁 tool_schemas/                          # Tool argument schemas and validation
-    └── tools_structured_classes.py
 ```
-
-### **Tool wrappers & adapters (additional files present)**
-- `src/tools/lggraph_tools/.env` — local env for tools/wrappers
-- `src/tools/lggraph_tools/wrappers/google_wrapper.py`
-- `src/tools/lggraph_tools/wrappers/translate_wrapper.py`
-- `src/tools/lggraph_tools/wrappers/rag_search_classifier_wrapper.py`
-- `src/tools/lggraph_tools/wrappers/run_shell_comand_wrapper.py`  # (note: filename contains 'comand' — matches repo)
-- `src/tools/lggraph_tools/wrappers/mcp_wrapper/filesystem_wrapper.py`
-- `src/tools/lggraph_tools/wrappers/mcp_wrapper/uni_mcp_wrappers.py`
 
 ### **🎨 Modern UI & Diagnostics**
 ```
 📁 src/ui/
 ├── 🎨 print_message_style.py                # Message formatting and styling
 ├── 🎪 print_banner.py                       # Application banner display
-├── 🕘 print_history.py                      # CLI history rendering utilities
-├── 🖨️ rich_error_print.py                    # Rich-styled error printing helpers
 └── 📁 diagnostics/                          # Rich Traceback system
     ├── 🔧 rich_traceback_manager.py         # Enterprise-grade error handling
-    ├── 🛟 debug_helpers.py                  # Structured debug utilities
+    ├── 🛟 debug_helpers.py                  # Debug message helpers
     └── 📨 debug_message_protocol.py         # Debug transport protocol
+```
+
+### **🔌 Enhanced MCP Integration**
+```
+📁 src/mcp/
+├── 🎛️ manager.py                            # MCP server lifecycle management
+├── 🔄 dynamically_tool_register.py          # Dynamic MCP tool registration
+├── 📥 load_config.py                        # MCP configuration loading (.mcp.json)
+└── 🏗️ mcp_register_structure.py            # MCP registration structure definitions
 ```
 
 ### **🧠 Next-Gen RAG System**
@@ -482,42 +304,256 @@ The AI-Agent-Workflow Project follows a modular, enterprise-grade architecture w
 📁 src/RAG/
 └── 📁 RAG_FILES/                            # Knowledge base and retrieval files
     ├── 🗄️ neo4j_rag.py                      # Neo4j graph database integration
-    ├── 📄 kafka.pdf                         # Example PDF used for RAG demos
-    ├── 🗃️ chroma.sqlite3                   # Example Chroma DB file
-    ├── 📁 chromaDB_patents/                # Chroma binary/index artifacts (large)
-    ├── 📝 processed_hash_chunks.txt        # Processed chunk hashes
-    ├── 📦 processed_triple.json            # Extracted triples (example)
-    ├── 🧾 rag.py                           # RAG orchestration utilities
-    └── 🧾 sheets_rag.py                    # Google Sheets based RAG helper
+    └── 📚 knowledge_base/                   # Document storage and indexing
+```
+
+### **🧪 Testing Infrastructure**
+```
+📁 tests/
+├── 🔬 run_tests.py                          # Test suite execution
+├── 📁 event_listener/                       # Event system testing
+│   ├── 🎯 quick_validation.py              # Fast event system validation
+│   ├── 🧪 test_event_listener_realistic.py # Realistic event testing scenarios
+│   └── 📊 run_listener_test.py             # Comprehensive listener testing
+└── 📁 integration/                          # Integration testing
+    ├── 🔗 test_mcp_integration.py          # MCP server integration tests
+    └── 🤖 test_agent_mode.py               # Agent mode functionality tests
 ```
 
 ### **📊 Configuration & DevOps**
 ```
 📁 Project Root
-├── 🐳 Dockerfile                           # Container deployment configuration (artifact)
-├── 🐙 docker-compose.yml                   # Multi-container orchestration (artifact)
+├── 🐳 Dockerfile                           # Container deployment configuration
+├── 🐙 docker-compose.yml                   # Multi-container orchestration
 ├── ⚙️ .mcp.json                            # Dynamic MCP server configuration
 ├── 🔧 pyproject.toml                       # Python project configuration
 ├── 📦 requirements.txt                     # Python dependencies
-├── 🌍 .env                                 # Environment variables (user-provided)
-├── 📁 basic_logs/                          # Top-level logs (note: repo also contains src/basic_logs/)
+├── 🌍 .env                                 # Environment variables
 └── 📁 copilot_instructions/                # Development guidelines
     └── 📘 mcp_instructions.md              # MCP integration guidelines
 ```
 
-### **🧾 Agent Workflow (agentic_orchestrator)**
-A dedicated internal agent workflow package provides hierarchical planning, parameter generation, sub-agent spawning and finalization. This package is invoked by Agent Mode and offers a self-contained agent orchestration stack.
+---
+
+### **🔄 Data Flow Architecture**
+
+```mermaid
+graph TD
+    A[🎯 main_orchestrator.py] --> B[🎬 ChatInitializer]
+    B --> C[🔍 Message Classifier]
+    C --> D{📋 Route Decision}
+    D -->|💬 Chat| E[🤖 LLM Agent]
+    D -->|🛠️ Tool| F[🔧 Tool Selector]
+    D -->|⚡ Agent Mode| G[🎯 Agent Orchestrator]
+    
+    F --> H[📂 MCP Tools]
+    F --> I[🔍 Core Tools]
+    
+    G --> J[🧠 AI Parameter Generation]
+    J --> K[🔄 Tool Chain Execution]
+    K --> L[📊 Final Evaluation]
+    
+    E --> M[🎨 Rich Output]
+    F --> M
+    L --> M
+    
+    M --> N[💻 User Interface]
+    
+    subgraph "🔌 MCP Ecosystem"
+        H --> O[📂 Filesystem Tools]
+        H --> P[🧠 Memory Tools]
+        H --> Q[🐙 GitHub Tools]
+    end
+    
+    subgraph "🎨 Rich System"
+        M --> R[🖥️ Main Window]
+        M --> S[🔧 Debug Panel]
+        R --> T[📡 Event Listeners]
+        S --> U[📊 Error Tracking]
+    end
+```
+
+This architecture ensures **scalability**, **maintainability**, and **enterprise-grade reliability** while maintaining a clean separation of concerns across all system components.
+
+---
+
+## 📁 Detailed Project Structure
 
 ```
-📁 src/agents/agentic_orchestrator/
-├── AgentGraphCore.py                # Core orchestrator: planner, executor, synthesizer, validator, finalizer
-├── hierarchical_agent_prompts.py    # Depth-aware prompt templates used by agent nodes
-├── __init__.py                      # Package entry
+AI-Agent-Workflow/
+├── src/
+│   ├── main_orchestrator.py          # Main application entry point
+│   ├── agents/                       # Multi-agent orchestration layer
+│   │   ├── agent_mode_node.py       # Agent mode implementation
+│   │   ├── classify_agent.py        # Message classification
+│   │   ├── chat_llm.py              # LLM communication
+│   │   ├── router.py                # Message routing
+│   │   └── tool_selector.py         # Tool selection logic
+│   ├── tools/lggraph_tools/         # Tool ecosystem (17 tools)
+│   │   ├── tool_assign.py           # Tool registry management
+│   │   ├── tool_response_manager.py # Response handling
+│   │   ├── tools/                   # Core tool implementations
+│   │   │   ├── google_search_tool.py
+│   │   │   ├── rag_search_tool.py
+│   │   │   ├── translate_tool.py
+│   │   │   ├── run_shell_command_tool.py
+│   │   │   └── mcp_integrated_tools/
+│   │   └── tool_schemas/            # Tool validation schemas
+│   ├── utils/                       # Supporting infrastructure
+│   │   ├── open_ai_integration.py   # OpenAI/NVIDIA API integration
+│   │   ├── model_manager.py         # Hybrid model management
+│   │   ├── socket_manager.py        # Logging infrastructure
+│   │   ├── argument_schema_util.py  # Schema utilities
+│   │   ├── error_transfer.py        # Error handling
+│   │   └── listeners/               # Event-driven architecture
+│   │       ├── event_listener.py    # Core event system
+│   │       └── rich_status_listen.py # Rich status integration
+│   ├── ui/diagnostics/              # Structured logging and diagnostics
+│   │   ├── rich_traceback_manager.py # Rich Traceback system
+│   │   ├── debug_helpers.py         # Structured debug utilities
+│   │   └── debug_message_protocol.py # Debug message protocol implementation
+│   ├── mcp/                         # Model Context Protocol
+│   │   ├── manager.py              # MCP server management
+│   │   ├── load_config.py          # Configuration loading
+│   │   ├── dynamically_tool_register.py # Dynamic registration
+│   │   └── mcp_register_structure.py # Registration structures
+│   ├── RAG/RAG_FILES/              # Knowledge retrieval engine
+│   │   └── neo4j_rag.py            # Neo4j integration
+│   ├── config/                     # Configuration management
+│   │   ├── settings.py             # Environment settings
+│   │   └── configure_logging.py    # Logging setup
+│   ├── models/                     # Data models
+│   │   └── state.py               # State management
+│   ├── prompts/                    # AI prompt templates
+│   │   ├── agent_mode_prompts.py   # Agent prompts
+│   │   └── open_ai_prompt.py       # OpenAI prompts
+│   └── core/                       # Core system components
+│       ├── chat_initializer.py     # Initialization
+│       └── graphs/                 # LangGraph definitions
+├── tests/                          # Comprehensive test suite
+│   ├── run_tests.py               # Test execution
+│   ├── event_listener/            # Event system tests
+│   └── integration/               # Integration tests
+├── examples/                       # Working demonstrations
+│   └── event_listener/             # Event system examples
+├── copilot_instructions/           # Development guidelines
+├── reports/                        # Analysis and documentation
+├── pyproject.toml                  # Python project configuration
+├── requirements.txt                # Python dependencies
+├── .env                           # Environment variables
+├── .mcp.json                      # MCP server configuration
+├── Dockerfile                     # Container configuration
+├── docker-compose.yml             # Multi-container setup
+└── README.md                       # This file
 ```
 
-Description:
-- AgentGraphCore.py — Implements the hierarchical agent graph, task decomposition, spawning of scoped sub-agents, and the main execution loop (plan → classify → param-gen → execute → synthesize → validate → plan/finish).
-- hierarchical_agent_prompts.py — Strict/depth-aware prompts used by planner and sub-agent nodes to control behavior and ensure consistent parameter formats and validation.
+### Directory Purpose Documentation
+
+**`src/utils/`** - Supporting infrastructure utilities
+- `argument_schema_util.py` - Tool argument schema extraction and validation
+- `error_transfer.py` - Raw socket server for debug messages and error logs
+- `model_manager.py` - Local/OpenAI model multiplexing with hybrid switching
+- `open_ai_integration.py` - NVIDIA-compatible OpenAI adapter with singleton pattern
+- `socket_manager.py` - Subprocess log server management with legacy bridge
+- `listeners/` - Event-driven architecture with Rich status integration
+
+**`src/ui/diagnostics/`** - Structured logging and Rich traceback management
+- `rich_traceback_manager.py` - Enterprise-grade error handling system
+- `debug_helpers.py` - Structured debug utilities and message routing
+- `debug_message_protocol.py` - Debug message protocol implementation
+
+**`src/agents/`** - Multi-agent orchestration layer
+- `agent_mode_node.py` - Complete agent mode implementation with tool orchestration
+- `classify_agent.py` - Message classification and routing logic
+- `chat_llm.py` - LLM communication and response handling
+- `router.py` - Message routing between processing nodes
+- `tool_selector.py` - Tool selection logic based on user input
+
+**`src/tools/lggraph_tools/`** - 17-tool ecosystem
+- 3 fundamental tools: GoogleSearch, RAGSearch, Translate
+- 14 dynamic MCP filesystem tools
+- Tool selection and execution logic
+- Response management and validation
+
+**`src/mcp/`** - Model Context Protocol implementation
+- JSON-RPC communication with subprocess management
+- Dynamic tool discovery and registration
+- Server lifecycle management
+- Configuration loading and validation
+
+---
+
+## 🤖 Agent Mode
+
+Advanced multi-tool orchestration system with AI-powered parameter generation.
+
+### Features
+- **AI-Powered Parameter Generation** - Intelligent parameter creation for tool execution
+- **Sequential Tool Processing** - Coordinated execution of multiple tools
+- **Failure Recovery** - Automatic retry and error handling
+- **Context Awareness** - Maintains context across tool executions
+- **Final Response Evaluation** - Quality assessment and optimization (v4.0 simplified)
+
+### Usage
+Agent mode is automatically activated for complex multi-step tasks that require tool orchestration. Use `/agent` command to explicitly trigger agent mode.
+
+### Example Workflow
+```
+/agent search for Python tutorials and save the best ones to a file
+
+Agent will automatically:
+1. Use GoogleSearch to find Python tutorials
+2. Evaluate and filter results
+3. Use filesystem tools to save content
+4. Provide comprehensive summary
+```
+
+---
+
+Addendum: Dedicated Agent Workflow (new)
+
+A new dedicated agent workflow has been added as an internal orchestrator package. This provides a self-contained workflow for hierarchical task decomposition, just-in-time parameter generation, and robust sub-agent spawning.
+
+- New package (visible in the project):
+  - src/agents/agentic_orchestrator/
+    - AgentGraphCore.py            # Core hierarchical agent workflow (planner, classifier, parameter generator, executor, synthesizer, validator, planner, finalizer)
+    - hierarchical_agent_prompts.py# Depth-aware, strict prompt templates for agent nodes
+
+Note: These files implement the "Agent Workflow" used by Agent Mode. They are internal implementation details and are invoked when `/agent` triggers multi-step orchestration.
+
+Agent Workflow (visualization)
+
+Below is a high-level visualization of the internal agent workflow (the main orchestrator graph) so you can see how the agent decomposes and executes tasks:
+
+```mermaid
+flowchart TD
+    A[subAGENT_initial_planner]
+    B[subAGENT_classifier]
+    C[subAGENT_parameter_generator]
+    D[subAGENT_task_executor]
+    E[subAGENT_context_synthesizer]
+    F[subAGENT_goal_validator]
+    G[subAGENT_task_planner]
+    H[subAGENT_finalizer]
+
+    A --> B
+    B --> C
+    C --> D
+    D --> E
+    E --> F
+    F -->|if task failed| B
+    F -->|if more pending| G
+    G --> B
+    G --> H
+
+    %% Spawning path for complex tasks or repeated failures
+    D -->|requires decomposition| SPAWN[Spawn_subAgent]
+    SPAWN --> A
+
+    style SPAWN fill:#f9f,stroke:#333,stroke-width:2px
+``` 
+
+This visualization reflects the main internal loop: plan → classify → generate parameters → execute → synthesize → validate → plan/finish. Spawning creates recursive, scoped sub-agents that are injected into the same unified workflow state (preserving Dual Context: raw results + analysis).
 
 ---
 
@@ -559,4 +595,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 **Built with ❤️ for enterprise-grade AI agent development**
 
-*AI-Agent-Workflow Project v1.8.0 - Transforming AI assistant development with enterprise-grade architecture and professional workflows.*
+*AI-Agent-Workflow Project v1.7.0 - Transforming AI assistant development with enterprise-grade architecture and professional workflows.*
