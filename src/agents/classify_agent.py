@@ -10,7 +10,12 @@ from src.slash_commands.executionar import ExecutionAr
 
 
 def classify_message_type(state) -> dict:
-    """Classifies the latest message in the conversation as either requiring an LLM response or a tool response.
+    """Determine the processing route for the latest conversation message.
+
+    This function examines the most recent message in the conversation state
+    and classifies it to require an LLM response, a tool response, or an agent action.
+    Routing is based on slash command prefixes. Supported commands are:
+        /llm, /tool, and /agent. If no valid command is detected, the default route is /llm.
     """
     print("\t\t----Node is classify_message")
     console = settings.console
@@ -51,66 +56,6 @@ def classify_message_type(state) -> dict:
                 console.print("[u][red]Defaulting to LLM response for non-routing slash command.[/u][/red]")
 
                 return {"message_type": "llm"}
-            # todo there is issue there if the other slash command other than routing would used here so the
-            # todo i can use ai to provide some details about the slash command because after every non routing slash command the node would be go to llm so we can make llm to provide some details about the slash command executed
-
-
-    explicit_ai_phrases = ["/use ai", "/use llm", "/llm", "/ai", "/assistant"]
-    lowered_content = content.lower()
-    for phrase in explicit_ai_phrases:
-        if lowered_content.startswith(phrase):
-            if settings.socket_con:
-                settings.socket_con.send_error(
-                    f"[LOG] Removing explicit AI phrase: {phrase}",
-                )
-            else:
-                debug_info(
-                    "Explicit AI Phrase Detected",
-                    f"Removing explicit AI phrase: {phrase}",
-                    {"phrase": phrase},
-                )
-            last_message.content = last_message.content.replace(phrase, "")
-            console.print(
-                "[u][red]Message classified as[/u][/red]: llm (explicit user request override)",
-            )
-            return {"message_type": "llm"}
-
-    explicit_tool_phrases = ["/use tool", "/tool"]
-    for phrase in explicit_tool_phrases:
-        if lowered_content.startswith(phrase):
-            if settings.socket_con:
-                settings.socket_con.send_error(
-                    f"[LOG] Removing explicit tool phrase: {phrase}",
-                )
-            else:
-                debug_info(
-                    "Explicit Tool Phrase Detected",
-                    f"Removing explicit tool phrase: {phrase}",
-                    {"phrase": phrase},
-                )
-            last_message.content = last_message.content.replace(phrase, "")
-            console.print(
-                "[u][red]Message classified as[/u][/red]: tool (explicit user request override)",
-            )
-            return {"message_type": "tool"}
-    explicit_agent_phrases = ["/use agent", "/agent", "/tool chain", "/agent mode"]
-    for phrase in explicit_agent_phrases:
-        if lowered_content.startswith(phrase):
-            if settings.socket_con:
-                settings.socket_con.send_error(
-                    f"[LOG] Removing explicit agent phrase: {phrase}",
-                )
-            else:
-                debug_info(
-                    "Explicit Agent Phrase Detected",
-                    f"Removing explicit agent phrase: {phrase}",
-                    {"phrase": phrase},
-                )
-            last_message.content = last_message.content.replace(phrase, "")
-            console.print(
-                "[u][red]Message classified as[/u][/red]: agent (explicit user request override)",
-            )
-            return {"message_type": "agent"}
 
     # Build history from state messages directly
     history_parts = []
