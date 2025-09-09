@@ -1,12 +1,19 @@
 """
 Configuration settings for AI LLM project.
 """
+from __future__ import annotations
 
 import os
-import dotenv
-
 # Load environment variables from .env file
 from pathlib import Path
+from typing import TypedDict, TYPE_CHECKING
+
+import dotenv
+
+# Use TYPE_CHECKING to avoid circular imports
+if TYPE_CHECKING:
+    from src.utils.listeners.rich_status_listen import RichStatusListener
+    from src.utils.listeners.exit_listener import ExitListener
 
 dotenv.load_dotenv(
     Path(__file__).resolve().parent.parent.parent / ".env", override=True
@@ -35,10 +42,10 @@ TRANSLATION_API_URL = os.getenv(
 # Default paths
 DEFAULT_RAG_EXAMPLE_FILE_PATH = BASE_DIR / "RAG" / "RAG_FILES" / "kafka.pdf"
 DEFAULT_RAG_FILES_HASH_TXT_PATH = (
-    BASE_DIR / "RAG" / "RAG_FILES" / "processed_hash_chunks.txt"
+        BASE_DIR / "RAG" / "RAG_FILES" / "processed_hash_chunks.txt"
 )
 DEFAULT_RAG_FILES_PROCESSED_TRIPLES_PATH = (
-    BASE_DIR / "RAG" / "RAG_FILES" / "processed_triple.json"
+        BASE_DIR / "RAG" / "RAG_FILES" / "processed_triple.json"
 )
 
 # Logging configuration
@@ -48,7 +55,7 @@ LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 # Feature flags
 ENABLE_SOCKET_LOGGING = os.getenv("ENABLE_SOCKET_LOGGING", "true").lower() == "true"
 ENABLE_SOUND_NOTIFICATIONS = (
-    os.getenv("ENABLE_SOUND_NOTIFICATIONS", "true").lower() == "true"
+        os.getenv("ENABLE_SOUND_NOTIFICATIONS", "true").lower() == "true"
 )
 
 # Log display mode options:
@@ -99,7 +106,18 @@ socket_con = (
 )
 
 # listeners
-listeners = {"eval": None}
+
+class ListenersDict(TypedDict):
+    eval: 'RichStatusListener | None'
+    exit: 'ExitListener | None'
+
+listeners: ListenersDict = {
+    "eval": None,
+    "exit": None
+}
+
+#exit flag to close the application smoothly
+exit_flag = False
 
 
 # mcp.md configs
