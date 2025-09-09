@@ -519,8 +519,11 @@ class ChatInitializer:
         """Register core slash commands like /help, /clear, /agent"""
         from src.slash_commands.commands.clear import register_clear_command
         from src.slash_commands.commands.help import register_help_command
-        from src.slash_commands.commands.core_slashs.agent import register_agent_command
         from src.slash_commands.commands.exit import register_exit_command
+        # core/routing slash commands
+        from src.slash_commands.commands.core_slashs.agent import register_agent_command
+        from src.slash_commands.commands.core_slashs.chat_llm import register_chat_llm_command
+        from src.slash_commands.commands.core_slashs.use_tool import register_slash_command_use_tool
 
 
         async def register_commands():
@@ -530,6 +533,8 @@ class ChatInitializer:
                 asyncio.to_thread(register_help_command),
                 asyncio.to_thread(register_agent_command),
                 asyncio.to_thread(register_exit_command),
+                asyncio.to_thread(register_chat_llm_command),
+                asyncio.to_thread(register_slash_command_use_tool),
             ]
             await asyncio.gather(*tasks)
 
