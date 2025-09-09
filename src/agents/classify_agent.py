@@ -1,7 +1,12 @@
+from langchain_core.messages import HumanMessage
+
 from src.config import settings
+from src.models.state import StateAccessor
 from src.tools.lggraph_tools.tool_assign import ToolAssign
 from src.ui.diagnostics.debug_helpers import debug_info
 from src.utils.model_manager import ModelManager
+from src.slash_commands.parser import ParseCommand
+from src.slash_commands.executionar import ExecutionAr
 
 
 def classify_message_type(state) -> dict:
@@ -14,6 +19,41 @@ def classify_message_type(state) -> dict:
     messages = state.get("messages", [])
     last_message = messages[-1] if messages else None
     content = last_message.content if last_message else ""
+
+    # upcoming feature to override the classification with explicit user commands
+    if content.lower().startswith('/'):
+        # send it to parser then executor
+        result = None
+        try:
+            slash_command = ParseCommand.get_command(content)
+            executor = ExecutionAr()
+            result = executor.execute(slash_command)
+            if result.success:
+                console.print(f"[u][red]Slash command executed:[/u][/red] {content}")
+            else:
+                console.print(f"[u][red]Slash command execution failed:[/u][/red] {result.message}")
+        except ValueError as ve:
+            console.print(f"[u][red]Invalid slash command:[/u][/red] {ve}")
+            message = HumanMessage(content=f"Invalid slash command: {ve}")
+            state["messages"].append(message)
+        except Exception as e:
+            console.print(f"[u][red]Error processing slash command:[/u][/red] {e}")
+            message = HumanMessage(content=f"Error processing slash command: {e}")
+            state["messages"].append(message)
+        finally:
+            if result and result.success and result.data and isinstance(result.data, dict) and "message_type" in result.data:
+                return result.data # this could be agent or tool or llm based on the command executed
+            else:
+                # if the slash command is non routing command like /help or /clear or any other command that does not change the flow we can default to llm
+                # add the message of slash-command from the executionar into the messages as well so the llm can see the result of the command executed
+                message = HumanMessage(content=f"user executed this slash command: {content}. Result: {result.message if result else 'No result available.'}" if result else f"Invalid or non-routing slash command executed: {content}")
+                state["messages"].append(message)
+                console.print("[u][red]Defaulting to LLM response for non-routing slash command.[/u][/red]")
+
+                return {"message_type": "llm"}
+            # todo there is issue there if the other slash command other than routing would used here so the
+            # todo i can use ai to provide some details about the slash command because after every non routing slash command the node would be go to llm so we can make llm to provide some details about the slash command executed
+
 
     explicit_ai_phrases = ["/use ai", "/use llm", "/llm", "/ai", "/assistant"]
     lowered_content = content.lower()
