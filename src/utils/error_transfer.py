@@ -20,30 +20,33 @@ from rich.console import Console
 
 class SocketCon:
     got_killed: bool = None  # Flag to indicate if the server was killed
+    _lock = threading.Lock()
 
     def __init__(self, _client_socket: socket.socket):
-        self.client_socket = _client_socket
+        with self._lock:
+            self.client_socket = _client_socket
 
     def send_error(self, error_message: str, close_socket: bool = False):
-        try:
-            #     check whether the socket is connected
-            if not self._is_connected():
-                print(error_message, flush=True, file=sys.stderr)
-                raise socket.error("Socket is not connected.")
-            # Send the error message
-            else:
-                # print("Sending error message: ", error_message, flush=True, file=sys.stderr)
-                # winsound.Beep(7933, 500)  # Beep sound for error notification
-                self.client_socket.sendall(error_message.encode("utf-8"))
-            # self.client_socket.sendall(error_message.encode('utf-8'))
-        except socket.error as e:
-            if str(e) == "Socket is not connected.":
-                pass
-            else:
-                print(f"Error sending message: {e}")
-        finally:
-            if close_socket:
-                self.client_socket.close()
+        with self._lock:
+            try:
+                #     check whether the socket is connected
+                if not self._is_connected():
+                    print(error_message, flush=True, file=sys.stderr)
+                    raise socket.error("Socket is not connected.")
+                # Send the error message
+                else:
+                    # print("Sending error message: ", error_message, flush=True, file=sys.stderr)
+                    # winsound.Beep(7933, 500)  # Beep sound for error notification
+                    self.client_socket.sendall(error_message.encode("utf-8"))
+                # self.client_socket.sendall(error_message.encode('utf-8'))
+            except socket.error as e:
+                if str(e) == "Socket is not connected.":
+                    pass
+                else:
+                    print(f"Error sending message: {e}")
+            finally:
+                if close_socket:
+                    self.client_socket.close()
 
     def receive_error(self) -> str:
         try:
