@@ -79,3 +79,8 @@ class StateAccessor:
                 return msg
         return None
 
+    def clear_state(self) -> None:
+        """
+        Clear the current state.
+        """
+        self._current_state = State(messages=[], message_type=None)
