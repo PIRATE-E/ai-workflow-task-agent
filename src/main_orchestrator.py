@@ -64,6 +64,7 @@ def run_chat(destructor: ChatDestructor):
         chat.set_graph(graph).tools_register().set_exit(
             destructor.call_all_cleanup_functions
         )
+        settings.chat = chat  # Set global chat reference
 
         os.system("cls" if os.name == "nt" else "clear")  # Clear console
         print_banner()
