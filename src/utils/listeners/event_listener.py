@@ -1,3 +1,4 @@
+from __future__ import annotations
 import threading
 from dataclasses import dataclass
 from enum import Enum
@@ -80,7 +81,7 @@ class EventListener:
         def register_listener(
             self,
             event_type: "EventListener.EventType",
-            listener: Callable,
+            listener: Callable[[EventListener.EventData],...],
             priority: int = 0,
             filter_func: Callable = None,
         ) -> None:
