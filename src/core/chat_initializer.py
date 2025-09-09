@@ -25,7 +25,7 @@ from src.ui.diagnostics.rich_traceback_manager import (
 from src.ui.print_message_style import print_message
 from src.utils.socket_manager import SocketManager
 
-
+from src.utils.listeners.exit_listener import ExitListener
 # mcp.md servers integration
 
 
@@ -47,6 +47,7 @@ class ChatInitializer:
         # mcp.md servers integration
         self._initialize_mcp_servers_sync()
         self.initialize_neo4j()
+        self._register_slash_commands()
 
         self.ToolResponseManager = None  # Initialize ToolResponseManager later
 
@@ -80,6 +81,10 @@ class ChatInitializer:
 
             # Set the socket connection for logging
             settings.socket_con = SocketManager.get_socket_con()
+
+            # register the exit listener
+            settings.listeners['exit'] = ExitListener()
+            settings.listeners['exit'].register()
 
         except Exception as e:
             RichTracebackManager.handle_exception(
@@ -412,7 +417,7 @@ class ChatInitializer:
             user_input = prompt.Prompt.ask(
                 "[bold cyan]You[/bold cyan]", default="", show_default=False
             )
-            if user_input.lower() == "exit":
+            if user_input.lower() == "exit" or settings.exit_flag:
                 self.console.print("[bold red]Exiting the chat...[/bold red]")
                 try:
                     self.on_exit()
@@ -429,21 +434,26 @@ class ChatInitializer:
                         settings.HumanMessage(content=user_input)
                     )
                     print_message(user_input, sender="user")
-                    try:
-                        self._state = self.graph.invoke(self._state)
-                    except Exception as graph_error:
-                        RichTracebackManager.handle_exception(
-                            graph_error,
-                            context="LangGraph Invocation",
-                            extra_context={
-                                "user_input": user_input[:100],
-                                "state_messages_count": len(
-                                    self._state.get("messages", [])
-                                ),
-                                "message_type": self._state.get("message_type"),
-                            },
+                    self._state = self.graph.invoke(self._state)
+
+                    # ✅ FIXED: Only set exit_flag when user actually wants to exit
+                    # Check if this was an exit-related workflow
+                    if (user_input.lower() == "exit" or
+                        user_input.startswith("/exit") or
+                        any(msg.content.lower() == "exit" or msg.content.startswith("/exit")
+                            for msg in self._state.get("messages", [])[-2:])):  # Check last 2 messages
+
+                        # Only NOW set the flag to True (first time)
+                        settings.exit_flag = True
+
+                        settings.listeners['exit'].emit_exit_ticket(
+                            source_class=ChatInitializer,
+                            source_name="workflow_completion"
                         )
-                        raise
+                    else:
+                        # ✅ CRITICAL FIX: Reset flag to False for non-exit messages
+                        settings.exit_flag = False
+
                     try:
                         self.state_accessor.sync_with_langgraph(self._state)
                     except Exception as sync_error:
@@ -503,4 +513,40 @@ class ChatInitializer:
             heading="MCP • SYNC_INIT_COMPLETE",
             body="All MCP servers initialized synchronously",
             metadata={"servers_count": len(MCP_Manager.mcp_servers)},
+        )
+
+    def _register_slash_commands(self):
+        """Register core slash commands like /help, /clear, /agent"""
+        from src.slash_commands.commands.clear import register_clear_command
+        from src.slash_commands.commands.help import register_help_command
+        from src.slash_commands.commands.core_slashs.agent import register_agent_command
+        from src.slash_commands.commands.exit import register_exit_command
+
+
+        async def register_commands():
+            ##### this is the place which register the all slash commands #####
+            tasks = [
+                asyncio.to_thread(register_clear_command),
+                asyncio.to_thread(register_help_command),
+                asyncio.to_thread(register_agent_command),
+                asyncio.to_thread(register_exit_command),
+            ]
+            await asyncio.gather(*tasks)
+
+        def run_async_init():
+            try:
+                loop = asyncio.get_event_loop()
+            except RuntimeError:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+            loop.run_until_complete(register_commands())
+
+        init_thread = threading.Thread(target=run_async_init)
+        init_thread.start()
+        init_thread.join()  # Wait for completion
+
+        debug_info(
+            heading="Slash Commands Registered",
+            body="Core slash commands registered successfully.",
+            metadata={},
         )
