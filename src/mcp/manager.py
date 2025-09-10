@@ -747,3 +747,130 @@ class MCP_Manager:
             debug_error(
                 heading="MCP • CLEANUP_ERROR", body=f"Cleanup failed: {e}", metadata={}
             )
+
+    @classmethod
+    def read_uri_resource(cls, server_name : str, uri_resource)-> dict[str, Any] | None:
+        """ Read a URI resource from a specific MCP server.
+        :param server_name: Name of the MCP server to read from.
+        :param uri_resource: The URI resource to read.
+        :return: Structured response dict with success/error status, or None for critical failures.
+        """
+
+        if server_name not in cls.mcp_servers:
+            msg = f"Server '{server_name}' not found"
+            debug_error(heading="MCP • URI_READ_ERROR", body=msg, metadata={"server": server_name})
+            return {"success": False, "error": msg}
+        if MCP_Manager.mcp_servers[server_name]["status"] != "running":
+            msg = f"Server '{server_name}' is not running"
+            debug_error(heading="MCP • URI_READ_ERROR", body=msg, metadata={"server": server_name})
+            return {"success": False, "error": msg}
+        debug_info(
+            heading="MCP • URI_READ",
+            body=f"Reading URI resource '{uri_resource}'",
+            metadata={"server": server_name, "uri": uri_resource},
+        )
+        proc = MCP_Manager.running_servers.get(server_name)
+        if not proc:
+            msg = f"Server '{server_name}' process not found"
+            debug_error(heading="MCP • URI_READ_ERROR", body=msg, metadata={"server": server_name})
+            return {"success": False, "error": msg}
+        try:
+            mcp_uri_read_request = {
+                "jsonrpc": "2.0",
+                "id": MCP_Manager.generate_response_id(),
+                "method": "resources/read",
+                "params": {"uri": uri_resource},
+            }
+            proc.stdin.write(json.dumps(mcp_uri_read_request) + "\n")
+            proc.stdin.flush()
+            # 🔧 FIX: Robust response reading with encoding handling
+            try:
+                response_line = proc.stdout.readline().strip()
+                if not response_line:
+                    msg = f"No response from server '{server_name}'"
+                    debug_error(
+                        heading="MCP • URI_READ_ERROR", body=msg, metadata={"server": server_name}
+                    )
+                    return {"success": False, "error": msg}
+
+                # Handle potential encoding issues with multiple fallback strategies
+                if isinstance(response_line, bytes):
+                    # Try multiple encoding strategies for robust handling
+                    for encoding in ["utf-8", "utf-8-sig", "latin-1", "cp1252"]:
+                        try:
+                            response_line = response_line.decode(encoding)
+                            break
+                        except UnicodeDecodeError:
+                            continue
+                    else:
+                        # Final fallback: decode with error replacement
+                        response_line = response_line.decode("utf-8", errors="replace")
+                        debug_warning(
+                            heading="MCP • URI_READ_ENCODING_FALLBACK",
+                            body="Used encoding fallback with character replacement for URI read",
+                            metadata={"server": server_name, "uri": uri_resource},
+                        )
+                elif isinstance(response_line, str):
+                    # Already a string, but might have encoding issues
+                    try:
+                        # Test if string is properly encoded by trying to encode/decode
+                        response_line.encode("utf-8")
+                    except UnicodeEncodeError:
+                        # Re-encode with error handling
+                        response_line = response_line.encode(
+                            "utf-8", errors="replace"
+                        ).decode("utf-8")
+                        debug_warning(
+                            heading="MCP • URI_READ_STRING_ENCODING_FIX",
+                            body="Fixed string encoding issues in URI read response",
+                            metadata={"server": server_name, "uri": uri_resource},
+                        )
+            except UnicodeDecodeError as encoding_error:
+                msg = f"Encoding error reading response: {encoding_error}"
+                debug_error(
+                    heading="MCP • URI_READ_ENCODING_ERROR",
+                    body=msg,
+                    metadata={"server": server_name, "uri": uri_resource},
+                )
+                return {"success": False, "error": msg}
+            try:
+                json_response = json.loads(response_line)
+                if "error" in json_response:
+                    msg = f"MCP server error: {json_response['error']}"
+                    debug_error(
+                        heading="MCP • URI_READ_TOOL_ERROR",
+                        body=msg,
+                        metadata={"server": server_name, "uri": uri_resource},
+                    )
+                    return {"success": False, "error": msg}
+                ## pass main successful response
+                if "result" in json_response:
+                    debug_info(
+                        heading="MCP • URI_READ_SUCCESS",
+                        body="URI resource read successfully",
+                        metadata={"server": server_name, "uri": uri_resource},
+                    )
+                    return {"success": True, "data": json_response["result"]}
+                debug_warning(
+                    heading="MCP • URI_READ_NO_RESULT_FIELD",
+                    body="Response missing 'result' field; returning raw payload",
+                    metadata={"server": server_name, "uri": uri_resource},
+                )
+                # return full response if no result field
+                return {"success": True, "data": json_response}
+            except json.JSONDecodeError as e:
+                msg = f"Invalid JSON response: {e}"
+                debug_error(
+                    heading="MCP • URI_READ_PARSE_ERROR",
+                    body=msg,
+                    metadata={"server": server_name, "uri": uri_resource},
+                )
+                return {"success": False, "error": msg, "raw_response": response_line}
+        except Exception as e:
+            msg = f"Communication error: {e}"
+            debug_error(
+                heading="MCP • URI_READ_COMM_ERROR",
+                body=msg,
+                metadata={"server": server_name, "uri": uri_resource},
+            )
+            return {"success": False, "error": msg}
