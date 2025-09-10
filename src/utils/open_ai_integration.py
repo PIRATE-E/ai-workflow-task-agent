@@ -890,7 +890,7 @@ class OpenAIIntegration:
 
         with cls._thread_lock:
             OpenAIIntegration.requests_count += 1
-            # eval_listener: RichStatusListener = settings.listeners.get("eval", None)
+            eval_listener: RichStatusListener = settings.listeners.get("eval", None)
             # if eval_listener is not None:
             #     eval_listener.emit_on_variable_change(
             #         OpenAIIntegration,
