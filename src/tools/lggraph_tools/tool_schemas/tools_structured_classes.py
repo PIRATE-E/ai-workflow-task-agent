@@ -42,3 +42,13 @@ class run_shell_command_message(BaseModel):
         description="Set True if you want user interaction with the command in a new console window",
         default=False,
     )
+
+
+class browser_use_agent(BaseModel):
+    query: str = Field(
+        description="A high-level objective for the autonomous browser agent. Describe the end goal (e.g., 'Find and summarize the latest AI news from Google News') rather than step-by-step instructions. The agent will handle the decomposition and execution.",
+    )
+    head_less_mode: bool = Field(
+        description="Set to True to run the browser in headless mode (without a GUI). Set to False to see the browser window.",
+        default=True,
+    )

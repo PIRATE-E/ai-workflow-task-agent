@@ -308,6 +308,9 @@ class ChatInitializer:
             from src.tools.lggraph_tools.wrappers.run_shell_comand_wrapper import (
                 ShellCommandWrapper,
             )
+            from src.tools.lggraph_tools.wrappers.browser_use_wrapper import (
+                BrowserUseWrapper,
+            )
 
             # schema
             from src.tools.lggraph_tools.tool_schemas.tools_structured_classes import (
@@ -315,6 +318,7 @@ class ChatInitializer:
                 rag_search_message,
                 TranslationMessage,
                 run_shell_command_message,
+                browser_use_agent,
             )
 
             # dynamically register tools
@@ -348,6 +352,12 @@ class ChatInitializer:
                     "For executing shell commands.",
                     run_shell_command_message,
                 ),
+                (
+                    "BrowserAgent",
+                    BrowserUseWrapper,
+                    "An autonomous AI agent that can control a web browser to perform complex tasks. Provide a high-level objective (e.g., 'Open Spotify and play a sad song') and the agent will handle the step-by-step execution. This is a powerful, autonomous tool; do not decompose its tasks.",
+                    browser_use_agent,
+                )
             ]
 
             for name, func, description, schema in tool_configs:
