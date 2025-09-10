@@ -162,7 +162,7 @@ def agent_node(state):
         try:
             graph = AgentGraphCore.build_graph()
             # Correct way to set recursion limit in LangGraph
-            final_state = graph.invoke(initial_state, config={"recursion_limit": 100})
+            final_state = graph.invoke(initial_state, config={"recursion_limit": settings.recursion_limit})
 
             # Debug: Log the complete final_state structure
             debug_info(

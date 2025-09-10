@@ -119,6 +119,9 @@ listeners: ListenersDict = {
 #exit flag to close the application smoothly
 exit_flag = False
 
+# recursion limits
+recursion_limit = int(os.getenv("RECURSION_LIMIT", 500))  ## recursion limit for the agent graph core
+
 
 # mcp.md configs
 MCP_CONFIG = {
