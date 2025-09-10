@@ -223,6 +223,25 @@ def universal_tool(**kwargs):
     if response.get("success"):
         # Extract the actual content from the structured response
         data = response.get("data")
+        # handle for uri type response
+        if isinstance(data, dict) and data.get('method') == 'notifications/resources/updated':
+            uri = data.get('params', {}).get('uri')
+            if uri:
+                # now it is confirmed that it is uri ##
+                debug_critical(
+                    heading="MCP_UNIVERSAL • URI_DETECTED",
+                    body=f"URI detected in MCP response: {uri}",
+                    metadata={
+                        "tool_name": tool_name,
+                        "server_name": server_name,
+                    },
+                )
+                resolved_uri = MCP_Manager.read_uri_resource(server_name, uri).get('data', None)
+                if resolved_uri:
+                    return resolved_uri
+                else:
+                    return {"success": False, "error": f"Failed to resolve URI: {uri}"}
+            pass
         debug_info(
             heading="MCP_UNIVERSAL • SUCCESS",
             body="Response received from MCP server",
