@@ -17,7 +17,7 @@ class TranslationMessage(BaseModel):
 
 class google_search(BaseModel):
     query: str = Field(
-        description="Search query for GoogleSearch. Use this to find information on the web. provide a clear and concise query.",
+        description="Search query for google_search. Use this to find information on the web. provide a clear and concise query.",
     )
 
 
@@ -44,11 +44,19 @@ class run_shell_command_message(BaseModel):
     )
 
 
-class browser_use_agent(BaseModel):
+class browser_agent(BaseModel):
     query: str = Field(
         description="A high-level objective for the autonomous browser agent. Describe the end goal (e.g., 'Find and summarize the latest AI news from Google News') rather than step-by-step instructions. The agent will handle the decomposition and execution.",
     )
     head_less_mode: bool = Field(
         description="Set to True to run the browser in headless mode (without a GUI). Set to False to see the browser window.",
         default=True,
+    )
+    log: bool = Field(
+        description="Set to True to enable logging of browser actions to a file.",
+        default=True,
+    )
+    keep_alive: bool = Field(
+        description="Set to True to keep the browser alive after execution for debugging purposes.",
+        default=False,
     )
