@@ -88,7 +88,7 @@ User: "create directory called myproject"
 → Parameters: {{"tool_name": "create_directory", "path": "myproject"}}
 
 User: "search for python files"
-→ Tool: RAGSearch
+→ Tool: rag_search
 → Schema Analysis: required: ["query"] 
 → User provided: query = "python files"
 → Missing required: none

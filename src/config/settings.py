@@ -122,6 +122,10 @@ exit_flag = False
 # recursion limits
 recursion_limit = int(os.getenv("RECURSION_LIMIT", 500))  ## recursion limit for the agent graph core
 
+# browser use
+BROWSER_USE_ENABLED = os.getenv("BROWSER_USE_ENABLED", "true").lower() == "true"
+BROWSER_USE_TIMEOUT = int(os.getenv("BROWSER_USE_TIMEOUT", 1300))  # Timeout in seconds (default 1300s = 20min)
+
 
 # mcp.md configs
 MCP_CONFIG = {

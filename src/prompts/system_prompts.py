@@ -16,7 +16,7 @@ class SystemPrompts:
     def web_search_assistant() -> str:
         """
         System prompt for web search result processing.
-        Used in: google_web_search(), GoogleSearchToolWrapper
+        Used in: google_web_search(), google_search wrapper/class
         """
         return """You are an intelligent web search assistant that provides comprehensive, accurate answers based on search results.
 
