@@ -13,10 +13,10 @@ Features:
 
 Usage:
     # Send an info message:
-    debug_info("AGENT_MODE • TOOL_EVALUATION", "Tool executed successfully", {"tool_name": "GoogleSearch"})
+    debug_info("AGENT_MODE • TOOL_EVALUATION", "Tool executed successfully", {"tool_name": "google_search"})
 
     # Send a warning:
-    debug_warning("AGENT_MODE • TOOL_EVALUATION", "Tool failed", {"tool_name": "GoogleSearch"})
+    debug_warning("AGENT_MODE • TOOL_EVALUATION", "Tool failed", {"tool_name": "google_search"})
 
     # Print debug content directly:
     debug_rich_panel("Error content here", "Error Title")

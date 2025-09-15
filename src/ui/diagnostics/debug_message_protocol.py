@@ -21,7 +21,7 @@ Usage:
         heading="AGENT_MODE • TOOL_EVALUATION",
         body="Tool execution failed",
         level="WARNING",
-        metadata={"tool_name": "GoogleSearch"}
+        metadata={"tool_name": "google_search"}
     )
 
     # Send Rich Panel object
