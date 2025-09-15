@@ -99,7 +99,7 @@ def demo_automatic_logging():
         workflow_steps = [
             ("User Input", "User asked: 'What is machine learning?'"),
             ("Classification", "Message classified as: tool"),
-            ("Tool Selection", "Selected tool: GoogleSearch"),
+            ("Tool Selection", "Selected tool: google_search"),
             ("Web Search", "Searching for: machine learning basics"),
             ("Response Generation", "Generating response from search results"),
             ("User Output", "Response delivered to user successfully"),

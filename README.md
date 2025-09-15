@@ -5,11 +5,11 @@
 [![Python 3.13+](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/downloads/)
 [![LangGraph](https://img.shields.io/badge/LangGraph-Latest-green.svg)](https://langchain-ai.github.io/langgraph/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Version](https://img.shields.io/badge/Version-v1.7.0-brightgreen.svg)]()
+[![Version](https://img.shields.io/badge/Version-v1.8.0-brightgreen.svg)]()
 
 ---
 
-## 🚀 What's New (v1.7.0 – September 2025)
+## 🚀 What's New (v1.8.0 – September 2025)
 - ✅ **Browser Agent Integration** - Automated web browsing with browser-use tool wrapper
 - ✅ **Slash Commands System** - Modular command framework (/clear, /help, /agent, /exit)
 - ✅ **Enhanced Tool Ecosystem** - Now 18 total tools with browser automation
@@ -18,7 +18,7 @@
 - ✅ **Robust MCP Manager** - ServerConfig/Command enum, safer subprocess I/O, encoding fallbacks
 - ✅ **OpenAI Circuit Breaker** - Automatic failure detection, retry/backoff, fallback responses
 - ✅ **Rich Traceback System** - Visual debugging with separate debug windows
-- ✅ **Dockerization** - Dockerfile + docker-compose for simple container runs
+- ✅ **Dockerization** - Dockerfile + docker-compose for simple container runs (NOT IMPLEMENTED YET)
 - ✅ **Python 3.13** - Updated target via pyproject.toml
 
 ## ✨ Current Status
@@ -70,8 +70,8 @@ This is a **production-ready consumer desktop AI assistant** with enterprise-gra
 ### 🛠️ **Comprehensive Tool System (18 Total)**
 
 #### **Fundamental Tools (3)**
-- **GoogleSearch**: Web search capabilities for current information
-- **RAGSearch**: Knowledge base search using retrieval-augmented generation
+- **google_search**: Web search capabilities for current information
+- **rag_search**: Knowledge base search using retrieval-augmented generation
 - **Translate**: Language translation services
 
 #### **MCP Filesystem Tools (14)**
@@ -745,3 +745,46 @@ flowchart TD
 - **🔧 Extensible Architecture**: Modular design enabling easy addition of new tools and capabilities
 
 ---
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+### MIT License Summary
+- **Commercial Use** - Permitted
+- **Modification** - Permitted
+- **Distribution** - Permitted
+- **Private Use** - Permitted
+- **Liability** - Limited
+- **Warranty** - None provided
+
+---
+
+
+## 🎯 Roadmap
+
+### Near-term Goals (Next 3 months)
+- **Complete Agent Mode Optimization** - Achieve 99% reliability
+- **Performance Improvements** - 50% faster response times
+- **Extended MCP Server Support** - Support for custom MCP implementations
+- **Enhance Dynamic Agent Capabilities** - Improved task decomposition and context handling and task failure recovery
+
+### Medium-term Vision (6-12 months)
+- **Production Deployment Capabilities** - Container orchestration and CI/CD
+- **Advanced AI Agent Orchestration** - Multi-agent collaboration patterns
+- **Enterprise Integration Features** - SSO, audit logging, compliance features
+- **User Experience Enhancements** - GUI interface, user onboarding, tutorials
+- **Actually implement Dockerization** - Finalize Dockerfile and docker-compose setup (currently NOT IMPLEMENTED YET)
+- **HANDLE USER PROFILES** - Save and load user preferences, chat, instructions and settings
+- **EXPAND TO API** - Provide REST API for external integrations
+
+### Long-term Vision (1+ years)
+- **Advanced Reasoning Capabilities** - Enhanced planning and execution
+- **Industry-Specific Solutions** - Specialized agent configurations
+- **Open-Source Ecosystem** - Community-driven tool and server development
+
+---
+
+**Built with ❤️ for enterprise-grade AI agent development**
+
+*AI-Agent-Workflow Project v1.8.0 - Transforming AI assistant development with enterprise-grade architecture and professional workflows.*
