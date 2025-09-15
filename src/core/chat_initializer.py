@@ -318,7 +318,7 @@ class ChatInitializer:
                 rag_search_message,
                 TranslationMessage,
                 run_shell_command_message,
-                browser_use_agent,
+                browser_agent,
             )
 
             # dynamically register tools
@@ -329,34 +329,35 @@ class ChatInitializer:
             # Register each tool with individual error handling
             tool_configs = [
                 (
-                    "GoogleSearch",
+                    "google_search",
                     GoogleSearchToolWrapper,
                     "For general web searches (recent info, facts, news).",
                     google_search,
                 ),
                 (
-                    "RAGSearch",
+                    "rag_search",
                     RagSearchClassifierWrapper,
                     "For searching the knowledge base (RAG search).",
                     rag_search_message,
                 ),
                 (
-                    "Translatetool",
+                    "translate",
                     TranslateToolWrapper,
                     "For translating messages into different languages.",
                     TranslationMessage,
                 ),
                 (
-                    "RunShellCommand",
+                    "run_shell_command",
                     ShellCommandWrapper,
                     "For executing shell commands.",
                     run_shell_command_message,
                 ),
                 (
-                    "BrowserAgent",
+                    "browser_agent",
                     BrowserUseWrapper,
-                    "An autonomous AI agent that can control a web browser to perform complex tasks. Provide a high-level objective (e.g., 'Open Spotify and play a sad song') and the agent will handle the step-by-step execution. This is a powerful, autonomous tool; do not decompose its tasks.",
-                    browser_use_agent,
+                    "An autonomous AI agent that can control a web browser to perform complex tasks. Provide a high-level objective (e.g., 'Open Spotify and play a sad song') and the agent will handle the step-by-step execution. This is a powerful, autonomous tool; do not decompose its tasks."
+                    ,
+                    browser_agent,
                 )
             ]
 

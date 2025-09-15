@@ -53,6 +53,7 @@ from src.ui.print_banner import print_banner
 from src.utils.model_manager import ModelManager
 from src.mcp.manager import MCP_Manager
 from src.utils.argument_schema_util import get_tool_argument_schema
+from src.tools.lggraph_tools.tools.browser_tool import BrowserHandler
 
 
 @rich_exception_handler("Main Chat Application")
@@ -132,6 +133,8 @@ if __name__ == "__main__":
         destructor.add_destroyer_function(SocketManager.cleanup)
         destructor.add_destroyer_function(ModelManager.cleanup_all_models)
         destructor.add_destroyer_function(MCP_Manager.cleanup)
+        destructor.add_destroyer_function(BrowserHandler.clear_all_processes)
+
         destructor.register_cleanup_handlers()
         run_chat(destructor)
     except Exception as e:  # pragma: no cover
