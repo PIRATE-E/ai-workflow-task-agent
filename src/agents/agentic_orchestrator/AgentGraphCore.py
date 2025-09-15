@@ -714,7 +714,7 @@ class AgentCoreHelpers:
                     debug_warning("Strategy Decision",
                                   f"LLM suggested invalid strategy '{recovery_strategy}'. Falling back to PARAMETER_REPAIR.",
                                   metadata={
-                                      "function_name": "decide_recovery_strategy",
+                                      "function name": "decide_recovery_strategy",
                                       "task_id": getattr(task, 'task_id', 'N/A'),
                                       "suggested_strategy": recovery_strategy
                                   })
@@ -723,7 +723,7 @@ class AgentCoreHelpers:
                 debug_info("Strategy Decision",
                            f"Selected strategy '{recovery_strategy}' for task {getattr(task, 'task_id', 'N/A')}",
                            metadata={
-                               "function_name": "decide_recovery_strategy",
+                               "function name": "decide_recovery_strategy",
                                "task_id": getattr(task, 'task_id', 'N/A'),
                                "recovery_strategy": recovery_strategy,
                                "confidence_level": strategy_result.get("confidence_level", "UNKNOWN"),
@@ -1764,10 +1764,19 @@ class AgentGraphCore:
                            })
                 if not validation_result.get("goal_achieved"):
                     current_task.status = "failed"
+                    # CRITICAL FIX: Preserve the original failed_parameters when creating new failure context
+                    original_failed_parameters = None
+                    original_strategy_history = []
+                    if current_task.failure_context:
+                        original_failed_parameters = current_task.failure_context.failed_parameters
+                        original_strategy_history = current_task.failure_context.strategy_history or []
+
                     current_task.failure_context = FAILURE_CONTEXT(
                         error_message=f"Goal not achieved: {validation_result.get('reasoning', 'No reasoning provided.')}",
                         fail_count=(current_task.failure_context.fail_count + 1) if current_task.failure_context else 1,
                         error_type="GoalValidationFailure",
+                        failed_parameters=original_failed_parameters,  # PRESERVE the original failed parameters
+                        strategy_history=original_strategy_history,  # PRESERVE the strategy history too
                     )
                     # Persist validator feedback into pre_execution_context so retries and parameter generator see corrective hints
                     try:
@@ -1797,10 +1806,19 @@ class AgentGraphCore:
                               })
                 current_task.execution_context.goal_achieved = False
                 current_task.status = "failed"
+                # CRITICAL FIX: Preserve the original failed_parameters here too
+                original_failed_parameters = None
+                original_strategy_history = []
+                if current_task.failure_context:
+                    original_failed_parameters = current_task.failure_context.failed_parameters
+                    original_strategy_history = current_task.failure_context.strategy_history or []
+
                 current_task.failure_context = FAILURE_CONTEXT(
                     error_message="Failed to validate goal achievement due to invalid LLM response.",
                     fail_count=(current_task.failure_context.fail_count + 1) if current_task.failure_context else 1,
                     error_type="GoalValidationFailure",
+                    failed_parameters=original_failed_parameters,  # PRESERVE the original failed parameters
+                    strategy_history=original_strategy_history,  # PRESERVE the strategy history too
                 )
 
         return {"tasks": tasks, "executed_nodes": state.executed_nodes + ["subAGENT_goal_validator"]}
