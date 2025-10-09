@@ -69,6 +69,26 @@ class EXECUTION_CONTEXT(BaseModel):
     goal_achieved: bool = Field(default=False, description="Indicates if the task's specific goal was met")
 
 
+class FAILURE_CONTEXT_STRATEGY(BaseModel):
+    recovery_strategy: Literal["PARAMETER_REPAIR", "ALTERNATIVE_TOOL", "TASK_DECOMPOSITION", "NO_STRATEGY"] = Field(
+        default="PARAMETER_REPAIR",
+        description="The recovery strategy attempted"
+    )
+    reasoning: str = Field(..., description="Reasoning behind choosing this strategy")
+    confidence_level: Literal["HIGH", "MEDIUM", "LOW"] = Field(default="LOW", description="Confidence in this strategy")
+    estimated_success_probability: int = Field(default=0,
+                                               description="Estimated probability (0-100) of success with this strategy",
+                                               ge=0, le=100)
+    next_steps: str | None = Field(default=None, description="Recommended next steps after this strategy")
+    outcome: Literal["FAILURE", "APPLIED", "NOT_APPLIED"] = Field(default="NOT_APPLIED",
+                                                                  description="Outcome after attempting this strategy")
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc).strftime('%Y-%m-%d %I:%M:%S.%f %p'),
+                                description="Timestamp when this strategy was attempted")
+
+    details: dict[str, Any] | None = Field(default={},
+                                           description="contains Additional details about the strategy attempt")
+
+
 class FAILURE_CONTEXT(BaseModel):
     error_message: str = Field(..., description="Detailed error message from the last failure")
     fail_count: int = Field(description="number of times the task has failed", default=1, ge=1)
@@ -78,8 +98,8 @@ class FAILURE_CONTEXT(BaseModel):
     error_type: str | None = Field(default=None, description="Type or category of the error")
     failed_parameters: dict[str, Any] | None = Field(default=None,
                                                      description="The parameters that caused the failure")  # <-- NEW FIELD
-    strategy_history: list[dict] | None = Field(default_factory=list,
-                                                description="History of all recovery strategies attempted with outcomes")  # <-- NEW FIELD
+    strategy_history: list[FAILURE_CONTEXT_STRATEGY] | None = Field(default_factory=list,
+                                                                    description="History of all recovery strategies attempted with outcomes")  # <-- NEW FIELD
     # Cooldown timestamp to avoid tight retry loops
     next_attempt_timestamp: datetime | None = Field(default=None, description="Earliest time allowed for next retry")
 
@@ -91,7 +111,7 @@ class subAgent_CONTEXT(BaseModel):
                                                                                      description="Current status")
     subAgent_tasks: TaskListType | None = Field(default=None, description="List of tasks assigned to the sub-agent")
     parent_task_id: str | int | float | None = Field(default=None,
-                                              description="The ID of the parent task that spawned this sub-agent")
+                                                     description="The ID of the parent task that spawned this sub-agent")
     creation_timestamp: datetime | None = Field(default=None,
                                                 description="Timestamp of when the sub-agent was created")
     completion_timestamp: datetime | None = Field(default=None, description="Timestamp of completion")
@@ -103,11 +123,15 @@ class TASK(BaseModel):
     task_id: str = Field(description="Unique identifier for the task", default_factory=lambda: str(uuid.uuid4()))
     description: str = Field(..., description="A clear description of what the task is supposed to achieve")
     tool_name: str = Field(..., description="The specific tool required to execute this task")
-    status: Literal["pending", "in_progress", "completed", "failed"] = Field(description="current status",
+    status: Literal["pending", "in_progress", "completed", "failed", "skip"] = Field(description="current status",
                                                                              default="pending")
     max_retries: int = Field(description="maximum number of retries allowed", default=1, ge=0)
     depth: int = Field(description="recursion depth of the task", default=0,
                        ge=0)  # for tracking how deep we are in sub-agent spawning and preventing infinite loops
+    requires_high_fidelity_context: bool = Field(
+        description="If true, the raw results of parent/sibling tasks should be prioritized in the context.",
+        default=False
+    )
 
     required_context: REQUIRED_CONTEXT = Field(..., description="Context required before executing the task")
     execution_context: EXECUTION_CONTEXT | None = Field(default=None, description="Context for executing the task")
@@ -140,119 +164,119 @@ subAgent_CONTEXT.model_rebuild()
 TASK.model_rebuild()
 
 
-# ================================================================================================================
-# CORE DESIGN PHILOSOPHY & ROUTING ARCHITECTURE DOCUMENTATION
-# ================================================================================================================
+# ================================================================================================================ 
+# CORE DESIGN PHILOSOPHY & ROUTING ARCHITECTURE DOCUMENTATION 
+# ================================================================================================================ 
 
-# The hierarchical agent system implements a sophisticated state machine that can handle:
-# 1. COMPLEX TASK DECOMPOSITION: Breaking down abstract goals into executable atomic tasks
-# 2. DYNAMIC SUB-AGENT SPAWNING: Creating specialized agents for complex sub-problems
-# 3. ERROR RECOVERY WITH SPAWNING: Intelligent failure handling through sub-agent creation
-# 4. TOOL PRE-FILTERING: 90% token reduction while maintaining 100% functionality
+# The hierarchical agent system implements a sophisticated state machine that can handle: 
+# 1. COMPLEX TASK DECOMPOSITION: Breaking down abstract goals into executable atomic tasks 
+# 2. DYNAMIC SUB-AGENT SPAWNING: Creating specialized agents for complex sub-problems 
+# 3. ERROR RECOVERY WITH SPAWNING: Intelligent failure handling through sub-agent creation 
+# 4. TOOL PRE-FILTERING: 90% token reduction while maintaining 100% functionality 
 
-# The main architectural challenge solved here is maintaining state consistency across:
-# - Parent tasks that spawn sub-agents
-# - Sub-task execution and completion tracking
-# - Error recovery and fallback scenarios
-# - Tool selection and parameter generation
+# The main architectural challenge solved here is maintaining state consistency across: 
+# - Parent tasks that spawn sub-agents 
+# - Sub-task execution and completion tracking 
+# - Error recovery and fallback scenarios 
+# - Tool selection and parameter generation 
 
-# ** ROUTING LOGIC TEMPLATE - WHEN TO ROUTE TO WHICH NODE **
-# This is the core state machine that determines workflow progression
+# ** ROUTING LOGIC TEMPLATE - WHEN TO ROUTE TO WHICH NODE ** 
+# This is the core state machine that determines workflow progression 
 
-####################################################################################################
-# 🚀 ROUTE TO: initial_planner
-# WHEN: WORKFLOW_STATUS is 'STARTED' only
-# PURPOSE: High-level goal decomposition into executable tasks
-# RESPONSIBILITY: Parse user goal and create initial task breakdown using tool pre-filtering
-####################################################################################################
+#################################################################################################### 
+# 🚀 ROUTE TO: initial_planner 
+# WHEN: WORKFLOW_STATUS is 'STARTED' only 
+# PURPOSE: High-level goal decomposition into executable tasks 
+# RESPONSIBILITY: Parse user goal and create initial task breakdown using tool pre-filtering 
+#################################################################################################### 
 
-####################################################################################################
-# 🏁 ROUTE TO: END node
-# WHEN: ALL task statuses are 'completed' OR 'failed'
-# PURPOSE: Workflow termination when no more work remains
-# LOGIC: task1.status == 'completed' AND task2.status == 'completed' AND ... taskN.status == 'completed'
-####################################################################################################
+#################################################################################################### 
+# 🏁 ROUTE TO: END node 
+# WHEN: ALL task statuses are 'completed' OR 'failed' 
+# PURPOSE: Workflow termination when no more work remains 
+# LOGIC: task1.status == 'completed' AND task2.status == 'completed' AND ... taskN.status == 'completed' 
+#################################################################################################### 
 
-####################################################################################################
-# ⚙️ ROUTE TO: task_executor
-# WHEN:
-#   - persona is 'AGENT_PERFORM_TASK'
-#   - CURRENT_TASK.status is 'pending' OR 'in_progress'
-#   - CURRENT_TASK.result is empty OR None
-# PURPOSE: Execute atomic tasks OR trigger spawning for complex tasks
-# KEY FEATURE: Complexity analysis determines direct execution vs. sub-agent spawning
-####################################################################################################
+#################################################################################################### 
+# ⚙️ ROUTE TO: task_executor 
+# WHEN: 
+#   - persona is 'AGENT_PERFORM_TASK' 
+#   - CURRENT_TASK.status is 'pending' OR 'in_progress' 
+#   - CURRENT_TASK.result is empty OR None 
+# PURPOSE: Execute atomic tasks OR trigger spawning for complex tasks 
+# KEY FEATURE: Complexity analysis determines direct execution vs. sub-agent spawning 
+#################################################################################################### 
 
-####################################################################################################
-# 🔧 ROUTE TO: error_fallback
-# WHEN:
-#   - persona is 'AGENT_PERFORM_ERROR_FALLBACK'
-#   - CURRENT_TASK.status is 'in_progress' OR 'pending'
-#   - CURRENT_TASK.result is empty OR None
-#   - CURRENT_TASK has failed at least 2 times (tracked via fail_count)
-# PURPOSE: Advanced error recovery including potential sub-agent spawning for complex failures
-####################################################################################################
+#################################################################################################### 
+# 🔧 ROUTE TO: error_fallback 
+# WHEN: 
+#   - persona is 'AGENT_PERFORM_ERROR_FALLBACK' 
+#   - CURRENT_TASK.status is 'in_progress' OR 'pending' 
+#   - CURRENT_TASK.result is empty OR None 
+#   - CURRENT_TASK has failed at least 2 times (tracked via fail_count) 
+# PURPOSE: Advanced error recovery including potential sub-agent spawning for complex failures 
+#################################################################################################### 
 
-####################################################################################################
-# 📝 ROUTE TO: task_updater (IMPLICIT - handled by task completion logic)
-# WHEN:
-#   - CURRENT_TASK.status is 'completed'
-#   - CURRENT_TASK.result is not empty AND not None
-#   - persona is 'AGENT_PERFORM_TASK' OR 'AGENT_PERFORM_ERROR_FALLBACK'
-# PURPOSE: Update task state and prepare for next task selection
-####################################################################################################
+#################################################################################################### 
+# 📝 ROUTE TO: task_updater (IMPLICIT - handled by task completion logic) 
+# WHEN: 
+#   - CURRENT_TASK.status is 'completed' 
+#   - CURRENT_TASK.result is not empty AND not None 
+#   - persona is 'AGENT_PERFORM_TASK' OR 'AGENT_PERFORM_ERROR_FALLBACK' 
+# PURPOSE: Update task state and prepare for next task selection 
+#################################################################################################### 
 
-####################################################################################################
-# 📋 ROUTE TO: task_planner
-# WHEN:
-#   - CURRENT_TASK.status is 'completed'
-#   - CURRENT_TASK.result is not empty AND not None
-#   - persona is 'AGENT_PERFORM_TASK' OR 'AGENT_PERFORM_ERROR_FALLBACK'
-#   - MORE tasks exist in TASKS list with status 'pending'
-# PURPOSE: Select next pending task and manage parent-child task relationships
-# SPECIAL LOGIC: Handles spawned sub-task completion and parent task status updates
-####################################################################################################
+#################################################################################################### 
+# 📋 ROUTE TO: task_planner 
+# WHEN: 
+#   - CURRENT_TASK.status is 'completed' 
+#   - CURRENT_TASK.result is not empty AND not None 
+#   - persona is 'AGENT_PERFORM_TASK' OR 'AGENT_PERFORM_ERROR_FALLBACK' 
+#   - MORE tasks exist in TASKS list with status 'pending' 
+# PURPOSE: Select next pending task and manage parent-child task relationships 
+# SPECIAL LOGIC: Handles spawned sub-task completion and parent task status updates 
+#################################################################################################### 
 
-####################################################################################################
-# 🎯 ROUTE TO: classifier
-# WHEN:
-#   - CURRENT_TASK.status is 'completed'
-#   - CURRENT_TASK.result is not empty AND not None
-#   - persona is 'AGENT_PERFORM_TASK' OR 'AGENT_PERFORM_ERROR_FALLBACK'
-#   - NO MORE tasks in TASKS list with status 'pending'
-#   - WORKFLOW_STATUS is 'RUNNING' OR 'RESTART'
-#   - EXECUTED_NODES does NOT contain 'subAGENT_finalizer'
-# PURPOSE: Determine next action when no pending tasks remain
-####################################################################################################
+#################################################################################################### 
+# 🎯 ROUTE TO: classifier 
+# WHEN: 
+#   - CURRENT_TASK.status is 'completed' 
+#   - CURRENT_TASK.result is not empty AND not None 
+#   - persona is 'AGENT_PERFORM_TASK' OR 'AGENT_PERFORM_ERROR_FALLBACK' 
+#   - NO MORE tasks in TASKS list with status 'pending' 
+#   - WORKFLOW_STATUS is 'RUNNING' OR 'RESTART' 
+#   - EXECUTED_NODES does NOT contain 'subAGENT_finalizer' 
+# PURPOSE: Determine next action when no pending tasks remain 
+#################################################################################################### 
 
-####################################################################################################
-# 🎉 ROUTE TO: finalizer
-# WHEN:
-#   - WORKFLOW_STATUS is 'COMPLETED' OR 'FAILED'
-#   - EXECUTED_NODES does NOT contain 'subAGENT_finalizer'
-#   - ALL tasks in TASKS list have status 'completed' OR 'failed'
-#   - CURRENT_TASK.status is 'completed'
-#   - CURRENT_TASK.result is not empty AND not None
-# PURPOSE: Generate final consolidated response from all task results
-####################################################################################################
+#################################################################################################### 
+# 🎉 ROUTE TO: finalizer 
+# WHEN: 
+#   - WORKFLOW_STATUS is 'COMPLETED' OR 'FAILED' 
+#   - EXECUTED_NODES does NOT contain 'subAGENT_finalizer' 
+#   - ALL tasks in TASKS list have status 'completed' OR 'failed' 
+#   - CURRENT_TASK.status is 'completed' 
+#   - CURRENT_TASK.result is not empty AND not None 
+# PURPOSE: Generate final consolidated response from all task results 
+#################################################################################################### 
 
-# ================================================================================================================
-# SPAWNING SYSTEM INTEGRATION NOTES
-# ================================================================================================================
+# ================================================================================================================ 
+# SPAWNING SYSTEM INTEGRATION NOTES 
+# ================================================================================================================ 
 
-# The spawning system (Spawn_subAgent class) integrates seamlessly with this routing logic:
-#
-# 1. COMPLEXITY ANALYSIS: task_executor analyzes if a task needs decomposition
-# 2. SPAWNING DECISION: Based on tool schema and task description complexity
-# 3. SUB-TASK INJECTION: New tasks are injected into the workflow with float IDs (e.g., 1.1, 1.2)
-# 4. PARENT TRACKING: Parent tasks are marked 'in_progress' while sub-tasks execute
-# 5. COMPLETION LOGIC: Parent tasks are marked complete only when ALL sub-tasks finish
-# 6. ERROR SPAWNING: Failed tasks can spawn recovery sub-agents for specialized handling
-#
-# This creates a true hierarchical execution model where complex problems are recursively
-# broken down into manageable atomic operations while maintaining full traceability.
+# The spawning system (Spawn_subAgent class) integrates seamlessly with this routing logic: 
+# 
+# 1. COMPLEXITY ANALYSIS: task_executor analyzes if a task needs decomposition 
+# 2. SPAWNING DECISION: Based on tool schema and task description complexity 
+# 3. SUB-TASK INJECTION: New tasks are injected into the workflow with float IDs (e.g., 1.1, 1.2) 
+# 4. PARENT TRACKING: Parent tasks are marked 'in_progress' while sub-tasks execute 
+# 5. COMPLETION LOGIC: Parent tasks are marked complete only when ALL sub-tasks finish 
+# 6. ERROR SPAWNING: Failed tasks can spawn recovery sub-agents for specialized handling 
+# 
+# This creates a true hierarchical execution model where complex problems are recursively 
+# broken down into manageable atomic operations while maintaining full traceability. 
 
-# ================================================================================================================
+# ================================================================================================================ 
 
 
 class AgentCoreHelpers:
@@ -268,10 +292,8 @@ class AgentCoreHelpers:
         """
         Executes the virtual 'perform_synthesis' tool by calling an LLM.
         """
-        debug_info("Internal Synthesis", f"Performing synthesis for task: {current_task.description}", metadata={
-            "function_name": "_perform_internal_synthesis",
-            "task_id": current_task.task_id,
-        })
+        debug_info("Internal Synthesis", f"Performing synthesis for task: {current_task.description}",
+                   metadata={"function_name": "_perform_internal_synthesis", "task_id": current_task.task_id})
 
         # Extract the raw results from the history
         context_from_history = "\n\n".join([
@@ -307,7 +329,7 @@ class AgentCoreHelpers:
             debug_error("Internal Synthesis", error_msg, metadata={"exception": str(e)})
             return False, error_msg
 
-    # ----------- these are tool list helpers -----------
+    # ----------- these are tool list helpers ----------- 
     @classmethod
     def get_safe_tools_list(cls):
         """Get a safe list of tools, raising an error if no tools are available."""
@@ -347,13 +369,14 @@ class AgentCoreHelpers:
         except Exception as e:
             # print_log_message(f"Failed to get detailed tool context: {e}", "Tool Context")
             debug_warning("Tool Context", f"Failed to get detailed tool context: {e}", metadata={
-                "function name": "get_detailed_tool_context",
+                "function_name": "get_detailed_tool_context",
                 "exception": str(e),
             })
             return "Tool context unavailable"
 
     @classmethod
-    def recommend_tools_for_task(cls, task_description: str, max_tools: int = 10) -> list[str]:
+    def recommend_tools_for_task(cls, task_description: str, max_tools: int = 10, parent_context: str | None = None) -> \
+            list[str]:
         """Use LLM to recommend 5-10 most relevant tools for a specific task.
         This is the pre-filtering step that makes the system much more efficient.
         """
@@ -364,16 +387,19 @@ class AgentCoreHelpers:
 
             # Create a concise tool list for the recommender, including the virtual tool
             tool_list_for_prompt = [f"• {tool.name}" for tool in all_tools]
-            tool_list_for_prompt.append("• perform_synthesis")  # Make the virtual tool visible
+            tool_list_for_prompt.append("perform_synthesis")  # Make the virtual tool visible
             tool_list = "\n".join(tool_list_for_prompt)
 
-            recommend_prompt = f"""
+            recommend_prompt = f'''
                 TOOL RECOMMENDATION SYSTEM
 
                 Task: "{task_description}"
 
                 Available Tools:
                 {tool_list}
+                
+                parent_context:
+                {parent_context if parent_context else "No additional context provided"}
 
                 Select up to {max_tools} tools from the list above that are most relevant for this task.
                 Consider broad categories such as: file operations (e.g., list/read/write), web research, analysis, shell/OS commands, and memory/graph operations and others.
@@ -381,7 +407,7 @@ class AgentCoreHelpers:
 
                 Respond with ONLY a JSON array of tool names, for example:
                 ["tool1", "tool2", "tool3"]
-                """
+                '''
 
             model = ModelManager(model="moonshotai/kimi-k2-instruct")
             response = model.invoke([
@@ -411,7 +437,7 @@ class AgentCoreHelpers:
             # Safe fallback
             return ["list_directory", "google_search", "write_file", "perform_synthesis"]
 
-    # ^^^^^^^^^^^^^^ these are tool list helpers ^^^^^^^^^^^^^^^^^^
+    # ^^^^^^^^^^^^^^ these are tool list helpers ^^^^^^^^^^^^^^^^^^ 
 
     class ErrorFallbackHelpers:
         """Enhanced helper functions for error fallback node with LLM-driven decision making."""
@@ -423,10 +449,7 @@ class AgentCoreHelpers:
             if not task.failure_context or not task.failure_context.failed_parameters:
                 debug_warning("Parameter Repair",
                               f"Task {task.task_id} has no failure context or failed parameters. Cannot attempt repair.",
-                              metadata={
-                                  "function_name": "attempt_parameter_repair",
-                                  "task_id": task.task_id,
-                              })
+                              metadata={"function_name": "attempt_parameter_repair", "task_id": task.task_id})
                 return False, {}
 
             # Get additional context that's now available
@@ -443,12 +466,8 @@ class AgentCoreHelpers:
 
             debug_info("Parameter Repair",
                        f"Attempting parameter repair for task {task.task_id} with {fail_count} failures",
-                       metadata={
-                           "function_name": "attempt_parameter_repair",
-                           "task_id": task.task_id,
-                           "error_type": error_type,
-                           "fail_count": fail_count,
-                       })
+                       metadata={"function_name": "attempt_parameter_repair", "task_id": task.task_id,
+                                 "error_type": error_type, "fail_count": fail_count})
 
             # Use LLM to analyze the failure and suggest parameter repairs
             prompt_generator = HierarchicalAgentPrompt()
@@ -474,27 +493,19 @@ class AgentCoreHelpers:
 
                 if is_valid:
                     debug_info("Parameter Repair", f"Successfully repaired parameters for task {task.task_id}",
-                               metadata={
-                                   "function_name": "attempt_parameter_repair",
-                                   "task_id": task.task_id,
-                                   "repaired_params": repaired_params
-                               })
+                               metadata={"function_name": "attempt_parameter_repair", "task_id": task.task_id,
+                                         "repaired_params": repaired_params})
                     return True, repaired_params
                 else:
                     debug_warning("Parameter Repair", f"LLM-suggested parameters failed validation: {error_msg}",
-                                  metadata={
-                                      "function_name": "attempt_parameter_repair",
-                                      "task_id": task.task_id,
-                                      "validation_error": error_msg
-                                  })
+                                  metadata={"function_name": "attempt_parameter_repair", "task_id": task.task_id,
+                                            "validation_error": error_msg})
                     return False, {}
 
             except Exception as e:
-                debug_error("Parameter Repair", f"Failed to repair parameters with LLM: {e}", metadata={
-                    "function_name": "attempt_parameter_repair",
-                    "task_id": task.task_id,
-                    "exception": str(e)
-                })
+                debug_error("Parameter Repair", f"Failed to repair parameters with LLM: {e}",
+                            metadata={"function_name": "attempt_parameter_repair", "task_id": task.task_id,
+                                      "exception": str(e)})
                 # Fallback to basic repair
                 required_keys = tool_schema.get("required", [])
                 missing_keys = [key for key in required_keys if key not in failed_params]
@@ -502,10 +513,7 @@ class AgentCoreHelpers:
                 if missing_keys:
                     debug_warning("Parameter Repair",
                                   f"Task {task.task_id} is missing required parameters: {missing_keys}. Attempting to add default values.",
-                                  metadata={
-                                      "function_name": "attempt_parameter_repair",
-                                      "task_id": task.task_id,
-                                  })
+                                  metadata={"function_name": "attempt_parameter_repair", "task_id": task.task_id})
                     # Simple repair: Add empty strings for missing keys
                     repaired_params = failed_params.copy()
                     for key in missing_keys:
@@ -515,16 +523,53 @@ class AgentCoreHelpers:
                 return False, {}
 
         @staticmethod
+        def convert_decision_task(whole_context:list[str], available_tools_str:str, parent_task:TASK) -> list[TASK] | None:
+            """
+            this convert that whole decision, error recovery strategy, parent failure context, original goal and create return lists of tasks
+            :return: list of tasks
+            """
+
+            hierarchy_prompt = HierarchicalAgentPrompt()
+            system_prompt, human_prompt = hierarchy_prompt.generate_plan_to_tasks_prompt(whole_context, available_tools_str)
+            try:
+                model = ModelManager(model="moonshotai/kimi-k2-instruct")
+                response = model.invoke([
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": human_prompt},
+                ])
+                task_list = ModelManager.convert_to_json(response.content)
+                if isinstance(task_list, list):
+                    tasks = []
+                    for idx, task_dict in enumerate(task_list):
+                        tasks.append(
+                            TASK(
+                                task_id=str(f"{parent_task.task_id}_{idx}"),
+                                description=task_dict.get("description", "No description provided"),
+                                tool_name=task_dict.get("tool_name", "unknown_tool"),
+                                status="pending",
+                                required_context=REQUIRED_CONTEXT(source_node="error_fallback", triggering_task_id=parent_task.task_id)
+                            )
+                        )
+                    return tasks if tasks else None
+                else:
+                    debug_warning("Task Conversion", "LLM response is not a list of tasks.",
+                                  metadata={"function_name": "convert_decision_task",
+                                            "response_content": response.content})
+                    return None
+            except Exception as e:
+                debug_error("Task Conversion", f"Failed to convert decision to tasks with LLM: {e}",
+                            metadata={"function_name": "convert_decision_task", "exception": str(e)})
+                return None
+
+
+        @staticmethod
         def find_alternative_tool(task: TASK, state: "WorkflowStateModel") -> str | None:
             """Use LLM to intelligently find a safer, alternative tool to accomplish the task's goal."""
             # Check if we have enough context to attempt alternative tool selection
             if not task.failure_context or not task.failure_context.error_message:
                 debug_warning("Alternative Tool",
                               f"Task {task.task_id} has no failure context or error message. Cannot find alternative tool.",
-                              metadata={
-                                  "function_name": "find_alternative_tool",
-                                  "task_id": task.task_id,
-                              })
+                              metadata={"function_name": "find_alternative_tool", "task_id": task.task_id})
                 return None
 
             # Get error details
@@ -540,12 +585,8 @@ class AgentCoreHelpers:
 
             debug_info("Alternative Tool",
                        f"Finding alternative tool for task {task.task_id} with {fail_count} failures",
-                       metadata={
-                           "function_name": "find_alternative_tool",
-                           "task_id": task.task_id,
-                           "error_type": error_type,
-                           "current_tool": task.tool_name,
-                       })
+                       metadata={"function_name": "find_alternative_tool", "task_id": task.task_id,
+                                 "error_type": error_type, "current_tool": task.tool_name})
 
             # Get all available tools for more intelligent selection
             all_tools = AgentCoreHelpers.get_safe_tools_list()
@@ -571,36 +612,27 @@ class AgentCoreHelpers:
                 # Validate that the alternative tool exists
                 if alternative_tool and alternative_tool in [tool.name for tool in all_tools]:
                     debug_info("Alternative Tool",
-                               f"Selected alternative tool '{alternative_tool}' for task {task.task_id}", metadata={
-                            "function_name": "find_alternative_tool",
-                            "task_id": task.task_id,
-                            "alternative_tool": alternative_tool,
-                            "reasoning": alternative_result.get("reasoning", "No reasoning provided")
-                        })
+                               f"Selected alternative tool '{alternative_tool}' for task {task.task_id}",
+                               metadata={"function name": "find_alternative_tool", "task_id": task.task_id,
+                                         "alternative_tool": alternative_tool,
+                                         "reasoning": alternative_result.get("reasoning", "No reasoning provided")})
                     return alternative_tool
                 else:
                     debug_warning("Alternative Tool",
-                                  f"LLM-suggested tool '{alternative_tool}' not found in available tools", metadata={
-                            "function_name": "find_alternative_tool",
-                            "task_id": task.task_id,
-                            "suggested_tool": alternative_tool
-                        })
+                                  f"LLM-suggested tool '{alternative_tool}' not found in available tools",
+                                  metadata={"function name": "find_alternative_tool", "task_id": task.task_id,
+                                            "suggested_tool": alternative_tool})
                     return None
 
             except Exception as e:
-                debug_error("Alternative Tool", f"Failed to find alternative tool with LLM: {e}", metadata={
-                    "function_name": "find_alternative_tool",
-                    "task_id": task.task_id,
-                    "exception": str(e)
-                })
+                debug_error("Alternative Tool", f"Failed to find alternative tool with LLM: {e}",
+                            metadata={"function name": "find_alternative_tool", "task_id": task.task_id,
+                                      "exception": str(e)})
                 # Fallback to basic pattern matching
                 error_message_lower = error_message.lower()
                 if "command not found" in error_message_lower and task.tool_name == "run_shell_command":
                     debug_info("Alternative Tool Finder", f"Suggesting google_search for 'command not found' error.",
-                               metadata={
-                                   "function_name": "find_alternative_tool",
-                                   "task_id": task.task_id,
-                               })
+                               metadata={"function name": "find_alternative_tool", "task_id": task.task_id})
                     return "google_search"
 
                 if "summarize" in task.description.lower() and task.tool_name != "perform_synthesis":
@@ -619,10 +651,8 @@ class AgentCoreHelpers:
             if not task.failure_context:
                 debug_warning("Strategy Decision",
                               f"Task {getattr(task, 'task_id', 'N/A')} has no failure context. Cannot decide strategy.",
-                              metadata={
-                                  "function_name": "decide_recovery_strategy",
-                                  "task_id": getattr(task, 'task_id', 'N/A'),
-                              })
+                              metadata={"function name": "decide_recovery_strategy",
+                                        "task_id": getattr(task, 'task_id', 'N/A')})
                 # Return a safe default strategy
                 return {
                     "recovery_strategy": "PARAMETER_REPAIR",
@@ -640,12 +670,9 @@ class AgentCoreHelpers:
 
             debug_info("Strategy Decision",
                        f"Deciding recovery strategy for task {getattr(task, 'task_id', 'N/A')} with {fail_count} failures",
-                       metadata={
-                           "function_name": "decide_recovery_strategy",
-                           "task_id": getattr(task, 'task_id', 'N/A'),
-                           "error_type": error_type,
-                           "fail_count": fail_count,
-                       })
+                       metadata={"function name": "decide_recovery_strategy",
+                                 "task_id": getattr(task, 'task_id', 'N/A'), "error_type": error_type,
+                                 "fail_count": fail_count})
 
             # Get tool schema
             tool_schema = AgentGraphCore.get_tool_schema(task.tool_name) if hasattr(AgentGraphCore,
@@ -667,7 +694,7 @@ class AgentCoreHelpers:
 
             failed_tasks_info = "\n".join([
                 f"• Task {getattr(t, 'task_id', 'N/A')}: {getattr(t, 'description', 'N/A')} -> Validator Feedback: {getattr(t.failure_context, 'error_message', 'N/A')}"
-                for t in failed_tasks_with_feedback[-2:]  # Last 2 failed tasks with feedback
+                for t in failed_tasks_with_feedback  # Last 2 failed tasks with feedback
             ]) or "No recent failed tasks with validator feedback"
 
             # Get all available tools
@@ -678,7 +705,8 @@ class AgentCoreHelpers:
                 for tool in all_tools
             ])
             strategy_history = '\n'.join(
-                [f"• Attempt {i + 1}: {s.get('strategy', 'UNKNOWN')} - reasoning: {s.get('reasoning', 'No reasoning')} - outcome: {s.get('outcome', 'UNKNOWN')} \n\t " for i, s
+                [f"• Attempt {i + 1}: {s.recovery_strategy} - reasoning: {s.reasoning} - outcome: {s.outcome} \n\t " for
+                 i, s
                  in enumerate(task.failure_context.strategy_history)]) or "No previous recovery attempts."
 
             # Use LLM to analyze the failure and suggest the best recovery strategy
@@ -708,37 +736,59 @@ class AgentCoreHelpers:
 
                 # Validate that we got a valid strategy
                 valid_strategies = ["PARAMETER_REPAIR", "ALTERNATIVE_TOOL", "TASK_DECOMPOSITION", "LLM_RECOVERY"]
-                recovery_strategy = strategy_result.get("recovery_strategy", "PARAMETER_REPAIR")
+                recovery_strategy = strategy_result.get("recovery_strategy", "PARAMETER_REPAIR") if isinstance(
+                    strategy_result, dict) else "PARAMETER_REPAIR"
+
+                if not isinstance(strategy_result, dict):
+                    # Ensure a mutable dict for downstream updates
+                    strategy_result = {}
 
                 if recovery_strategy not in valid_strategies:
                     debug_warning("Strategy Decision",
                                   f"LLM suggested invalid strategy '{recovery_strategy}'. Falling back to PARAMETER_REPAIR.",
-                                  metadata={
-                                      "function name": "decide_recovery_strategy",
-                                      "task_id": getattr(task, 'task_id', 'N/A'),
-                                      "suggested_strategy": recovery_strategy
-                                  })
+                                  metadata={"function name": "decide_recovery_strategy",
+                                            "task_id": getattr(task, 'task_id', 'N/A'),
+                                            "suggested_strategy": recovery_strategy})
                     recovery_strategy = "PARAMETER_REPAIR"
+
+                # FIX 3: Enhanced discovery logic - if LLM suggests multiple tools or discovery steps, force TASK_DECOMPOSITION
+                next_steps = strategy_result.get("next_steps", "")
+                if next_steps and isinstance(next_steps, str):
+                    # Count discovery-related tool mentions in next_steps
+                    discovery_tool_mentions = 0
+                    discovery_keywords = ["list_allowed_directories", "search_files", "list_directory", "find",
+                                          "discover", "explore", "search", "investigate", "verify", "check", "examine",
+                                          "analyze"]
+                    for keyword in discovery_keywords:
+                        if keyword.lower() in next_steps.lower():
+                            discovery_tool_mentions += 1
+
+                    # # this is causing un intentional issues If LLM mentions multiple discovery tools/steps, force decomposition
+                    # if discovery_tool_mentions >= 5:
+                    #     debug_info("Strategy Decision",
+                    #                f"LLM suggested multi-step discovery approach, forcing TASK_DECOMPOSITION for task {getattr(task, 'task_id', 'N/A')}",
+                    #                metadata={"original_strategy": str(recovery_strategy), "next_steps": str(next_steps),
+                    #                          "discovery_mentions": str(discovery_tool_mentions)})
+                    #     recovery_strategy = "TASK_DECOMPOSITION"
+                    #     strategy_result["recovery_strategy"] = "TASK_DECOMPOSITION"
+                    #     strategy_result[
+                    #         "reasoning"] = f"Original: {strategy_result.get('reasoning', '')} | ENHANCED: Multi-step discovery approach detected, forcing decomposition to implement: {next_steps}"
 
                 debug_info("Strategy Decision",
                            f"Selected strategy '{recovery_strategy}' for task {getattr(task, 'task_id', 'N/A')}",
-                           metadata={
-                               "function name": "decide_recovery_strategy",
-                               "task_id": getattr(task, 'task_id', 'N/A'),
-                               "recovery_strategy": recovery_strategy,
-                               "confidence_level": strategy_result.get("confidence_level", "UNKNOWN"),
-                               "estimated_success_probability": strategy_result.get("estimated_success_probability", 0),
-                               "reasoning": strategy_result.get("reasoning", "No reasoning provided")
-                           })
+                           metadata={"function name": "decide_recovery_strategy",
+                                     "task_id": getattr(task, 'task_id', 'N/A'), "recovery_strategy": recovery_strategy,
+                                     "confidence_level": strategy_result.get("confidence_level", "UNKNOWN"),
+                                     "estimated_success_probability": strategy_result.get(
+                                         "estimated_success_probability", 0),
+                                     "reasoning": strategy_result.get("reasoning", "No reasoning provided")})
 
                 return strategy_result
 
             except Exception as e:
-                debug_error("Strategy Decision", f"Failed to decide recovery strategy with LLM: {e}", metadata={
-                    "function_name": "decide_recovery_strategy",
-                    "task_id": getattr(task, 'task_id', 'N/A'),
-                    "exception": str(e)
-                })
+                debug_error("Strategy Decision", f"Failed to decide recovery strategy with LLM: {e}",
+                            metadata={"function name": "decide_recovery_strategy",
+                                      "task_id": getattr(task, 'task_id', 'N/A'), "exception": str(e)})
                 # Fallback to rule-based decision making
                 return AgentCoreHelpers.EnhancedErrorFallbackHelpers._fallback_strategy_selection(task, state)
 
@@ -860,11 +910,7 @@ class AgentCoreHelpers:
 
             debug_info("Tool Executor",
                        f"Executing tool: '{tool_name}' with parameters: {parameters}",
-                       metadata={
-                           "function name": "__tool_executor",
-                           "tool_name": tool_name,
-                           "parameters": parameters,
-                       })
+                       metadata={"function name": "__tool_executor", "tool_name": tool_name, "parameters": parameters})
 
             try:
                 registered_tools = AgentCoreHelpers.get_safe_tools_list()
@@ -958,29 +1004,21 @@ class AgentCoreHelpers:
                             break
 
                 if is_logical_success:
-                    debug_info("Tool Executor", f"Tool '{tool_name}' executed successfully.", metadata={
-                        "function name": "__tool_executor",
-                        "tool_name": tool_name,
-                        "response_content": last_response.content[:200] + "..." if len(
-                            last_response.content) > 200 else last_response.content,
-                    })
+                    debug_info("Tool Executor", f"Tool '{tool_name}' executed successfully.",
+                               metadata={"function name": "__tool_executor", "tool_name": tool_name,
+                                         "response_content": last_response.content[:200] + "..." if len(
+                                             last_response.content) > 200 else last_response.content})
                     return (True, last_response.content)
                 else:
                     debug_warning("Tool Executor", f"Tool '{tool_name}' executed but detected logical failure.",
-                                  metadata={
-                                      "function name": "__tool_executor",
-                                      "tool_name": tool_name,
-                                      "response_content": last_response.content[:200] + "..." if len(
-                                          last_response.content) > 200 else last_response.content,
-                                      "logical_failure": True,
-                                  })
+                                  metadata={"function name": "__tool_executor", "tool_name": tool_name,
+                                            "response_content": last_response.content[:200] + "..." if len(
+                                                last_response.content) > 200 else last_response.content,
+                                            "logical_failure": True})
                     return (False, logical_failure_message)
             except Exception as e:
-                debug_error("Tool Executor", f"Exception during tool execution: {str(e)}", metadata={
-                    "function name": "__tool_executor",
-                    "tool_name": tool_name,
-                    "exception": str(e),
-                })
+                debug_error("Tool Executor", f"Exception during tool execution: {str(e)}",
+                            metadata={"function name": "__tool_executor", "tool_name": tool_name, "exception": str(e)})
                 return (False, f"Error executing tool {tool_name}: {e!s}")
 
         @staticmethod
@@ -1014,45 +1052,32 @@ class AgentCoreHelpers:
                 # but it will prevent the main workflow from hanging.
                 executor.shutdown(wait=False)
                 debug_error("Tool Executor", f"Tool '{tool_name}' execution timed out after {timeout} seconds.",
-                            metadata={
-                                "function name": "exeCuteTool",
-                                "tool_name": tool_name,
-                                "timeout": timeout,
-                            })
+                            metadata={"function name": "exeCuteTool", "tool_name": tool_name, "timeout": timeout})
                 return False, f"Tool execution timed out after {timeout} seconds"
             except Exception as e:
                 # Handle other exceptions during execution.
                 executor.shutdown(wait=True)
-                debug_error("Tool Executor", f"Exception during tool execution: {str(e)}", metadata={
-                    "function name": "exeCuteTool",
-                    "tool_name": tool_name,
-                    "exception": str(e),
-                })
+                debug_error("Tool Executor", f"Exception during tool execution: {str(e)}",
+                            metadata={"function name": "exeCuteTool", "tool_name": tool_name, "exception": str(e)})
                 return False, f"Error executing tool {tool_name}: {e!s}"
 
     class ComplexityAnalyzer:
         """Analyzes task complexity and determines decomposition requirements."""
 
         @staticmethod
-        def analyze_task_complexity(task: TASK) -> dict:
+        def analyze_task_complexity(task: TASK, spawn_reason: str | None = None) -> dict:
             """Analyze if task is atomic or needs decomposition using tool schema awareness."""
-            # print_log_message(f"--- HELPER: Analyzing complexity for Task {task.task_id}: '{task.description}' ---",
-            #                   "Complexity Analyzer")
             debug_info("Complexity Analyzer",
                        f"Analyzing complexity for Task {task.task_id}: '{task.description}'",
-                       metadata={
-                           "function name": "__analyze_task_complexity",
-                           "task_id": task.task_id,
-                           "task_description": task.description,
-                           "tool_name": task.tool_name,
-                       })
+                       metadata={"function name": "__analyze_task_complexity", "task_id": task.task_id,
+                                 "task_description": task.description, "tool_name": task.tool_name})
 
-            # Get tool schema for better analysis
             tool_schema = AgentGraphCore.get_tool_schema(task.tool_name)
 
             prompt_generator = HierarchicalAgentPrompt()
+            # Pass the spawn_reason to the prompt generator
             system_prompt, human_prompt = prompt_generator.generate_tool_schema_complexity_prompt(
-                task.description, task.tool_name, tool_schema, task.depth
+                task.description, task.tool_name, tool_schema, task.depth, parent_context=spawn_reason
             )
 
             model = ModelManager(model="moonshotai/kimi-k2-instruct")
@@ -1063,7 +1088,6 @@ class AgentCoreHelpers:
 
             analysis_result = ModelManager.convert_to_json(response.content)
 
-            # Smart fallback based on tool patterns
             if not isinstance(analysis_result, dict) or "requires_decomposition" not in analysis_result:
                 simple_tools = ["list_directory", "read_text_file", "write_file", "create_directory", "google_search"]
                 is_simple = task.tool_name in simple_tools
@@ -1074,12 +1098,9 @@ class AgentCoreHelpers:
                     "atomic_tool_name": task.tool_name if is_simple else None,
                 }
 
-            # print_log_message(f"Complexity Analysis Result: {analysis_result}", "Complexity Analyzer")
-            debug_info("Complexity Analyzer", f"Complexity Analysis Result: {analysis_result}", metadata={
-                "function name": "__analyze_task_complexity",
-                "task_id": task.task_id,
-                "analysis_result": analysis_result,
-            })
+            debug_info("Complexity Analyzer", f"Complexity Analysis Result: {analysis_result}",
+                       metadata={"function name": "__analyze_task_complexity", "task_id": task.task_id,
+                                 "analysis_result": analysis_result})
             return analysis_result
 
 
@@ -1124,10 +1145,8 @@ class AgentGraphCore:
         """Creates high-level plan using tool pre-filtering and self-healing for efficiency."""
         AgentStatusUpdater.update_status('Initial Planner')
         goal = state.original_goal
-        debug_info("--- NODE: Initial Planner ---", f"Decomposing goal: {goal}", metadata={
-            "function name": "__subAGENT_initial_planner",
-            "original_goal": goal,
-        })
+        debug_info("--- NODE: Initial Planner ---", f"Decomposing goal: {goal}",
+                   metadata={"function name": "__subAGENT_initial_planner", "original_goal": goal})
 
         llm_returned = []
         validated_tasks = []
@@ -1188,6 +1207,9 @@ class AgentGraphCore:
                     invalid_tool_name = f"Task at index {item_idx} missing 'description' key"
                     break
 
+                # NEW: Capture the high-fidelity flag from the plan
+                requires_high_fidelity = item.get("requires_high_fidelity_context", False)
+
                 original_tool_name = item.get("tool_name")  # Use .get() for safety
                 if not original_tool_name:
                     has_invalid_tool = True
@@ -1236,6 +1258,8 @@ class AgentGraphCore:
                     invalid_tool_name = original_tool_name  # Use the original name in the error
                     break
 
+                # Add the high-fidelity flag to the validated task item
+                item['requires_high_fidelity_context'] = requires_high_fidelity
                 current_validated_tasks.append(item)
 
             if not has_invalid_tool:
@@ -1263,11 +1287,30 @@ class AgentGraphCore:
                     filtered_tasks.append(item)
                     seen_descriptions.add(item["description"])
 
+            # --- ENFORCE FINAL COLLECTOR (MANDATORY) ---
+            # try:
+            #     has_final_collector = any(
+            #         isinstance(it, dict)
+            #         and str(it.get("tool_name", "")).lower() == "perform_synthesis"
+            #         and "collector" in str(it.get("description", "")).lower()
+            #         for it in filtered_tasks
+            #     )
+            #     if not has_final_collector:
+            #         filtered_tasks.append({
+            #             "description": "Collector: Synthesize outputs of all previous tasks into concise, structured notes (Findings, Evidence, Risks).",
+            #             "tool_name": "perform_synthesis",
+            #             "requires_high_fidelity_context": False,
+            #         })
+            # except Exception:
+            #     # Defensive: never fail planning because of enforcement
+            #     pass
+
             actual_tasks = [
                 TASK(
                     task_id=str(idx + 1),
                     description=item["description"],
                     tool_name=item["tool_name"],
+                    requires_high_fidelity_context=item.get("requires_high_fidelity_context", False),  # Pass the flag
                     required_context=REQUIRED_CONTEXT(source_node="initial_planner"),
                 ) for idx, item in enumerate(filtered_tasks)
             ]
@@ -1286,10 +1329,8 @@ class AgentGraphCore:
                 )
             )
 
-        debug_info("Initial Planner", f"Final plan generated with {len(actual_tasks)} tasks.", metadata={
-            "task_count": len(actual_tasks),
-            "tasks": [task.model_dump() for task in actual_tasks],
-        })
+        debug_info("Initial Planner", f"Final plan generated with {len(actual_tasks)} tasks.",
+                   metadata={"task_count": len(actual_tasks), "tasks": [task.model_dump() for task in actual_tasks]})
 
         return {
             "tasks": actual_tasks,
@@ -1312,9 +1353,7 @@ class AgentGraphCore:
         current_task_id = state.current_task_id
         AgentStatusUpdater.update_status("complexity_analysis", task_id=current_task_id, extra_info="Analyzing task")
         debug_info("--- NODE: Classifier ---", "Deciding next action based on task status and failure history",
-                   metadata={
-                       "function name": "__subAGENT_classifier",
-                   })
+                   metadata={"function name": "__subAGENT_classifier"})
         tasks = state.tasks
         current_task = next((t for t in tasks if t.task_id == current_task_id), None)
 
@@ -1334,23 +1373,17 @@ class AgentGraphCore:
                                                  extra_info="FAILED: Exceeded retry limit")
                 debug_error("Classifier",
                             f"Task {current_task_id} has failed {current_task.failure_context.fail_count} times. Exceeded retry limit. Marking as permanently failed.",
-                            metadata={
-                                "function name": "__subAGENT_classifier",
-                                "task_id": current_task_id,
-                                "fail_count": current_task.failure_context.fail_count,
-                                "max_retries": current_task.max_retries,
-                            })
+                            metadata={"function name": "__subAGENT_classifier", "task_id": current_task_id,
+                                      "fail_count": current_task.failure_context.fail_count,
+                                      "max_retries": current_task.max_retries})
                 current_task.status = "failed"
                 persona = "AGENT_PERFORM_ERROR_FALLBACK"
             elif current_task.failure_context.fail_count >= current_task.max_retries:
                 persona = "AGENT_PERFORM_ERROR_FALLBACK"
 
         # print_log_message(f"Task ID: {current_task_id}, Persona: {persona}", "Classifier")
-        debug_info("Classifier", f"Task ID: {current_task_id}, Persona: {persona}", metadata={
-            "function name": "__subAGENT_classifier",
-            "task_id": current_task_id,
-            "persona": persona,
-        })
+        debug_info("Classifier", f"Task ID: {current_task_id}, Persona: {persona}",
+                   metadata={"function name": "__subAGENT_classifier", "task_id": current_task_id, "persona": persona})
         return {"executed_nodes": state.executed_nodes + ["subAGENT_classifier"], "persona": persona}
 
     @classmethod
@@ -1368,10 +1401,8 @@ class AgentGraphCore:
                     isinstance(current_task.execution_context.parameters,
                                dict) and current_task.execution_context.parameters:
                 debug_info("Parameter Generator",
-                           "Reusing existing parameters for pending task; skipping regeneration.", metadata={
-                        "function name": "subAGENT_parameter_generator",
-                        "task_id": current_task_id,
-                    })
+                           "Reusing existing parameters for pending task; skipping regeneration.",
+                           metadata={"function name": "subAGENT_parameter_generator", "task_id": current_task_id})
                 return {"tasks": tasks, "executed_nodes": state.executed_nodes + ["subAGENT_parameter_generator"]}
 
             tool_schema = cls.get_tool_schema(current_task.tool_name)
@@ -1402,17 +1433,63 @@ class AgentGraphCore:
                 if failed_task.failure_context and failed_task.failure_context.error_type == "GoalValidationFailure":
                     validator_feedback_summary.append(
                         f"VALIDATOR REJECTED Task {failed_task.task_id} ({failed_task.tool_name}): {failed_task.failure_context.error_message}"
+                        f"\n FAILED Parameters: {failed_task.failure_context.failed_parameters if failed_task.failure_context.failed_parameters else 'N/A'}"
                     )
 
             # Combine completed task analysis and validator feedback
             context_parts = []
             if analysis_summary:
-                context_parts.append("COMPLETED TASKS:\n" + "\n".join(analysis_summary))
+                context_parts.append("COMPLETED TASKS (Summarized):\n" + "\n".join(analysis_summary))
+
+            # NEW: Check for high-fidelity flag
+            if current_task.requires_high_fidelity_context:
+                raw_results_summary = [
+                    f"Task {t.task_id} ({t.tool_name}) Raw Result:\n{t.execution_context.result}"
+                    for t in full_history
+                    if t.execution_context and t.execution_context.result
+                ]
+                if raw_results_summary:
+                    context_parts.append("--- HIGH-FIDELITY RAW RESULTS (as requested by current task) ---\
+" + "\n\n".join(raw_results_summary))
+
             if validator_feedback_summary:
                 context_parts.append(
                     "VALIDATOR FEEDBACK (avoid these patterns):\n" + "\n".join(validator_feedback_summary))
 
             context_string = "\n\n".join(context_parts) if context_parts else None
+
+            # 🚨 CRITICAL FIX: Include failure_context and platform information
+            failure_context_info = None
+            platform_info = None
+
+            # Extract failure context from current task if available
+            if current_task.failure_context:
+                failure_context_info = {
+                    "error_message": current_task.failure_context.error_message,
+                    "error_type": current_task.failure_context.error_type,
+                    "fail_count": current_task.failure_context.fail_count,
+                    "failed_parameters": current_task.failure_context.failed_parameters,
+                    "strategy_history": [
+                        {
+                            "strategy": s.recovery_strategy,
+                            "reasoning": s.reasoning,
+                            "outcome": s.outcome
+                        } for s in (current_task.failure_context.strategy_history or [])
+                    ]
+                }
+                debug_info("Parameter Generator",
+                           f"Including failure context for task {current_task_id}: {current_task.failure_context.error_type}",
+                           metadata={"function name": "subAGENT_parameter_generator", "task_id": current_task_id,
+                                     "error_type": current_task.failure_context.error_type,
+                                     "fail_count": current_task.failure_context.fail_count})
+
+            # Get platform information
+            import os
+            platform_info = {
+                "os_name": os.name,
+                "platform": "Windows" if os.name == "nt" else "Unix/Linux",
+                "supports_posix": os.name != "nt"
+            }
 
             prompt_generator = HierarchicalAgentPrompt()
             system_prompt, human_prompt = prompt_generator.generate_schema_aware_parameter_prompt(
@@ -1422,6 +1499,9 @@ class AgentGraphCore:
                 context=context_string,
                 full_history=full_history,
                 depth=current_task.depth,
+                failure_context=failure_context_info,  # 🚨 NEW: Pass failure context
+                platform_info=platform_info,  # 🚨 NEW: Pass platform info
+                requires_high_fidelity=current_task.requires_high_fidelity_context,  # 🚨 NEW: Pass high-fidelity flag
             )
 
             model = ModelManager(model="moonshotai/kimi-k2-instruct")
@@ -1445,11 +1525,8 @@ class AgentGraphCore:
                     parameters=parameters,
                 )
                 debug_info("Parameter Generator", f"Generated and validated parameters for task {current_task_id}",
-                           metadata={
-                               "function name": "subAGENT_parameter_generator",
-                               "task_id": current_task_id,
-                               "parameters": parameters
-                           })
+                           metadata={"function name": "subAGENT_parameter_generator", "task_id": current_task_id,
+                                     "parameters": parameters})
             else:
                 # If validation fails, set task to failed and route to error fallback
                 current_task.status = "failed"
@@ -1461,12 +1538,9 @@ class AgentGraphCore:
                     failed_parameters=parameters,
                 )
                 debug_error("Parameter Generator",
-                            f"Parameter validation failed for task {current_task_id}: {error_message}", metadata={
-                        "function name": "subAGENT_parameter_generator",
-                        "task_id": current_task_id,
-                        "tool_name": current_task.tool_name,
-                        "invalid_parameters": parameters
-                    })
+                            f"Parameter validation failed for task {current_task_id}: {error_message}",
+                            metadata={"function name": "subAGENT_parameter_generator", "task_id": current_task_id,
+                                      "tool_name": current_task.tool_name, "invalid_parameters": parameters})
 
         return {"tasks": tasks, "executed_nodes": state.executed_nodes + ["subAGENT_parameter_generator"]}
 
@@ -1484,10 +1558,8 @@ class AgentGraphCore:
             return {}
         except Exception as e:
             # print_log_message(f"Failed to get schema for {tool_name}: {e}", "Tool Schema")
-            debug_error("Tool Schema", f"Failed to get schema for {tool_name}: {e}", metadata={
-                "function name": "__get_tool_schema",
-                "tool_name": tool_name,
-            })
+            debug_error("Tool Schema", f"Failed to get schema for {tool_name}: {e}",
+                        metadata={"function name": "__get_tool_schema", "tool_name": tool_name})
             return {}
 
     @classmethod
@@ -1520,19 +1592,16 @@ class AgentGraphCore:
         The spawning integration here enables true hierarchical problem-solving
         where abstract goals are recursively refined into executable operations.
         """
-        debug_info("--- NODE: Task Executor ---", "Executing or decomposing current task", metadata={
-            "function name": "__subAGENT_task_executor",
-        })
+        debug_info("--- NODE: Task Executor ---", "Executing or decomposing current task",
+                   metadata={"function name": "__subAGENT_task_executor"})
         current_task_id = state.current_task_id
         updated_tasks = state.tasks
         current_task = next((task for task in updated_tasks if task.task_id == current_task_id), None)
         AgentStatusUpdater.update_status("task_execution", task_id=current_task_id)
 
         if not current_task:
-            debug_error("Task Executor", f"Could not find current task with ID {current_task_id}", metadata={
-                "function name": "__subAGENT_task_executor",
-                "current_task_id": current_task_id,
-            })
+            debug_error("Task Executor", f"Could not find current task with ID {current_task_id}",
+                        metadata={"function name": "__subAGENT_task_executor", "current_task_id": current_task_id})
             return {"workflow_status": "FAILED"}
 
         # --- VIRTUAL TOOL INTERCEPTION ---
@@ -1555,31 +1624,69 @@ class AgentGraphCore:
         # --- END VIRTUAL TOOL INTERCEPTION ---
 
         try:
+            # Ensure a failure_context exists for the parent BEFORE we call any analysis or decomposition.
+            # Some failure paths set task.status = 'failed' but don't populate failure_context; the spawner and
+            # recovery logic rely on that context to choose discovery-first decompositions.
+            if getattr(current_task, 'status', None) == 'failed' and not getattr(current_task, 'failure_context', None):
+                # Create a minimal synthetic failure_context from available execution_context so downstream nodes
+                # (strategy decision, decomposer) have the failed parameters and an error message to reason about.
+                synthetic_failed_params = None
+                try:
+                    if current_task.execution_context and isinstance(current_task.execution_context.parameters, dict):
+                        synthetic_failed_params = current_task.execution_context.parameters.copy()
+                except Exception:
+                    synthetic_failed_params = None
+
+                current_task.failure_context = FAILURE_CONTEXT(
+                    error_message=(current_task.execution_context.result if current_task.execution_context and getattr(
+                        current_task.execution_context, 'result',
+                        None) else f"Parent task {current_task.task_id} failed without explicit failure_context."),
+                    fail_count=1,
+                    last_failure_timestamp=datetime.now(timezone.utc),
+                    error_type="SyntheticFailureContext",
+                    failed_parameters=synthetic_failed_params,
+                    strategy_history=[]
+                )
+                debug_info("SubAgent Spawner",
+                           f"Injected synthetic failure_context into parent task {current_task.task_id}",
+                           metadata={"function name": "spawn_subAgent_recursive",
+                                     "parent_task_id": current_task.task_id,
+                                     "injected_failed_parameters": synthetic_failed_params})
+
             complexity_analysis = AgentCoreHelpers.ComplexityAnalyzer.analyze_task_complexity(current_task)
 
             if complexity_analysis.get("requires_decomposition"):
                 AgentStatusUpdater.update_status("task complexity analysis", task_id=current_task_id,
                                                  extra_info="Decomposing complex task")
-                debug_info("Task Executor", f"Task {current_task_id} is complex - triggering spawning", metadata={
-                    "function name": "__subAGENT_task_executor",
-                    "task_id": current_task_id,
-                    "complexity_analysis": complexity_analysis,
-                })
+                debug_info("Task Executor", f"Task {current_task_id} is complex - triggering spawning",
+                           metadata={"function name": "__subAGENT_task_executor", "task_id": current_task_id,
+                                     "complexity_analysis": complexity_analysis})
 
                 # *** FIX: Gather context BEFORE spawning ***
                 completed_tasks = [t for t in updated_tasks if
                                    t.status == "completed" and t.execution_context and t.execution_context.result]
-                parent_context = {
-                    "original_goal": state.original_goal,
-                    "completed_tasks_history": completed_tasks,  # FIX: Use correct key and pass full task objects
-                    "workflow_progress": f"{len(completed_tasks)}/{len(updated_tasks)} tasks completed"
-                }
+
+                # Create comprehensive context string (consistent with error_fallback approach)
+                parent_context_str = (
+                        f"Original Goal: {state.original_goal}\n"
+                        f"Workflow Progress: {len(completed_tasks)}/{len(updated_tasks)} tasks completed\n"
+                        f"Completed Tasks: {[f'Task {t.task_id}: {t.description}' for t in completed_tasks]}\n"
+                        f"COMPLEXITY ANALYSIS CONTEXT:\n"
+                        f"- Current Task ID: {current_task.task_id}\n"
+                        f"- Description: {current_task.description}\n"
+                        f"- Tool: {current_task.tool_name}\n"
+                        f"- Reasoning: {complexity_analysis.get('reasoning', 'Complex task requiring decomposition')}\n"
+                        + (
+                            f"- Failure Context: {current_task.failure_context.error_message}\n" if current_task.failure_context else "- No previous failures\n")
+                        + (
+                            f"- Failed Parameters: {current_task.failure_context.failed_parameters}\n" if current_task.failure_context and current_task.failure_context.failed_parameters else "")
+                )
 
                 spawn_result = Spawn_subAgent.spawn_subAgent_recursive(
-                    state,
-                    current_task,
-                    complexity_analysis.get("reasoning", "Complex task requiring decomposition"),
-                    parent_context  # Pass the context down
+                    state=state,
+                    parent_task=current_task,
+                    spawn_reason=complexity_analysis.get("reasoning", "Complex task requiring decomposition"),
+                    parent_context=parent_context_str  # Pass the context as string
                 )
 
                 if spawn_result and spawn_result.get("spawn_triggered"):
@@ -1600,19 +1707,15 @@ class AgentGraphCore:
                 }
 
             AgentStatusUpdater.update_status("task_execution", task_id=current_task_id, extra_info="Executing tool")
-            debug_info("Task Executor", f"Task {current_task_id} is atomic - executing directly", metadata={
-                "function name": "__subAGENT_task_executor",
-                "task_id": current_task_id,
-            })
+            debug_info("Task Executor", f"Task {current_task_id} is atomic - executing directly",
+                       metadata={"function name": "__subAGENT_task_executor", "task_id": current_task_id})
 
             # --- SAFETY FIX: mark task as in_progress before attempting execution to avoid immediate retry loops ---
             try:
                 if current_task.status != "in_progress":
                     current_task.status = "in_progress"
-                    debug_info("Task Executor", f"Marked Task {current_task_id} as in_progress", metadata={
-                        "function name": "__subAGENT_task_executor",
-                        "task_id": current_task_id,
-                    })
+                    debug_info("Task Executor", f"Marked Task {current_task_id} as in_progress",
+                               metadata={"function name": "__subAGENT_task_executor", "task_id": current_task_id})
             except Exception:
                 pass
 
@@ -1642,37 +1745,43 @@ class AgentGraphCore:
                 # Add explicit debug when failures repeat to help root cause analysis
                 debug_error("Task Executor",
                             f"Task {current_task_id} execution failed (fail_count={current_task.failure_context.fail_count}): {result}",
-                            metadata={
-                                "function name": "__subAGENT_task_executor",
-                                "task_id": current_task_id,
-                                "failed_parameters": current_task.execution_context.parameters,
-                            })
+                            metadata={"function name": "__subAGENT_task_executor", "task_id": current_task_id,
+                                      "failed_parameters": current_task.execution_context.parameters})
 
                 if current_task.failure_context.fail_count > 3:
                     AgentStatusUpdater.update_status("task_execution", task_id=current_task_id,
                                                      extra_info="failed: exceeded retries")
                     debug_error("Task Executor",
                                 f"Task {current_task_id} has failed {current_task.failure_context.fail_count} times. Exceeded retry limit of 3.",
-                                metadata={
-                                    "function name": "__subAGENT_task_executor",
-                                    "task_id": current_task_id,
-                                    "fail_count": current_task.failure_context.fail_count,
-                                })
+                                metadata={"function name": "__subAGENT_task_executor", "task_id": current_task_id,
+                                          "fail_count": current_task.failure_context.fail_count})
                     current_task.failure_context.error_message = f"Task failed after maximum retry attempts (3). Original error: {result}"
                     current_task.status = "failed"
                     return {"tasks": updated_tasks,
                             "executed_nodes": state.executed_nodes + ["subAGENT_task_executor"]}
 
         except Exception as e:
-            debug_error("Task Executor", f"Error during task execution: {e!s}", metadata={
-                "function name": "__subAGENT_task_executor",
-                "task_id": current_task_id,
-                "exception": str(e),
-            })
+            debug_error("Task Executor", f"Error during task execution: {e!s}",
+                        metadata={"function name": "__subAGENT_task_executor", "task_id": current_task_id,
+                                  "exception": str(e)})
+            # Ensure we preserve/record failed_parameters and strategy history when an unexpected exception occurs
             current_task.status = "failed"
+            preserved_strategy_history = current_task.failure_context.strategy_history.copy() if current_task.failure_context and current_task.failure_context.strategy_history else []
+            preserved_fail_count = (current_task.failure_context.fail_count + 1) if current_task.failure_context else 1
+            preserved_failed_parameters = None
+            try:
+                if current_task.execution_context and isinstance(current_task.execution_context.parameters, dict):
+                    preserved_failed_parameters = current_task.execution_context.parameters.copy()
+            except Exception:
+                preserved_failed_parameters = None
+
             current_task.failure_context = FAILURE_CONTEXT(
                 error_message=str(e),
+                fail_count=preserved_fail_count,
+                last_failure_timestamp=datetime.now(timezone.utc),
                 error_type="UnhandledException",
+                failed_parameters=preserved_failed_parameters,
+                strategy_history=preserved_strategy_history,
             )
 
         return {"tasks": updated_tasks, "executed_nodes": state.executed_nodes + ["subAGENT_task_executor"]}
@@ -1680,9 +1789,8 @@ class AgentGraphCore:
     @classmethod
     def __subAGENT_context_synthesizer(cls, state: "WorkflowStateModel") -> dict:
         """Summarizes the result of a completed task for cleaner context passing."""
-        debug_info("--- NODE: Context Synthesizer ---", "Summarizing task result for context bridge", metadata={
-            "function name": "__subAGENT_context_synthesizer",
-        })
+        debug_info("--- NODE: Context Synthesizer ---", "Summarizing task result for context bridge",
+                   metadata={"function name": "__subAGENT_context_synthesizer"})
         tasks = state.tasks
         current_task_id = state.current_task_id
         current_task: TASK = next((t for t in tasks if t.task_id == current_task_id), None)
@@ -1712,11 +1820,8 @@ class AgentGraphCore:
             if summary:
                 current_task.execution_context.analysis = summary
                 debug_info("Context Synthesizer", f"Generated analysis for Task {current_task_id}: '{summary}'",
-                           metadata={
-                               "function name": "__subAGENT_context_synthesizer",
-                               "task_id": current_task_id,
-                               "summary": summary,
-                           })
+                           metadata={"function name": "__subAGENT_context_synthesizer", "task_id": current_task_id,
+                                     "summary": summary})
             else:
                 current_task.execution_context.analysis = f"Task {current_task.tool_name} completed successfully."
 
@@ -1725,9 +1830,8 @@ class AgentGraphCore:
     @classmethod
     def __subAGENT_goal_validator(cls, state: "WorkflowStateModel") -> dict:
         """Validates if the task's goal was achieved based on the result and analysis."""
-        debug_info("--- NODE: Goal Validator ---", "Validating task goal achievement", metadata={
-            "function name": "__subAGENT_goal_validator",
-        })
+        debug_info("--- NODE: Goal Validator ---", "Validating task goal achievement",
+                   metadata={"function name": "__subAGENT_goal_validator"})
         tasks = state.tasks
         current_task_id = state.current_task_id
         current_task = next((t for t in tasks if t.task_id == current_task_id), None)
@@ -1757,19 +1861,13 @@ class AgentGraphCore:
                 current_task.execution_context.goal_achieved = validation_result.get("goal_achieved", False)
                 debug_info("Goal Validator",
                            f"Validation for Task {current_task_id}: Goal Achieved = {validation_result.get('goal_achieved')}, Reasoning: {validation_result.get('reasoning')}",
-                           metadata={
-                               "function name": "__subAGENT_goal_validator",
-                               "task_id": current_task_id,
-                               "validation_result": validation_result,
-                           })
+                           metadata={"function name": "__subAGENT_goal_validator", "task_id": current_task_id,
+                                     "validation_result": validation_result})
                 if not validation_result.get("goal_achieved"):
                     current_task.status = "failed"
                     # CRITICAL FIX: Preserve the original failed_parameters when creating new failure context
-                    original_failed_parameters = None
-                    original_strategy_history = []
-                    if current_task.failure_context:
-                        original_failed_parameters = current_task.failure_context.failed_parameters
-                        original_strategy_history = current_task.failure_context.strategy_history or []
+                    original_failed_parameters = current_task.execution_context.parameters if current_task.execution_context else None
+                    original_strategy_history = current_task.failure_context.strategy_history.copy() if current_task.failure_context and current_task.failure_context.strategy_history else []
 
                     current_task.failure_context = FAILURE_CONTEXT(
                         error_message=f"Goal not achieved: {validation_result.get('reasoning', 'No reasoning provided.')}",
@@ -1799,18 +1897,14 @@ class AgentGraphCore:
             else:
                 debug_warning("Goal Validator",
                               f"Invalid response from validation LLM for Task {current_task_id}. Defaulting to goal not achieved.",
-                              metadata={
-                                  "function name": "__subAGENT_goal_validator",
-                                  "task_id": current_task_id,
-                                  "llm_response": response.content,
-                              })
+                              metadata={"function name": "__subAGENT_goal_validator", "task_id": current_task_id,
+                                        "llm_response": response.content})
                 current_task.execution_context.goal_achieved = False
                 current_task.status = "failed"
                 # CRITICAL FIX: Preserve the original failed_parameters here too
-                original_failed_parameters = None
+                original_failed_parameters = current_task.execution_context.parameters if current_task.execution_context else None
                 original_strategy_history = []
                 if current_task.failure_context:
-                    original_failed_parameters = current_task.failure_context.failed_parameters
                     original_strategy_history = current_task.failure_context.strategy_history or []
 
                 current_task.failure_context = FAILURE_CONTEXT(
@@ -1828,16 +1922,14 @@ class AgentGraphCore:
         ## todo shifting fallback to use enhanced helper - pending
         """Handle task failures with a tiered, state-driven recovery system."""
         AgentStatusUpdater.update_status("error_recovery", task_id=state.current_task_id)
-        debug_info("--- NODE: Error Fallback ---", "Handling task failure with tiered recovery strategies", metadata={
-            "function name": "__subAGENT_error_fallback",
-        })
+        debug_info("--- NODE: Error Fallback ---", "Handling task failure with tiered recovery strategies",
+                   metadata={"function name": "__subAGENT_error_fallback"})
         current_task_id = state.current_task_id
         updated_tasks = state.tasks
         current_task: TASK = next((task for task in updated_tasks if task.task_id == current_task_id), None)
 
         if not current_task or not current_task.failure_context:
-            return {"tasks": updated_tasks,
-                    "executed_nodes": state.executed_nodes + ["subAGENT_error_fallback"]}
+            return {"tasks": updated_tasks, "executed_nodes": state.executed_nodes + ["subAGENT_error_fallback"]}
 
         # todo here the enhancement start to use the new helper
         # 1. DELEGATE to the new, intelligent helper
@@ -1847,15 +1939,13 @@ class AgentGraphCore:
         if not strategy:
             current_task.status = "failed"
             current_task.failure_context.strategy_history.append(
-                {
-                    "strategy": "NO_STRATEGY",
-                    "reasoning": recovery_decision.get("reasoning", "No viable recovery strategy identified."),
-                    "outcome": "NOT_APPLIED",
-                    "timestamp": datetime.now(timezone.utc).strftime('%Y-%m-%d %I:%M:%S.%f %p'),
-                    "details": {
-                        "error_message": getattr(current_task.failure_context, "error_message", None)
-                    }
-                }
+                FAILURE_CONTEXT_STRATEGY(
+                    recovery_strategy="NO_STRATEGY",
+                    reasoning=recovery_decision.get("reasoning", "No viable recovery strategy identified."),
+                    outcome="NOT_APPLIED",
+                    details={"description": current_task.description,
+                             "error_message": getattr(current_task.failure_context, "error_message", None)}
+                )
             )
             return {"tasks": updated_tasks, "executed_nodes": state.executed_nodes + ["subAGENT_error_fallback"]}
         # 2. ACT on the strategic decision
@@ -1864,61 +1954,68 @@ class AgentGraphCore:
                 is_repaired, new_params = AgentCoreHelpers.ErrorFallbackHelpers.attempt_parameter_repair(current_task,
                                                                                                          state)
                 if is_repaired:
+                    # Ensure execution_context exists before assigning parameters
+                    if current_task.execution_context is None:
+                        current_task.execution_context = EXECUTION_CONTEXT(
+                            tool_name=current_task.tool_name,
+                            parameters={},
+                        )
+                    else:
+                        # Keep tool_name in sync in case it changed elsewhere
+                        current_task.execution_context.tool_name = current_task.tool_name
                     current_task.execution_context.parameters = new_params
                     current_task.status = "pending"
-                    current_task.failure_context.strategy_history.append({
-                        "strategy": "PARAMETER_REPAIR",
-                        "reasoning": recovery_decision.get("reasoning", "Parameters repaired based on failure context."),
-                        "outcome": "APPLIED",
-                        "timestamp": datetime.now(timezone.utc).strftime('%Y-%m-%d %I:%M:%S.%f %p'),
-                        "details": {
-                            "repaired_parameters": new_params,
-                            "error_message": getattr(current_task.failure_context, "error_message", None)
-                        }
-                    })
+                    current_task.failure_context.strategy_history.append(
+                        FAILURE_CONTEXT_STRATEGY(
+                            recovery_strategy="PARAMETER_REPAIR",
+                            reasoning=recovery_decision.get("reasoning",
+                                                            "Parameters repaired based on failure context."),
+                            outcome="APPLIED",
+                            details={
+                                "repaired_parameters": new_params,
+                                "description": current_task.description,
+                                "error_message": getattr(current_task.failure_context, "error_message", None)
+                            }
+                        )
+                    )
                 else:
                     current_task.status = "failed"
             elif strategy == "ALTERNATIVE_TOOL":
                 new_tool = AgentCoreHelpers.ErrorFallbackHelpers.find_alternative_tool(current_task, state)
                 if new_tool:
                     current_task.tool_name = new_tool
-                    # Clear execution context parameters to force regeneration for the new tool
+                    # 🚨 CRITICAL FIX: DO NOT reset parameters to {} - preserve failure_context for parameter generator
                     if current_task.execution_context is None:
                         current_task.execution_context = EXECUTION_CONTEXT(tool_name=new_tool, parameters={})
                     else:
+                        # Preserve the failed parameters in failure_context - DO NOT reset to empty dict
                         current_task.execution_context.tool_name = new_tool
+                        # 🚨 KEY FIX: Keep parameters empty but ensure failure_context is preserved
+                        # The parameter generator will use failure_context.failed_parameters to avoid repetition
                         current_task.execution_context.parameters = {}
                         current_task.execution_context.result = None
                         current_task.execution_context.analysis = None
                         current_task.execution_context.goal_achieved = False
                     current_task.status = "pending"
                     current_task.failure_context.strategy_history.append(
-                        {
-                            "strategy": "ALTERNATIVE_TOOL",
-                            "reasoning": recovery_decision.get("reasoning", "Alternative tool suggested by LLM."),
-                            "outcome": "APPLIED",
-                            "timestamp": datetime.now(timezone.utc).strftime('%Y-%m-%d %I:%M:%S.%f %p'),
-                            "details": {
-                                "alternative_tool": new_tool,
-                                "description": current_task.description,
-                                "error_message": getattr(current_task.failure_context, "error_message", None)
-                            }
-                        }
+                        FAILURE_CONTEXT_STRATEGY(
+                            recovery_strategy="ALTERNATIVE_TOOL",
+                            reasoning=recovery_decision.get("reasoning", "Alternative tool suggested by LLM."),
+                            outcome="APPLIED",
+                            details={"alternative_tool": new_tool, "description": current_task.description,
+                                     "error_message": getattr(current_task.failure_context, "error_message", None)}
+                        )
                     )
                 else:
                     # Record no-op attempt for observability
                     current_task.failure_context.strategy_history.append(
-                        {
-                            "strategy": "ALTERNATIVE_TOOL",
-                            "reasoning": recovery_decision.get("reasoning", "Alternative tool suggested by LLM."),
-                            "outcome": "NOT_APPLIED",
-                            "timestamp": datetime.now(timezone.utc).strftime('%Y-%m-%d %I:%M:%S.%f %p'),
-                            "details": {
-                                "alternative_tool": None,
-                                "description": current_task.description,
-                                "error_message": getattr(current_task.failure_context, "error_message", None)
-                            }
-                        }
+                        FAILURE_CONTEXT_STRATEGY(
+                            recovery_strategy="ALTERNATIVE_TOOL",
+                            reasoning=recovery_decision.get("reasoning", "Alternative tool suggested by LLM."),
+                            outcome="NOT_APPLIED",
+                            details={"alternative_tool": None, "description": current_task.description,
+                                     "error_message": getattr(current_task.failure_context, "error_message", None)}
+                        )
                     )
                     current_task.status = "failed"
 
@@ -1926,6 +2023,8 @@ class AgentGraphCore:
                 # Build parent context with completed tasks and failure context
                 completed_tasks = [t for t in updated_tasks if
                                    t.status == "completed" and t.execution_context and t.execution_context.result]
+                current_task.status = "skip"  # Mark as like this while we handle decomposition
+                # this is the issue it pass the only last strategy context
                 parent_context = {
                     "original_goal": state.original_goal,
                     "completed_tasks_history": completed_tasks,
@@ -1936,25 +2035,84 @@ class AgentGraphCore:
                         "failure_reason": current_task.failure_context.error_message,
                         "fail_count": current_task.failure_context.fail_count,
                         "error_type": current_task.failure_context.error_type,
-                        "failed_parameters": current_task.failure_context.failed_parameters
+                        "failed_parameters": current_task.failure_context.failed_parameters,
+                        "strategy_history": current_task.failure_context.strategy_history,
                     }
                 }
+                parent_context_str = (
+                    f"Original Goal: {parent_context['original_goal']}\n"
+                    f"Workflow Progress: {parent_context['workflow_progress']}\n"
+                    f"Completed Tasks: {[f'Task {t.task_id}: {t.description}' for t in parent_context['completed_tasks_history']]}\n"
+                    f"FAILED TASK CONTEXT:\n"
+                    f"- Task ID: {parent_context['failed_task_context']['task_id']}\n"
+                    f"- Description: {parent_context['failed_task_context']['description']}\n"
+                    f"- Failure Reason: {parent_context['failed_task_context']['failure_reason']}\n"
+                    f"- Fail Count: {parent_context['failed_task_context']['fail_count']}\n"
+                    f"- Error Type: {parent_context['failed_task_context']['error_type']}\n"
+                    f"- LAST Failed Parameters: {parent_context['failed_task_context']['failed_parameters']}\n"
+                    f"**FAILED FULL HISTORY NEVER IGNORE THIS ***\n"
+                    f" \n".join(
+                        [f"  {idx + 1}. Strategy: {s.recovery_strategy}, Outcome: {s.outcome}, Reasoning: {s.reasoning}"
+                         for idx, s in enumerate(parent_context['failed_task_context']['strategy_history'])])
+                )
 
-                spawn_result = Spawn_subAgent.spawn_subAgent_recursive(state, current_task,
-                                                                       "Decomposition suggested by LLM.",
-                                                                       parent_context)
+                # this needs to be got more verbose like what error we are facing and how to decompose such that,
+                # we would be able to pass the last finding to next higher task
+                detailed_spawn_reason = \
+                    f"""
+                      --- RECOVERY MANDATE: TASK DECOMPOSITION ---
+                    
+                      A task has failed, and the chosen recovery strategy is to decompose it into a new, investigative plan.
+                    
+                      Original User Goal:
+                      {state.original_goal}
+                    
+                      Failed Task Details:
+                      - Task Description: {current_task.description}
+                      - Failed Tool: {current_task.tool_name}
+                      - Failed Parameters: {current_task.failure_context.failed_parameters}
+                    
+                      Failure Analysis:
+                      - Error Type: {current_task.failure_context.error_type}
+                      - Error Message: {current_task.failure_context.error_message}
+                    
+                      Recovery Plan from Strategist:
+                      - Chosen Strategy: {recovery_decision.get('recovery_strategy')}
+                      - Strategist's Reasoning: {recovery_decision.get('reasoning')}
+                      - Plan to Execute: {recovery_decision.get('next_steps')}
+                    
+                      Your Mission:
+                      Your only job is to convert the 'Plan to Execute' above into a precise, executable list of new sub-tasks. Do not re-evaluate the strategy
+                      or the original task. Your purpose is to implement the recovery plan exactly as specified.
+                    """
+
+                # there is we are adding the artificial tasks to TASK DECOMPOSER work on that
+                sub_tasks:list[TASK] = AgentCoreHelpers.ErrorFallbackHelpers.convert_decision_task(
+                    [parent_context_str, detailed_spawn_reason],
+                    str(AgentCoreHelpers.recommend_tools_for_task(current_task.description))
+                    , current_task)
+
+                # insert that artificial TASKS created by the parser
+                parent_task_idx = next((i for i, t in enumerate(state.tasks) if t.task_id == current_task.task_id), None)
+                # insertion logic
+                state.tasks = state.tasks[:parent_task_idx + 1] + sub_tasks + state.tasks[parent_task_idx + 1:]
+
+                spawn_result = Spawn_subAgent.spawn_subAgent_recursive(state, sub_tasks[0],
+                                                                    detailed_spawn_reason,
+                                                                    parent_context_str,
+                                                                    recovery_plan=recovery_decision.get(
+                                                                    "recovery_plan"))
                 if spawn_result.get("spawn_triggered"):
                     current_task.failure_context.strategy_history.append(
-                        {
-                            "strategy": "TASK_DECOMPOSITION",
-                            "reasoning": recovery_decision.get("reasoning", "Decomposition suggested by LLM."),
-                            "outcome": "APPLIED",
-                            "timestamp": datetime.now(timezone.utc).strftime('%Y-%m-%d %I:%M:%S.%f %p'),
-                            "details": {
-                                "spawned_subtasks": [t.tool_name for t in spawn_result["tasks"] if t.task_id != current_task.task_id],
-                                "error_message": getattr(current_task.failure_context, "error_message", None)
-                            }
-                        }
+                        FAILURE_CONTEXT_STRATEGY(
+                            recovery_strategy="TASK_DECOMPOSITION",
+                            reasoning=recovery_decision.get("reasoning", "Decomposition suggested by LLM."),
+                            outcome="APPLIED",
+                            details={"spawned_subtasks": [t.tool_name for t in spawn_result["tasks"] if
+                                                          t.task_id != current_task.task_id],
+                                     "description": current_task.description,
+                                     "error_message": getattr(current_task.failure_context, "error_message", None)}
+                        )
                     )
                     return {
                         "tasks": spawn_result["tasks"],
@@ -1967,11 +2125,9 @@ class AgentGraphCore:
                 current_task.status = "failed"
 
         except Exception as e:
-            debug_error("Error Fallback", f"Error during LLM recovery processing: {e}", metadata={
-                "function name": "__subAGENT_error_fallback",
-                "task_id": current_task_id,
-                "exception": str(e),
-            })
+            debug_error("Error Fallback", f"Error during LLM recovery processing: {e}",
+                        metadata={"function name": "__subAGENT_error_fallback", "task_id": current_task_id,
+                                  "exception": str(e)})
             current_task.status = "failed"
             current_task.failure_context.error_message += f" | Error during recovery processing: {e}"
 
@@ -1999,18 +2155,17 @@ class AgentGraphCore:
         This is where the hierarchical magic happens - parent tasks are only
         considered complete when their spawned sub-tasks finish successfully.
         """
-        debug_info("--- NODE: Task Planner ---", "Managing task progression and parent-child relationships", metadata={
-            "function name": "__subAGENT_task_planner",
-        })
+        debug_info("--- NODE: Task Planner ---", "Managing task progression and parent-child relationships",
+                   metadata={"function name": "__subAGENT_task_planner"})
 
         tasks = state.tasks
         last_completed_id = state.current_task_id
 
         # If the last completed task was a sub-task (e.g., '1.1-abc'), update its parent
-        if isinstance(last_completed_id, str) and '-' in last_completed_id: # Check for new string format
+        if isinstance(last_completed_id, str) and '-' in last_completed_id:  # Check for new string format
             # Extract parent_id from string, e.g., '1' from '1.1-abc'
             parent_id_prefix = last_completed_id.split('.')[0]
-            parent_task = next((t for t in tasks if str(t.task_id) == parent_id_prefix), None) # Find parent by prefix
+            parent_task = next((t for t in tasks if str(t.task_id) == parent_id_prefix), None)  # Find parent by prefix
             if parent_task and parent_task.status == "in_progress":
                 # Find sibling tasks that share the same parent prefix
                 sibling_tasks = [t for t in tasks if
@@ -2018,8 +2173,10 @@ class AgentGraphCore:
                 if all(t.status in ["completed", "failed"] for t in sibling_tasks):
                     failed_subtasks = [t for t in sibling_tasks if t.status == "failed"]
                     if not parent_task.execution_context:
-                        parent_task.execution_context = EXECUTION_CONTEXT(tool_name=parent_task.tool_name,
-                                                                          parameters={})
+                        parent_task.execution_context = EXECUTION_CONTEXT(
+                            tool_name=parent_task.tool_name,
+                            parameters={},
+                        )
                     if failed_subtasks:
                         parent_task.status = "failed"
                         parent_task.execution_context.analysis = f"Failed due to {len(failed_subtasks)} failed subtasks."
@@ -2054,11 +2211,8 @@ class AgentGraphCore:
 
             debug_info("Context Bridge",
                        f"Injected context from {len(completed_tasks)} completed tasks into Task {next_task_id}",
-                       metadata={
-                           "function name": "__subAGENT_task_planner",
-                           "next_task_id": next_task_id,
-                           "completed_tasks_count": len(completed_tasks),
-                       })
+                       metadata={"function name": "__subAGENT_task_planner", "next_task_id": next_task_id,
+                                 "completed_tasks_count": len(completed_tasks)})
 
         return {
             "current_task_id": next_task_id,
@@ -2070,9 +2224,8 @@ class AgentGraphCore:
     def __subAGENT_finalizer(cls, state: "WorkflowStateModel") -> dict:
         """Generate final response consolidating all task results."""
         # print_log_message("--- NODE: Finalizer ---", "Finalizer")
-        debug_info("--- NODE: Finalizer ---", "Generating final response consolidating all task results", metadata={
-            "function name": "__subAGENT_finalizer",
-        })
+        debug_info("--- NODE: Finalizer ---", "Generating final response consolidating all task results",
+                   metadata={"function name": "__subAGENT_finalizer"})
 
         all_results = []
         tasks = state.tasks
@@ -2094,11 +2247,11 @@ class AgentGraphCore:
                             if text_match:
                                 extracted_text = text_match.group(1)
                                 # Unescape newlines and clean up
-                                extracted_text = extracted_text.replace('\\n', '\n').replace("\'", "'")
+                                extracted_text = extracted_text.replace('\n', '\n').replace("\'", "'")
                                 result_content = extracted_text
 
                     all_results.append(f"Task {task.task_id} ({task.tool_name}): {result_content}")
-                except Exception as e:
+                except Exception:
                     # Fallback to original content if parsing fails
                     all_results.append(f"Task {task.task_id} ({task.tool_name}): {task.execution_context.result}")
 
@@ -2147,11 +2300,9 @@ class AgentGraphCore:
                 for t in tasks
             )
             workflow_status = "FAILED" if (any_failed or any_goal_false) else "COMPLETED"
-            debug_info("Finalizer", "LLM produced parsable JSON. Returning parsed object as final_response.", metadata={
-                "function name": "__subAGENT_finalizer",
-                "parsed_preview": str(parsed)[:200],
-                "workflow_status": workflow_status,
-            })
+            debug_info("Finalizer", "LLM produced parsable JSON. Returning parsed object as final_response.",
+                       metadata={"function name": "__subAGENT_finalizer", "parsed_preview": str(parsed)[:200],
+                                 "workflow_status": workflow_status})
             return {
                 "final_response": final_response_obj,
                 "final_response_source": "llm",
@@ -2175,7 +2326,7 @@ class AgentGraphCore:
                 '    "issues": "string",\n'
                 '    "reason": "string"\n'
                 '  }\n'
-                '}\n\nReturn only the JSON object, nothing else.'
+                "}\n\nReturn only the JSON object, nothing else."
             )
 
             model = ModelManager(model="moonshotai/kimi-k2-instruct")
@@ -2199,11 +2350,8 @@ class AgentGraphCore:
                 )
                 workflow_status = "FAILED" if (any_failed or any_goal_false) else "COMPLETED"
                 debug_info("Finalizer", "Repaired final response successfully and returning as final_response.",
-                           metadata={
-                               "function name": "__subAGENT_finalizer",
-                               "response_preview": str(repaired)[:200],
-                               "workflow_status": workflow_status,
-                           })
+                           metadata={"function name": "__subAGENT_finalizer", "response_preview": str(repaired)[:200],
+                                     "workflow_status": workflow_status})
                 return {
                     "final_response": final_response_obj,
                     "final_response_source": "llm_repaired",
@@ -2211,10 +2359,8 @@ class AgentGraphCore:
                     "executed_nodes": state.executed_nodes + ["subAGENT_finalizer"],
                 }
         except Exception as e:
-            debug_warning("Finalizer", f"JSON repair attempt failed: {e}", metadata={
-                "function name": "__subAGENT_finalizer",
-                "exception": str(e),
-            })
+            debug_warning("Finalizer", f"JSON repair attempt failed: {e}",
+                          metadata={"function name": "__subAGENT_finalizer", "exception": str(e)})
 
         # As a last resort, build a fallback wrapped schema so the caller can reliably extract a message.
         final_text = None
@@ -2227,10 +2373,8 @@ class AgentGraphCore:
         except Exception:
             final_text = str(raw)
 
-        debug_info("Finalizer", f"Final Response (fallback text): {final_text}", metadata={
-            "function name": "__subAGENT_finalizer",
-            "response_preview_length": len(final_text),
-        })
+        debug_info("Finalizer", f"Final Response (fallback text): {final_text}",
+                   metadata={"function name": "__subAGENT_finalizer", "response_preview_length": len(final_text)})
 
         # Wrap fallback text into the exact schema so the caller can reliably extract
         # a human-friendly message. This guarantees the agent_node can always display
@@ -2253,10 +2397,9 @@ class AgentGraphCore:
                 "analysis": {"issues": "", "reason": ""},
             }
 
-        debug_info("Finalizer", "Returning wrapped fallback final response as structured JSON schema", metadata={
-            "function name": "__subAGENT_finalizer",
-            "response_preview": str(final_response_obj)[0:200],
-        })
+        debug_info("Finalizer", "Returning wrapped fallback final response as structured JSON schema",
+                   metadata={"function name": "__subAGENT_finalizer",
+                             "response_preview": str(final_response_obj)[0:200]})
 
         return {
             "final_response": final_response_obj,
@@ -2276,9 +2419,8 @@ class AgentGraphCore:
         This is a critical routing function that enables the retry loop.
         """
         # print_log_message("--- ROUTER: After Execution ---", "Router")
-        debug_info("--- ROUTER: After Execution ---", "Routing after task execution based on task status", metadata={
-            "function name": "__router_after_execution",
-        })
+        debug_info("--- ROUTER: After Execution ---", "Routing after task execution based on task status",
+                   metadata={"function name": "__router_after_execution"})
         current_task_id = state.current_task_id
         tasks = state.tasks
         current_task = next((t for t in tasks if t.task_id == current_task_id), None)
@@ -2287,11 +2429,9 @@ class AgentGraphCore:
             # If the task failed, route back to the classifier to decide on a retry or fallback.
             # This creates the crucial "retry loop".
             # print_log_message(f"Task {current_task_id} failed. Routing to classifier for retry/fallback.", "Router")
-            debug_info("Router", f"Task {current_task_id} failed. Routing to classifier for retry/fallback.", metadata={
-                "function name": "__router_after_execution",
-                "task_id": current_task_id,
-                "task_status": current_task.status,
-            })
+            debug_info("Router", f"Task {current_task_id} failed. Routing to classifier for retry/fallback.",
+                       metadata={"function name": "__router_after_execution", "task_id": current_task_id,
+                                 "task_status": current_task.status})
             return "subAGENT_classifier"
 
         # If the task succeeded, check if there are more pending tasks.
@@ -2299,16 +2439,14 @@ class AgentGraphCore:
         if not pending_tasks:
             # If no more pending tasks, it's time to finalize the workflow.
             # print_log_message("All tasks completed. Routing to finalizer.", "Router")
-            debug_info("Router", "All tasks completed. Routing to finalizer.", metadata={
-                "function name": "__router_after_execution",
-            })
+            debug_info("Router", "All tasks completed. Routing to finalizer.",
+                       metadata={"function name": "__router_after_execution"})
             return "subAGENT_finalizer"
 
         # If there are more pending tasks, route to the planner to select the next one.
         # print_log_message("Task completed. Routing to task planner for next task.", "Router")
-        debug_info("Router", "Task completed. Routing to task planner for next task.", metadata={
-            "function name": "__router_after_execution",
-        })
+        debug_info("Router", "Task completed. Routing to task planner for next task.",
+                   metadata={"function name": "__router_after_execution"})
         return "subAGENT_task_planner"
 
     @classmethod
@@ -2316,9 +2454,8 @@ class AgentGraphCore:
         "subAGENT_parameter_generator", "subAGENT_error_fallback"]:
         """Route to parameter generation or error fallback."""
         # print_log_message("--- ROUTER: Classifier ---", "Router")
-        debug_info("--- ROUTER: Classifier ---", "Routing based on classifier decision", metadata={
-            "function name": "__router_classifier",
-        })
+        debug_info("--- ROUTER: Classifier ---", "Routing based on classifier decision",
+                   metadata={"function name": "__router_classifier"})
         if state.persona == "AGENT_PERFORM_ERROR_FALLBACK":
             return "subAGENT_error_fallback"
         return "subAGENT_parameter_generator"
@@ -2327,9 +2464,8 @@ class AgentGraphCore:
     def __router_task_planner(cls, state: "WorkflowStateModel") -> Literal["subAGENT_classifier", "subAGENT_finalizer"]:
         """Route from task planner to either classifier or finalizer."""
         # print_log_message("--- ROUTER: Task Planner ---", "Router")
-        debug_info("--- ROUTER: Task Planner ---", "Routing based on task planner decision", metadata={
-            "function name": "__router_task_planner",
-        })
+        debug_info("--- ROUTER: Task Planner ---", "Routing based on task planner decision",
+                   metadata={"function name": "__router_task_planner"})
         # Check if all tasks are completed or failed
         tasks = state.tasks
         all_tasks_finished = all(t.status in ["completed", "failed"] for t in tasks)
@@ -2367,7 +2503,7 @@ class AgentGraphCore:
         graph_builder.add_node("subAGENT_parameter_generator", cls.subAGENT_parameter_generator)
         graph_builder.add_node("subAGENT_task_executor", cls.__subAGENT_task_executor)
         graph_builder.add_node("subAGENT_context_synthesizer", cls.__subAGENT_context_synthesizer)
-        graph_builder.add_node("subAGENT_goal_validator", cls.__subAGENT_goal_validator) # New node
+        graph_builder.add_node("subAGENT_goal_validator", cls.__subAGENT_goal_validator)  # New node
         graph_builder.add_node("subAGENT_error_fallback", cls.__subAGENT_error_fallback)
         graph_builder.add_node("subAGENT_task_planner", cls.__subAGENT_task_planner)
         graph_builder.add_node("subAGENT_finalizer", cls.__subAGENT_finalizer)
@@ -2419,37 +2555,37 @@ class AgentGraphCore:
         return graph_builder.compile()
 
 
-# ================================================================================================================
-# HIERARCHICAL SUB-AGENT SPAWNING AND ROUTING LOGIC
-# ================================================================================================================
+# ================================================================================================================ 
+# HIERARCHICAL SUB-AGENT SPAWNING AND ROUTING LOGIC 
+# ================================================================================================================ 
 
-# The Spawn_subAgent class implements the "Progressive Refinement" pattern:
-#
-# CORE CONCEPT: When a task is too complex for direct execution, dynamically create
-# specialized sub-agents that break the problem into smaller, atomic operations.
-#
-# SPAWNING TRIGGERS:
-# 1. COMPLEXITY ANALYSIS: LLM determines task needs decomposition
-# 2. ERROR RECOVERY: Task fails multiple times, spawn recovery agent
-# 3. TOOL MISMATCH: Task requires tools not in the pre-filtered set
-#
-# SPawning PROCESS:
-# 1. analyze_spawn_requirement() → Should we spawn? (LLM decision)
-# 2. decompose_task_for_subAgent() → Break into sub-tasks (with tool pre-filtering)
-# 3. inject_subAgent_into_workflow() → Insert sub-tasks into main workflow
+# The Spawn_subAgent class implements the "Progressive Refinement" pattern: 
+# 
+# CORE CONCEPT: When a task is too complex for direct execution, dynamically create 
+# specialized sub-agents that break the problem into smaller, atomic operations. 
+# 
+# SPAWNING TRIGGERS: 
+# 1. COMPLEXITY ANALYSIS: LLM determines task needs decomposition 
+# 2. ERROR RECOVERY: Task fails multiple times, spawn recovery agent 
+# 3. TOOL MISMATCH: Task requires tools not in the pre-filtered set 
+# 
+# SPAWNING PROCESS: 
+# 1. analyze_spawn_requirement() → Should we spawn? (LLM decision) 
+# 2. decompose_task_for_subAgent() → Break into sub-tasks (with tool pre-filtering) 
+# 3. inject_subAgent_into_workflow() → Insert sub-tasks into main workflow 
 # 4. spawn_subAgent_recursive() → Orchestrate the entire process
 #
-# SUB-TASK ID SYSTEM:
-# - Parent task: 1, 2, 3, etc.
-# - Sub-tasks: 1.1, 1.2, 1.3, etc. (float IDs)
-# - Sub-sub-tasks: 1.1.1, 1.1.2, etc. (recursive spawning)
-#
-# TOOL PRE-FILTERING INTEGRATION:
-# - Each spawning operation uses tool recommendation system
-# - Sub-tasks are created with validated, relevant tools only
-# - Prevents tool hallucination in decomposed sub-tasks
-# - Maintains 90% token efficiency even in spawned contexts
-# ================================================================================================================
+# SUB-TASK ID SYSTEM: 
+# - Parent task: 1, 2, 3, etc. 
+# - Sub-tasks: 1.1, 1.2, 1.3, etc. (float IDs) 
+# - Sub-sub-tasks: 1.1.1, 1.1.2, etc. (recursive spawning) 
+# 
+# TOOL PRE-FILTERING INTEGRATION: 
+# - Each spawning operation uses tool recommendation system 
+# - Sub-tasks are created with validated, relevant tools only 
+# - Prevents tool hallucination in decomposed sub-tasks 
+# - Maintains 90% token efficiency even in spawned contexts 
+# ================================================================================================================ 
 
 
 class Spawn_subAgent:
@@ -2459,27 +2595,19 @@ class Spawn_subAgent:
 
     @classmethod
     def analyze_spawn_requirement(cls, parent_task: TASK, reason: str, state: "WorkflowStateModel") -> dict:
-        """Uses an LLM to analyze if a task is too complex and requires decomposition (spawning).
+        """Uses an LLM to analyze if a task is too complex and requires decomposition. 
         """
-        error_context = "no context till now available"  # todo this is not using anywhere currently
-        if parent_task.failure_context:
-            error_context = f"task failed {parent_task.failure_context.fail_count} times.. and Last error: {parent_task.failure_context.error_message}"
-
         debug_info("--- SPAWNER: Analyzing Task for sub-agent spawning ---",
-                   f"Task ID: {parent_task.task_id}, Reason: {reason}, Error Context: {error_context}",
-                   metadata={
-                       "function name": "analyze_spawn_requirement",
-                       "task_id": parent_task.task_id,
-                       "reason": reason,
-                       "error_context": error_context,
-                   })
+                   f"Task ID: {parent_task.task_id}, Reason: {reason}",
+                   metadata={"function name": "analyze_spawn_requirement", "task_id": parent_task.task_id,
+                             "reason": reason})
 
         prompt_generator = HierarchicalAgentPrompt()
         tool_schema = AgentGraphCore.get_tool_schema(parent_task.tool_name)
 
-        # we are providing depth also to avoid infinite recursion of spawning more than 2 levels
+        # 🚨 FIX: Pass the `reason` (which contains the Recovery Mandate) to the prompt generator.
         system_prompt, human_prompt = prompt_generator.generate_tool_schema_complexity_prompt(
-            parent_task.description, parent_task.tool_name, tool_schema, parent_task.depth
+            parent_task.description, parent_task.tool_name, tool_schema, parent_task.depth, parent_context=reason
         )
 
         model = ModelManager(model="moonshotai/kimi-k2-instruct")
@@ -2492,46 +2620,36 @@ class Spawn_subAgent:
         if not isinstance(analysis_result, dict) or "requires_decomposition" not in analysis_result:
             debug_warning("SubAgent Spawner",
                           "LLM failed to provide a valid spawn analysis. Defaulting to NO spawn.",
-                          metadata={
-                              "function name": "analyze_spawn_requirement",
-                              "task_id": parent_task.task_id,
-                              "reason": reason,
-                          })
+                          metadata={"function name": "analyze_spawn_requirement", "task_id": parent_task.task_id,
+                                    "reason": reason})
             return {"should_spawn": False, "reasoning": "Fallback due to invalid LLM response."}
 
-        debug_info("SubAgent Spawner", f"Spawn Analysis Result: {analysis_result.get('reasoning')}", metadata={
-            "function name": "analyze_spawn_requirement",
-            "task_id": parent_task.task_id,
-            "reason": reason,
-            "should_spawn": analysis_result.get("requires_decomposition"),
-            "reasoning": analysis_result.get("reasoning"),
-        })
+        debug_info("SubAgent Spawner", f"Spawn Analysis Result: {analysis_result.get('reasoning')}",
+                   metadata={"function name": "analyze_spawn_requirement", "task_id": parent_task.task_id,
+                             "reason": reason, "should_spawn": analysis_result.get("requires_decomposition"),
+                             "reasoning": analysis_result.get("reasoning")})
         analysis_result["should_spawn"] = analysis_result.get("requires_decomposition", False)
         return analysis_result
 
     @classmethod
-    def decompose_task_for_subAgent(cls, parent_task: TASK, state: "WorkflowStateModel", parent_context: dict | None) -> \
-    list[TASK]:
+    def decompose_task_for_subAgent(cls, parent_task: TASK, state: "WorkflowStateModel", parent_context: str | None,
+                                    recovery_plan: str | None = None) -> \
+            list[TASK]:
         """Uses LLM to decompose a complex parent task into smaller, atomic sub-tasks.
         Enhanced with tool pre-filtering and context passing.
-        there are 2 cases if the decomposition is happening for the first time of the task it would be limited in context
-        but in order to restrict the infinite recursion we would provide all the context to use max no of tools by which we would be able to perform the task
+        FIX 2: Now implements discovery-first approach when parent task has failure context.
         """
         debug_info("--- SPAWNER: Decomposing Task into smaller tasks ---",
                    f"Task ID: {parent_task.task_id}",
-                   metadata={
-                       "function name": "decompose_task_for_subAgent",
-                       "task_id": parent_task.task_id,
-                       "description": parent_task.description,
-                       "tool_name": parent_task.tool_name,
-                       "depth": parent_task.depth,
-                   })
+                   metadata={"function name": "decompose_task_for_subAgent", "task_id": parent_task.task_id,
+                             "description": parent_task.description, "tool_name": parent_task.tool_name,
+                             "depth": parent_task.depth})
 
         try:
             if parent_task.depth < 1:
-                # only if depth is 1
+                # only if depth is 1 we can also modify the description to get better tool recommendations like add recommended tools of fallbacks
                 recommended_tools = AgentCoreHelpers.recommend_tools_for_task(
-                    f"Break down complex task: {parent_task.description}", max_tools=8,
+                    f"Break down complex task: {parent_task.description}", max_tools=8, parent_context=parent_context
                 )
             else:
                 # if depth is more than 1, we get all the tools so that we don't limit the capabilities of sub-agents
@@ -2539,25 +2657,45 @@ class Spawn_subAgent:
                 all_tools = AgentCoreHelpers.get_safe_tools_list()
                 recommended_tools = [tool.name for tool in all_tools]
 
+            # Ensure the virtual Collector tool is always allowed during decomposition
+            if "perform_synthesis" not in recommended_tools:
+                recommended_tools.append("perform_synthesis")
+
             available_tools_str = AgentCoreHelpers.get_detailed_tool_context(recommended_tools)
         except Exception as e:
             # This is a critical internal error, not just a planning choice.
             debug_error("SubAgent Spawner",
-                        f"CRITICAL: Failed to generate sub-task prompt due to an internal error: {e}", metadata={
-                    "function name": "decompose_task_for_subAgent",
-                    "task_id": parent_task.task_id,
-                    "exception_type": type(e).__name__,
-                    "exception": str(e),
-                })
+                        f"CRITICAL: Failed to generate sub-task prompt due to an internal error: {e}",
+                        metadata={"function name": "decompose_task_for_subAgent", "task_id": parent_task.task_id,
+                                  "exception_type": type(e).__name__, "exception": str(e)})
             return []  # Return empty list to signal decomposition failure to the caller.
 
         prompt_generator = HierarchicalAgentPrompt()
+
+        # FIX 2: Pass parent failure context to prompt generator for better decomposition
+
+        failure_context_info = None
+        if parent_task.failure_context:
+            # Format a concise string for the decomposition prompt
+            try:
+                fp_preview = (str(parent_task.failure_context.failed_parameters)[
+                                  :300] + '...') if parent_task.failure_context.failed_parameters else 'None'
+            except Exception:
+                fp_preview = 'None'
+            chain_part = f" | Chain: {parent_task.failure_context.parent_failure_chain}" if getattr(
+                parent_task.failure_context, 'parent_failure_chain', None) else ""
+            failure_context_info = (
+                f"PARENT FAILURE CONTEXT → Type: {parent_task.failure_context.error_type or 'Unknown'} | Message: {parent_task.failure_context.error_message} | "
+                f"Fail Count: {getattr(parent_task.failure_context, 'fail_count', 1)} | Failed Params: {fp_preview}{chain_part}")
+
         system_prompt, human_prompt = prompt_generator.generate_task_decomposition_prompt(
             original_goal=state.original_goal,
             complex_task_description=parent_task.description,
             available_tools_str=available_tools_str,
             parent_context=parent_context,
-            depth=parent_task.depth
+            depth=parent_task.depth,
+            failure_context=failure_context_info,  # Pass failure context to prompt
+            recovery_plan=recovery_plan
         )
 
         model = ModelManager(model="moonshotai/kimi-k2-instruct")
@@ -2570,10 +2708,7 @@ class Spawn_subAgent:
         if not isinstance(decomposed_tasks_data, list):
             debug_warning("SubAgent Spawner",
                           "LLM failed to return a valid list for decomposition.",
-                          metadata={
-                              "function name": "decompose_task_for_subAgent",
-                              "task_id": parent_task.task_id,
-                          })
+                          metadata={"function name": "decompose_task_for_subAgent", "task_id": parent_task.task_id})
             return []
 
         sub_tasks: list[TASK] = []
@@ -2583,11 +2718,8 @@ class Spawn_subAgent:
                 if item["tool_name"] not in recommended_tools:
                     debug_warning("SubAgent Spawner",
                                   f"Tool '{item['tool_name']}' not in recommended set. Skipping.",
-                                  metadata={
-                                      "function name": "decompose_task_for_subAgent",
-                                      "task_id": parent_task.task_id,
-                                      "tool_name": item["tool_name"],
-                                  })
+                                  metadata={"function name": "decompose_task_for_subAgent",
+                                            "task_id": parent_task.task_id, "tool_name": item["tool_name"]})
                     continue
 
                 base_id_str = str(parent_task.task_id)
@@ -2600,22 +2732,23 @@ class Spawn_subAgent:
                         description=item["description"],
                         tool_name=item["tool_name"],
                         depth=parent_task.depth + 1,  # Increment depth for creating sub-tasks
+                        requires_high_fidelity_context=item.get("requires_high_fidelity_context", False),
+                        # Pass the flag
                         required_context=REQUIRED_CONTEXT(
                             source_node="subAgent_decomposer",
                             triggering_task_id=parent_task.task_id,
-                            pre_execution_context=parent_context,
-                            # Pass parent's context (completed history + failure info)
+                            pre_execution_context={"parent_context_str": parent_context,
+                                                   "context_type": "spawning_context",
+                                                   "original_goal": state.original_goal} if parent_context else None,
+                            # Pass parent's context (completed history + failure info) wrapped in dict
                         ),
                     ),
                 )
 
         debug_info("SubAgent Spawner",
                    f"Decomposed into {len(sub_tasks)} validated sub-tasks.",
-                   metadata={
-                       "function name": "decompose_task_for_subAgent",
-                       "task_id": parent_task.task_id,
-                       "subtasks_created": len(sub_tasks),
-                   })
+                   metadata={"function name": "decompose_task_for_subAgent", "task_id": parent_task.task_id,
+                             "subtasks_created": len(sub_tasks)})
         return sub_tasks
 
     @classmethod
@@ -2625,11 +2758,8 @@ class Spawn_subAgent:
         """
         debug_info("--- SPAWNER: Injecting sub-tasks into the workflow ---",
                    f"Parent Task ID: {parent_task.task_id}, Sub-tasks to inject: {len(subtasks)}",
-                   metadata={
-                       "function name": "inject_subAgent_into_workflow",
-                       "parent_task_id": parent_task.task_id,
-                       "subtasks_to_inject": len(subtasks),
-                   })
+                   metadata={"function name": "inject_subAgent_into_workflow", "parent_task_id": parent_task.task_id,
+                             "subtasks_to_inject": len(subtasks)})
 
         parent_task.status = "in_progress"
         if not parent_task.execution_context:
@@ -2639,16 +2769,30 @@ class Spawn_subAgent:
             )
         parent_task.execution_context.analysis = f"Decomposed into {len(subtasks)} sub-tasks."
 
+        # FIX 1: Inherit parent's failure context for sub-tasks so parameter repair can work
+        if parent_task.failure_context and parent_task.failure_context.failed_parameters:
+            for subtask in subtasks:
+                if not subtask.failure_context:
+                    subtask.failure_context = FAILURE_CONTEXT(
+                        error_message="Inherited from parent task",
+                        fail_count=1,
+                        error_type="InheritedContext",
+                        failed_parameters=parent_task.failure_context.failed_parameters.copy(),
+                        strategy_history=parent_task.failure_context.strategy_history.copy() if parent_task.failure_context.strategy_history else []
+                    )
+                debug_info("SubAgent Spawner",
+                           f"Inherited failed_parameters from parent {parent_task.task_id} to subtask {subtask.task_id}",
+                           metadata={"parent_failed_params": parent_task.failure_context.failed_parameters,
+                                     "subtask_id": subtask.task_id})
+
         current_tasks = state.tasks
         try:
             current_task_index = current_tasks.index(parent_task)
         except ValueError:
             debug_warning("SubAgent Spawner",
                           f"Could not find parent task {parent_task.task_id} in state.",
-                          metadata={
-                              "function name": "inject_subAgent_into_workflow",
-                              "parent_task_id": parent_task.task_id,
-                          })
+                          metadata={"function name": "inject_subAgent_into_workflow",
+                                    "parent_task_id": parent_task.task_id})
             return {"tasks": current_tasks}
 
         # --- START DEDUPLICATION LOGIC ---
@@ -2665,13 +2809,11 @@ class Spawn_subAgent:
             new_signature = f"{new_sub_task.tool_name.lower()}:{new_sub_task.description.lower()}"
 
             if new_signature in completed_task_signatures:
-                debug_info("SubAgent Spawner",
+                debug_warning("SubAgent Spawner",
                            f"Skipping redundant sub-task {new_sub_task.task_id} ('{new_sub_task.description}') as it's semantically equivalent to a completed task.",
-                           metadata={
-                               "function name": "inject_subAgent_into_workflow",
-                               "redundant_task_id": new_sub_task.task_id,
-                               "redundant_task_description": new_sub_task.description,
-                           })
+                           metadata={"function name": "inject_subAgent_into_workflow",
+                                     "redundant_task_id": new_sub_task.task_id,
+                                     "redundant_task_description": new_sub_task.description})
             else:
                 filtered_subtasks.append(new_sub_task)
         # --- END DEDUPLICATION LOGIC ---
@@ -2682,26 +2824,47 @@ class Spawn_subAgent:
 
     @classmethod
     def spawn_subAgent_recursive(cls, state: "WorkflowStateModel", parent_task: TASK, spawn_reason: str,
-                                 parent_context: dict | None) -> dict:
+                                 parent_context: str | None, recovery_plan: str | None = None) -> dict:
         """The main orchestrator for the spawning process.
         """
+        # FIX: Ensure a failure_context exists for the parent BEFORE we call any analysis or decomposition.
+        # Some failure paths set task.status = 'failed' but don't populate failure_context; the spawner and
+        # recovery logic rely on that context to choose discovery-first decompositions.
+        if getattr(parent_task, 'status', None) == 'failed' and not getattr(parent_task, 'failure_context', None):
+            # Create a minimal synthetic failure_context from available execution_context so downstream nodes
+            # (strategy decision, decomposer) have the failed parameters and an error message to reason about.
+            synthetic_failed_params = None
+            try:
+                if parent_task.execution_context and isinstance(parent_task.execution_context.parameters, dict):
+                    synthetic_failed_params = parent_task.execution_context.parameters.copy()
+            except Exception:
+                synthetic_failed_params = None
+
+            parent_task.failure_context = FAILURE_CONTEXT(
+                error_message=(parent_task.execution_context.result if parent_task.execution_context and getattr(
+                    parent_task.execution_context, 'result',
+                    None) else f"Parent task {parent_task.task_id} failed without explicit failure_context."),
+                fail_count=1,
+                last_failure_timestamp=datetime.now(timezone.utc),
+                error_type="SyntheticFailureContext",
+                failed_parameters=synthetic_failed_params,
+                strategy_history=[]
+            )
+            debug_info("SubAgent Spawner", f"Injected synthetic failure_context into parent task {parent_task.task_id}",
+                       metadata={"function name": "spawn_subAgent_recursive", "parent_task_id": parent_task.task_id,
+                                 "injected_failed_parameters": synthetic_failed_params})
+
         spawn_analysis = cls.analyze_spawn_requirement(parent_task, spawn_reason, state)
         if not spawn_analysis.get("should_spawn"):
             debug_info("SubAgent Spawner",
                        f"Analysis decided not to spawn a sub-agent for task {parent_task.task_id}.",
-                       metadata={
-                           "function name": "spawn_subAgent_recursive",
-                           "task_id": parent_task.task_id,
-                       })
+                       metadata={"function name": "spawn_subAgent_recursive", "task_id": parent_task.task_id})
 
-        subtasks = cls.decompose_task_for_subAgent(parent_task, state, parent_context)
+        subtasks = cls.decompose_task_for_subAgent(parent_task, state, parent_context, recovery_plan)
         if not subtasks:
             debug_warning("SubAgent Spawner",
                           f"Decomposition failed for task {parent_task.task_id}.",
-                          metadata={
-                              "function name": "spawn_subAgent_recursive",
-                              "task_id": parent_task.task_id,
-                          })
+                          metadata={"function name": "spawn_subAgent_recursive", "task_id": parent_task.task_id})
             return {"spawn_triggered": False}
 
         injection_result = cls.inject_subAgent_into_workflow(parent_task, subtasks, state)
@@ -2730,7 +2893,7 @@ class AgentStatusUpdater:
 
     FUNNY_QUOTES = {
         "initial_planning": [
-            "�� Putting on my thinking cap... Time to break down your request into bite-sized tasks!",
+            " Putting on my thinking cap... Time to break down your request into bite-sized tasks!",
             "🎯 Analyzing your request like a detective with a magnifying glass...",
             "🔍 Dissecting your goal with surgical precision... Don't worry, no anesthesia needed!",
             "📋 Creating a master plan... Even Napoleon would be impressed!",
@@ -2827,8 +2990,5 @@ class AgentStatusUpdater:
 
         except Exception as e:
             # Fail silently - status updates shouldn't break the workflow
-            debug_warning("Status Updater", f"Failed to update status: {e}", metadata={
-                "category": category,
-                "task_id": task_id,
-                "extra_info": extra_info
-            })
+            debug_warning("Status Updater", f"Failed to update status: {e}",
+                          metadata={"category": category, "task_id": task_id, "extra_info": extra_info})

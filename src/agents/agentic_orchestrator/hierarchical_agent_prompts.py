@@ -9,15 +9,13 @@ class HierarchicalAgentPrompt:
     This version fully supports the two-stage planning and decomposition workflow.
     """
 
-    
-
     def generate_task_decomposition_prompt(self, original_goal: str, complex_task_description: str,
-                                           available_tools_str: str, parent_context: dict | None,
-                                           depth: int = 0) -> tuple[str, str]:
+                                           available_tools_str: str, parent_context: dict | str | None,
+                                           depth: int = 0, failure_context: str | None = None,
+                                           recovery_plan: str | None = None) -> tuple[str, str]:
         """
         Generates prompts for the sub-agent spawner/decomposer.
-        This is where the list of REAL, ATOMIC tools is provided.
-        **NEW**: Includes rich context from parent tasks and is depth-aware.
+        **NEW**: Can now accept a pre-made recovery_plan to execute.
         """
         # --- NEW: Depth-Aware System Prompt ---
         if depth >= 1:
@@ -31,17 +29,26 @@ class HierarchicalAgentPrompt:
         else:
             mode_prompt = ""
 
-        if parent_context and parent_context.get("completed_tasks_history"):
-            context_summary_lines = []
-            for task in parent_context["completed_tasks_history"]:
-                if hasattr(task, 'execution_context') and task.execution_context and hasattr(task.execution_context,
-                                                                                             'analysis') and task.execution_context.analysis:
-                    context_summary_lines.append(
-                        f"- Task {task.task_id} ({task.tool_name}): {task.execution_context.analysis}")
-            context_summary = "\n".join(context_summary_lines)
-            context_section = f"""
+        # **FIX ERROR #1: Handle both dict and string parent_context**
+        context_section = ""
+        if parent_context:
+            if isinstance(parent_context, dict):
+                # Handle dictionary format (from task_executor)
+                completed_tasks_history = parent_context.get("completed_tasks_history", [])
+                if completed_tasks_history:
+                    context_summary_lines = []
+                    for task in completed_tasks_history:
+                        if hasattr(task, 'execution_context') and task.execution_context and hasattr(
+                                task.execution_context,
+                                'analysis') and task.execution_context.analysis:
+                            context_summary_lines.append(
+                                f"- Task {task.task_id} ({task.tool_name}): {task.execution_context.analysis}")
+                    context_summary = "\n".join(context_summary_lines)
+                    context_section = f'''
         CONTEXT FROM PREVIOUSLY COMPLETED TASKS:
         {context_summary}
+        --------------------
+        {failure_context if failure_context else ""}
 
         --- CRITICAL INSTRUCTION ---
         Assume all information provided in the "CONTEXT FROM PREVIOUSLY COMPLETED TASKS" is accurate and represents fully achieved objectives.
@@ -50,19 +57,62 @@ class HierarchicalAgentPrompt:
         ---------------------------
 
         Based on this, plan the *next* logical steps to accomplish the complex task. Do NOT repeat actions that are already completed.
-        """
+        '''
+                else:
+                    context_section = "CONTEXT: This is the first step. Plan the initial actions to accomplish the complex task."
+            elif isinstance(parent_context, str):
+                # Handle string format (from error_fallback) - use as-is since it's already formatted
+                context_section = f'''
+        CONTEXT FROM PARENT AGENT:
+        {parent_context}
+        --------------------
+        {failure_context if failure_context else ""}
+
+        --- CRITICAL INSTRUCTION ---
+        Review the provided context carefully. This contains information about completed tasks and any failure context.
+        Your responsibility is to plan sub-tasks that build upon successful work and avoid repeating failed approaches.
+        ---------------------------
+
+        Based on this context, plan the logical steps to accomplish the complex task.
+        '''
+            else:
+                context_section = "CONTEXT: This is the first step. Plan the initial actions to accomplish the complex task."
         else:
             context_section = "CONTEXT: This is the first step. Plan the initial actions to accomplish the complex task."
 
-        system_prompt = f"""
+        # NEW: Conditional logic for the main instruction
+        if recovery_plan:
+            # 🚨 OVERRIDE: Force the description and instruction to focus only on the recovery plan.
+            complex_task_description = "Your ONLY mission is to convert the provided recovery plan into a JSON task list. Do not add, remove, or modify any steps."
+            main_instruction = f'''
+        --- 🚨 CRITICAL DIRECTIVE: EXECUTE RECOVERY PLAN 🚨 ---
+        A higher-level strategist has provided a specific, multi-step recovery plan.
+        Your job is to translate the following plan into an executable JSON task list.
+
+        - **DO NOT** analyze the original task description.
+        - **DO NOT** invent new steps.
+        - **EXECUTE** the recovery plan exactly as written.
+
+        **RECOVERY PLAN TO EXECUTE:**
+        {recovery_plan}
+        '''
+        else:
+            main_instruction = f'''
+        --- DECOMPOSE COMPLEX TASK ---
+        Your job is to break down the following complex task into a sequence of smaller, concrete sub-tasks.
+        The complex task to decompose is: "{complex_task_description}"
+        '''
+
+        system_prompt = f'''
         🚨 CRITICAL ALERT: YOU MUST RETURN EXACTLY ONE JSON ARRAY OF ATOMIC SUB-TASKS.
 
-        You are an expert task decomposer. Your job is to break down a single complex task into a sequence of smaller, concrete sub-tasks. Each sub-task MUST use one of the available atomic tools.
+        You are an expert task decomposer.
 
         {mode_prompt}
 
+        {main_instruction}
+
         The user's high-level objective is: "{original_goal}".
-        The complex task to decompose is: "{complex_task_description}"
 
         {context_section}
 
@@ -72,43 +122,52 @@ class HierarchicalAgentPrompt:
         ✅ REQUIRED OUTPUT FORMAT (EXACT JSON ARRAY):
         [
             {{
-                "description": "First logical atomic step.",
+                "description": "A specific, executable step.",
                 "tool_name": "exact_tool_name_from_available_list"
             }}
         ]
 
         📋 RULES:
         - `tool_name` MUST be one of the tools from the provided AVAILABLE ATOMIC TOOLS list.
-        - The sequence of sub-tasks must logically accomplish the parent complex task.
-        - Each sub-task should be atomic (single tool operation).
+        - If you are executing a recovery plan, you MUST use the exact steps provided.
+        - If you are decomposing a task, the sequence of sub-tasks must logically accomplish the parent complex task.
         - **Do not create sub-tasks for work that is already done according to the context.**
         - Do not include a `task_id` in the output.
         
-        📋 NEW RULE: THE "COLLECTOR" PATTERN
-        If a future sub-task requires the combined output of several previous sub-tasks, you MUST insert a dedicated "Collector" task right before it.
-        - The "Collector" task MUST use the `perform_synthesis` tool.
-        - Its `description` MUST clearly state its job: to gather and synthesize the results from the previous steps.
-        - Example: {{'description': 'Review raw results from previous search sub-tasks and synthesize into a single comprehensive summary.', 'tool_name': 'perform_synthesis'}}
-        """
+        📋 NEW RULE: THE "COLLECTOR" PATTERN (MANDATORY)
+        If ANY downstream sub-task will consume or combine outputs from MORE THAN ONE prior sub-task, you MUST insert a dedicated "Collector" task IMMEDIATELY BEFORE it.
+        - The Collector task MUST use `perform_synthesis`.
+        - The Collector task's description MUST explicitly contain the word "Collector" and clearly state what to aggregate and how to format it.
+        - The consuming sub-task MUST use ONLY the Collector's output as its input (do not consume multiple raw outputs directly).
+        - Example: {{'description': 'Collector: Synthesize outputs of steps 1-3 into a concise brief', 'tool_name': 'perform_synthesis'}}
 
-        human_prompt = f"""
-         DECOMPOSE THIS COMPLEX TASK:
-         
-         "{complex_task_description}"
-         
-         Break it down into a sequence of atomic sub-tasks using ONLY the available tools provided in the system prompt.
-         Make each step concrete and executable with a single tool.
+        📋 NEW RULE: FINAL COLLECTOR (MANDATORY)
+        - Always END your decomposition with a final "Collector" task using `perform_synthesis` that synthesizes ALL prior sub-task outputs into concise notes or analysis for the parent task.
+        - This final collector MUST include instructions to produce short, structured notes (e.g., bullets: Findings, Evidence, Next risks).
+        - The description MUST contain the word "Collector".
+
+        📋 NEW RULE: HIGH-FIDELITY CONTEXT FLAG (OPTIONAL)
+        - If a sub-task REQUIRES exact raw outputs from prior steps (e.g., code linters, diff tools, exact text transformations), set `requires_high_fidelity_context: true` on that sub-task.
+        - Use sparingly. Most sub-tasks should rely on summarized context.
+        '''
+
+        human_prompt = f'''
+         Based on the instructions in the system prompt, generate the required JSON array of tasks.
          
          🚨 RESPOND WITH ONLY THE JSON ARRAY - NO OTHER TEXT.
-         """
+         '''
 
         return system_prompt, human_prompt
 
-
     def generate_schema_aware_parameter_prompt(self, task_description: str, tool_name: str,
                                                tool_schema: dict, context: str | None = None,
-                                               full_history: list[Any] | None = None, depth: int = 0) -> tuple[str, str]:
+                                               full_history: list[Any] | None = None, depth: int = 0,
+                                               failure_context: dict | None = None,  # 🚨 NEW: Failure context
+                                               platform_info: dict | None = None,  # 🚨 NEW: Platform info
+                                               requires_high_fidelity: bool = False) -> tuple[
+        str, str]:  # 🚨 NEW: High-fidelity flag
         """Generate parameters with full knowledge of tool schema and dual context.
+        🚨 ENHANCED: Now includes failure context and platform awareness to prevent context amnesia.
         """
         required_params = tool_schema.get("required", [])
         all_params = tool_schema.get("properties", {})
@@ -126,16 +185,70 @@ class HierarchicalAgentPrompt:
             You are generating parameters for a high-level task. You can use the context to infer logical parameters.
             '''
 
-        system_prompt = f"""
+        # 🚨 NEW: Failure Context Warning Section
+        failure_context_section = ""
+        if failure_context:
+            failure_context_section = f'''
+            🚨 **CRITICAL FAILURE CONTEXT - MUST NOT REPEAT FAILED APPROACHES** 🚨
+            This task has FAILED before. You MUST avoid repeating the same mistakes:
+            
+            PREVIOUS FAILURE DETAILS:
+            - Error Type: {failure_context.get("error_type", "Unknown")}
+            - Error Message: {failure_context.get("error_message", "No message")}
+            - Fail Count: {failure_context.get("fail_count", 0)} attempts
+            - Previously Failed Parameters: {failure_context.get("failed_parameters", "None")}
+            
+            FAILED RECOVERY STRATEGIES:
+            {chr(10).join([f"  • {s.get('strategy', 'Unknown')}: {s.get('reasoning', 'No reasoning')} - Outcome: {s.get('outcome', 'Unknown')}" for s in failure_context.get("strategy_history", [])])}
+            
+            🔥 **DO NOT REPEAT**: You MUST generate different parameters than those that failed before.
+            🔥 **LEARN FROM FAILURE**: Analyze why the previous approach failed and choose a different strategy.
+            '''
+
+        # 🚨 NEW: Platform Awareness Section
+        platform_section = ""
+        if platform_info:
+            platform_section = f'''
+            🖥️ **PLATFORM AWARENESS** 🖥️
+            Current Platform: {platform_info.get("platform", "Unknown")}
+            OS Name: {platform_info.get("os_name", "Unknown")}
+            POSIX Support: {platform_info.get("supports_posix", False)}
+            
+            🔧 **PLATFORM-SPECIFIC RULES:**
+            - Windows: Use 'dir' instead of 'ls', 'cd' instead of 'pwd', proper Windows paths
+            - Unix/Linux: Standard POSIX commands available
+            - Always use commands that work on the current platform!
+            '''
+
+        # 🚨 NEW: High-Fidelity Context Section
+        high_fidelity_section = ""
+        if requires_high_fidelity:
+            high_fidelity_section = '''
+            🔍 **HIGH-FIDELITY CONTEXT MODE ENABLED** 🔍
+            This task requires exact raw outputs from previous tasks.
+            - Prioritize `FULL RAW RESULTS` over summaries for parameter generation
+            - Use exact content without modification for parameters like 'content', 'text', 'data'
+            - Do not summarize or paraphrase raw results when they are needed as direct input
+            '''
+
+        system_prompt = f'''
             😎 DUAL CONTEXT & SCHEMA-AWARE PARAMETER GENERATOR
             {mode_prompt}
+            
+            {failure_context_section}
+            
+            {platform_section}
+            
+            {high_fidelity_section}
+            
             You have two sources of context: a concise summary of past actions and the full, raw results.
     
             --- YOUR TASK ---
             1.  **Understand History:** Use the `CONTEXT FROM PREVIOUS STEP SUMMARIES` to understand what has already been accomplished.
             2.  **Avoid Repetition:** Your primary goal is to NOT repeat work.
-            3.  **Source Data Correctly:** When a tool needs data from a previous step (e.g., `write_file` needs content), you MUST source that data from the `FULL RAW RESULTS OF PREVIOUS TASKS`.
-            4.  **Generate Parameters:** Create a valid JSON object for the tool `{tool_name}` based on its schema.
+            3.  **Avoid Failed Approaches:** If failure context is provided, you MUST NOT repeat the same parameters or approach that failed.
+            4.  **Source Data Correctly:** When a tool needs data from a previous step (e.g., `write_file` needs content), you MUST source that data from the `FULL RAW RESULTS OF PREVIOUS TASKS`.
+            5.  **Generate Parameters:** Create a valid JSON object for the tool `{tool_name}` based on its schema.
     
             --- TOOL SCHEMA for `{tool_name}` ---
             - Required Parameters: {required_params}
@@ -146,13 +259,18 @@ class HierarchicalAgentPrompt:
             If a preceding task used the `perform_synthesis` tool and its purpose was to "summarize", "collect", or "synthesize" information, you MUST use the `FULL RAW RESULT` of THAT specific `perform_synthesis` task as the value for the 'content' parameter.
             Do not try to re-summarize or use the results of other, earlier tasks. Use the output of the dedicated Collector task.
             
-            😡 CRITICAL RULE: For parameters like `content`, `text`, or `data`, you must reference the full, raw result of a previous task, NOT the summary. For parameters like `file_path` or `query`, you can infer them from the task description and the context summaries.
-            """
+            😡 CRITICAL RULES:
+            - For parameters like `content`, `text`, or `data`, you must reference the full, raw result of a previous task, NOT the summary.
+            - For parameters like `file_path` or `query`, you can infer them from the task description and the context summaries.
+            - If the current task is marked with `requires_high_fidelity_context: true`, prioritize raw results over summaries in your reasoning.
+            - If failure context is provided, you MUST avoid repeating the exact same parameters that caused the previous failure.
+            - Use platform-appropriate commands and paths based on the platform information provided.
+            '''
 
-        context_summary_section = f"""
+        context_summary_section = f'''
              --- CONTEXT FROM PREVIOUS STEP SUMMARIES ---
              {context}
-             """ if context else "--- CONTEXT: No previous results available. Generate parameters based on the task description alone. ---"
+             ''' if context else "--- CONTEXT: No previous results available. Generate parameters based on the task description alone. ---"
 
         raw_history_section = ""
         if full_history:
@@ -164,24 +282,24 @@ class HierarchicalAgentPrompt:
                         f"- Task {task.task_id} ({task.tool_name}) Raw Result: {task.execution_context.result}...")
             if raw_history_preview:
                 joint_preview = "\n".join(raw_history_preview)
-                raw_history_section = f"""
+                raw_history_section = f'''
              --- FULL RAW RESULTS OF PREVIOUS TASKS (for data sourcing) ---
              (You have access to the full, untruncated results of these tasks)
              {joint_preview}
-             """
+             '''
 
             # Specific instruction for Collector tasks using perform_synthesis
         collector_instruction = ""
         if tool_name == "perform_synthesis" and "Collector" in task_description:
-            collector_instruction = f"""
+            collector_instruction = f'''
              --- COLLECTOR TASK INSTRUCTION ---
              This is a "Collector" task. Your goal is to synthesize the raw results from previous tasks into a single, comprehensive output.
              You MUST review the `FULL RAW RESULTS OF PREVIOUS TASKS` section. For each relevant task (e.g., `google_search`, `read_text_file`), extract the *full, raw text content* of its `result` field.
              Do NOT paste raw content into parameters; instead, set the `instructions` to clearly state how to aggregate and summarize the data (for example, "Summarize each topic into 10 lines").
              If needed, include `per_item_lines` and `output_format` to constrain the output.
-             """
+             '''
 
-        human_prompt = f"""
+        human_prompt = f'''
              {context_summary_section}
              {raw_history_section}
              {collector_instruction}
@@ -193,13 +311,13 @@ class HierarchicalAgentPrompt:
              Generate the precise JSON parameters for this tool.
              
              😡 RESPOND WITH ONLY THE JSON PARAMETER OBJECT - NO OTHER TEXT.
-             """
+             '''
 
         return system_prompt, human_prompt
 
-
     def generate_context_synthesis_prompt(self, tool_name: str, raw_result: str, depth: int = 0) -> tuple[str, str]:
-        """Generates prompts for the context synthesizer node."""
+        """Generates prompts for the context synthesizer node.
+        """
         # --- NEW: Depth-Aware System Prompt ---
         if depth >= 1:
             # For sub-tasks, the summary is for the machine, so be technical.
@@ -222,7 +340,7 @@ class HierarchicalAgentPrompt:
             🚨 CRITICAL: Your response MUST be a single, concise sentence.
             '''
 
-        human_prompt = f"""
+        human_prompt = f'''
             TOOL EXECUTED: {tool_name}
     
             RAW RESULT:
@@ -233,9 +351,8 @@ class HierarchicalAgentPrompt:
     
             Based on the tool and its raw result, generate a one-sentence summary of what was accomplished.
             🚨 RESPOND WITH ONLY THE SUMMARY SENTENCE - NO OTHER TEXT.
-            """
+            '''
         return system_prompt, human_prompt
-
 
     def generate_final_response_prompt(self, task_results: list[str], original_goal: str) -> tuple[str, str]:
         system_prompt = '''
@@ -267,7 +384,7 @@ class HierarchicalAgentPrompt:
               can extract `user_response.message` for display and `user_response.next_steps` for guidance.
             '''
         results_text = "\n".join(task_results) if task_results else "No task results available."
-        human_prompt = f"""
+        human_prompt = f'''
             ORIGINAL USER GOAL: {original_goal}
     
             TASK EXECUTION RESULTS:
@@ -277,9 +394,8 @@ class HierarchicalAgentPrompt:
             Make `user_response.message` a clear, human-friendly summary and `user_response.next_steps` 1-2 actionable steps (or empty string).
     
             🚨 RESPOND WITH ONLY THE JSON OBJECT - NO OTHER TEXT.
-            """
+            '''
         return system_prompt, human_prompt
-
 
     def generate_tool_aware_initial_plan_prompt(self, goal: str, available_tools_context: str,
                                                 error_feedback: str | None = None) -> tuple[str, str]:
@@ -291,7 +407,7 @@ class HierarchicalAgentPrompt:
             ---
             ''' if error_feedback else ""
 
-        system_prompt = f"""
+        system_prompt = f'''
             🚨 CRITICAL: YOU MUST RETURN A JSON ARRAY OF TASKS USING ONLY REAL, AVAILABLE TOOLS.
     
             You are a strategic planner with complete knowledge of the available tool ecosystem.
@@ -304,8 +420,11 @@ class HierarchicalAgentPrompt:
     
             --- 📋 STRICT RULES FOR TOOL SELECTION ---
             1.  **Semantic Match is CRITICAL:** The tool you choose MUST be able to perform the action in the description. Do not assign a tool that cannot logically achieve the task's goal.
-            2.  **Synthesis/Analysis Task Rule:** For any task that involves summarizing, analyzing, reviewing, combining, or creating a report from previous results, you MUST use the `perform_synthesis` tool. This is the designated "Collector" and "Synthesizer" tool.
-            3.  **File System Task Rule:** Tools like `list_directory`, `read_text_file`, and `write_file` can ONLY be used for their specific file system purpose. They CANNOT be used to analyze or summarize content.
+            2.  **Synthesis/Analysis Task Rule (MANDATORY):** For any task that involves summarizing, analyzing, reviewing, combining, compiling, or creating a report from previous results, you MUST use the `perform_synthesis` tool. This is the designated "Collector" tool.
+            3.  **Collector Placement Rule (MANDATORY):** If a task will consume or combine the outputs of multiple prior tasks, you MUST insert a dedicated Collector task (using `perform_synthesis`) immediately BEFORE that consuming task. The Collector task's description MUST contain the word "Collector" and state clearly what to aggregate and the desired format.
+            4.  **Final Collector Rule (MANDATORY):** Your plan MUST end with a final "Collector" task using `perform_synthesis` that synthesizes ALL prior task outputs into concise, structured notes for the user or for downstream steps.
+            5.  **High-Fidelity Context Flag (OPTIONAL):** If a task REQUIRES raw outputs from prior tasks (precise code, diffs, exact text), include `requires_high_fidelity_context: true` for that task.
+            6.  **File System Task Rule:** Tools like `list_directory`, `read_text_file`, and `write_file` can ONLY be used for their specific file system purpose. They CANNOT be used to analyze or summarize content.
     
             --- ❌ EXAMPLES OF INCORRECT ASSIGNMENTS (DO NOT DO THIS) ---
             - {{'description': 'Summarize the findings', 'tool_name': 'list_directory'}}  <-- WRONG! list_directory cannot summarize.
@@ -314,141 +433,133 @@ class HierarchicalAgentPrompt:
             --- ✅ EXAMPLES OF CORRECT ASSIGNMENTS ---
             - {{'description': 'List the files in the root directory', 'tool_name': 'list_directory'}}
             - {{'description': 'Read the content of the README.md file', 'tool_name': 'read_text_file'}}
-            - {{'description': 'Review the search results and create a summary report', 'tool_name': 'perform_synthesis'}}
+            - {{'description': 'Collector: Review the search results and create a summary report', 'tool_name': 'perform_synthesis'}}
     
-            ✅ REQUIRED OUTPUT FORMAT:
-            [{{"task_id": 1, "description": "Specific description of what this tool will accomplish", "tool_name": "exact_tool_name_from_available_list"}}]
+            ✅ REQUIRED OUTPUT FORMAT (JSON ARRAY):
+            [{{"description": "Specific description of what this tool will accomplish", "tool_name": "exact_tool_name_from_available_list", "requires_high_fidelity_context": boolean_optional}}]
     
-            📋 NEW RULE: THE "COLLECTOR" PATTERN
+            📋 NEW RULE: THE "COLLECTOR" PATTERN (MANDATORY)
             If a future task requires the combined output of several previous tasks (e.g., writing a final report, summarizing multiple sources), you MUST insert a dedicated "Collector" task right before it.
-            - The "Collector" task MUST use the `perform_synthesis` tool.
-            - Its `description` MUST clearly state its job: to gather and synthesize the results from the previous steps.
-            - Example: {{'description': 'Review raw results from previous search tasks and synthesize into a single comprehensive summary.', 'tool_name': 'perform_synthesis'}}
-            """
-        human_prompt = f"""
+            - The Collector task MUST use the `perform_synthesis` tool.
+            - The Collector task's description MUST contain the word "Collector" and clearly state its job: to gather and synthesize the results from the previous steps with the desired output format.
+            - The consuming task MUST depend only on the Collector's output, not on multiple raw outputs directly.
+            '''
+        human_prompt = f'''
             USER GOAL: "{goal}" 
             
             Create a step-by-step plan using ONLY the available tools listed in the system prompt.
             🚨 RESPOND WITH ONLY THE JSON ARRAY - NO OTHER TEXT.
-            """
+            '''
         return system_prompt, human_prompt
 
-
     def generate_tool_schema_complexity_prompt(self, task_description: str, tool_name: str,
-                                               tool_schema: dict, depth: int) -> tuple[str, str]:
+                                               tool_schema: dict, depth: int, parent_context: str | None = None) -> tuple[str, str]:
         schema_desc = tool_schema.get('description', 'No description')
         schema_props = tool_schema.get('properties', {})
 
-        # --- NEW: Depth-Aware System Prompt ---
-        if depth >= 1:
-            # This is a sub-task. Be strict and avoid further recursion.
-            system_prompt = f'''
-            🎯 FOCUSED SUB-TASK ANALYZER (Strict Mode)
-    
-            You are analyzing a SUB-TASK that was already created to solve a more complex parent task.
-            Your primary goal is to PREVENT infinite recursion.
-    
-            --- CRITICAL RULE ---
-            Your bias MUST be heavily towards `requires_decomposition: false`.
-            Only return `true` if it is ABSOLUTELY IMPOSSIBLE to execute the task with a single call to the assigned tool.
-            Simple tasks like formulating a query or reviewing text should ALWAYS be considered atomic (`false`).
-    
-            TOOL INFORMATION:
-            - Tool Name: {tool_name}
-            - Tool Description: {schema_desc}
-            - Required Parameters: {list(schema_props.keys())}
-            
-            ✅ OUTPUT FORMAT:
-            {{ 
-                "requires_decomposition": boolean,
-                "reasoning": "Specific analysis",
-                "atomic_tool_name": "{tool_name}" or null,
-                "estimated_subtasks": number_if_complex
-            }}
-            '''
-        else:
-            # This is a parent task. Standard analysis is fine.
-            system_prompt = f'''
-            🎯 TOOL-SCHEMA-AWARE COMPLEXITY ANALYZER (Standard Mode) 
-            
-            You are analyzing whether a task can be completed with a single tool call or requires decomposition.
-            
-            TOOL INFORMATION:
-            - Tool Name: {tool_name}
-            - Tool Description: {schema_desc}
-            - Required Parameters: {list(schema_props.keys())}
-    
-            ✅ OUTPUT FORMAT:
-            {{
-                "requires_decomposition": boolean,
-                "reasoning": "Specific analysis",
-                "atomic_tool_name": "{tool_name}" or null,
-                "estimated_subtasks": number_if_complex
-            }}
-            '''
-        # --- END OF NEW LOGIC ---
+        # --- NEW: Logic to handle the Recovery Mandate ---
+        directive_section = ""
+        if parent_context and "--- RECOVERY MANDATE" in parent_context:
+            directive_section = f'''
+        🚨 **CRITICAL OVERRIDE: RECOVERY MANDATE DETECTED** 🚨
+        You are analyzing this task as part of a pre-approved recovery plan. A higher-level strategist has already determined that decomposition is necessary to resolve a prior failure.
 
-        human_prompt = f"""
-            ANALYZE THIS TASK: 
-            
-            Task: "{task_description}"
-            Assigned Tool: "{tool_name}"
-            
-            Can this tool directly accomplish this task in a single call, or does it need decomposition?
-            🚨 RESPOND WITH ONLY THE JSON OBJECT - NO OTHER TEXT.
-            """
+        **RECOVERY CONTEXT AND PLAN:**
+        {parent_context}
+
+        **YOUR DIRECTIVE:**
+        Your ONLY job is to confirm that decomposition is required to execute the recovery plan.
+        You MUST return `{{"requires_decomposition": true, "reasoning": "Following recovery mandate to decompose."}}`.
+        Do NOT second-guess the strategic decision to decompose. Your role is to enable the execution of the recovery plan.
+        '''
+        else:
+            # This is the original logic for non-recovery scenarios
+            if depth >= 1:
+                directive_section = '''
+            🎯 FOCUSED SUB-TASK ANALYZER (Strict Mode)
+            Your primary goal is to PREVENT infinite recursion. Your bias MUST be heavily towards `requires_decomposition: false`.
+            Only return `true` if it is ABSOLUTELY IMPOSSIBLE to execute the task with a single call to the assigned tool.
+            '''
+            else:
+                directive_section = '''
+            🎯 TOOL-SCHEMA-AWARE COMPLEXITY ANALYZER (Standard Mode)
+            You are analyzing whether a task can be completed with a single tool call or requires decomposition.
+            '''
+
+        system_prompt = f'''
+        {directive_section}
+
+        ---
+        TOOL INFORMATION:
+        - Tool Name: {tool_name}
+        - Tool Description: {schema_desc}
+        - Required Parameters: {list(schema_props.keys())}
+
+        ✅ OUTPUT FORMAT:
+        {{
+            "requires_decomposition": boolean,
+            "reasoning": "Specific analysis explaining your decision. If a recovery mandate was detected, state that you are following the mandate.",
+            "atomic_tool_name": "{tool_name}" or null,
+            "estimated_subtasks": number_if_complex
+        }}
+        '''
+
+        human_prompt = f'''
+        ANALYZE THIS TASK:
+
+        Task: "{task_description}"
+        Assigned Tool: "{tool_name}"
+
+        Based on your directive and the provided context, does this task require decomposition?
+        🚨 RESPOND WITH ONLY THE JSON OBJECT - NO OTHER TEXT.
+        '''
         return system_prompt, human_prompt
 
-
-    
-
-    
-
-
-    def generate_enhanced_parameter_repair_prompt(self, task: Any, state: Any) -> tuple[str, str]:
+    def generate_enhanced_parameter_repair_prompt(self, task: Any, state: Any, tool_schema) -> tuple[str, str]:
         """Generate enhanced prompt for parameter repair with full context."""
-        
+
         # Extract all relevant context from the task
         task_description = task.description
         tool_name = task.tool_name
-        tool_schema = {}  # This will be populated by the calling function
-        original_goal = state.original_goal
-        
+        original_goal = getattr(state, 'original_goal', '')
+
         # Get failure context
         error_message = ""
         error_type = ""
         fail_count = 0
         failed_parameters = {}
-        
+
         if hasattr(task, 'failure_context') and task.failure_context:
-            error_message = task.failure_context.error_message
-            error_type = task.failure_context.error_type or ""
-            fail_count = task.failure_context.fail_count
-            failed_parameters = task.failure_context.failed_parameters or {}
-        
+            error_message = getattr(task.failure_context, 'error_message', '')
+            error_type = getattr(task.failure_context, 'error_type', '') or ""
+            fail_count = getattr(task.failure_context, 'fail_count', 0)
+            failed_parameters = getattr(task.failure_context, 'failed_parameters', {}) or {}
+
         # Get validator feedback if available
         validator_feedback = ""
         if error_type == "GoalValidationFailure":
             validator_feedback = error_message
-        
+
         # Get completed task history for context
-        completed_tasks = [t for t in state.tasks if t.status == "completed" and hasattr(t, 'execution_context') and t.execution_context]
+        completed_tasks = [t for t in getattr(state, 'tasks', []) if
+                           getattr(t, 'status', '') == "completed" and hasattr(t,
+                                                                               'execution_context') and t.execution_context]
         recent_completed_tasks_info = "\n".join([
-            f"• Task {t.task_id}: {t.description} ({t.tool_name}) -> {t.execution_context.analysis or 'No analysis'}"
+            f"• Task {getattr(t, 'task_id', 'N/A')}: {getattr(t, 'description', 'N/A')} ({getattr(t, 'tool_name', 'N/A')}) -> {getattr(t.execution_context, 'analysis', 'No analysis') or 'No analysis'}"
             for t in completed_tasks[-3:]  # Last 3 completed tasks
         ]) or "No recent completed tasks"
-        
+
         # Get failed tasks with validator feedback
-        failed_tasks_with_feedback = [t for t in state.tasks 
-                                     if t.status == "failed" 
-                                     and hasattr(t, 'failure_context') and t.failure_context 
-                                     and t.failure_context.error_type == "GoalValidationFailure"]
-        
+        failed_tasks_with_feedback = [t for t in getattr(state, 'tasks', [])
+                                      if getattr(t, 'status', '') == "failed"
+                                      and hasattr(t, 'failure_context') and t.failure_context
+                                      and getattr(t.failure_context, 'error_type', '') == "GoalValidationFailure"]
+
         failed_tasks_info = "\n".join([
-            f"• Task {t.task_id}: {t.description} -> Validator Feedback: {t.failure_context.error_message}"
+            f"• Task {getattr(t, 'task_id', 'N/A')}: {getattr(t, 'description', 'N/A')} -> Validator Feedback: {getattr(t.failure_context, 'error_message', 'N/A')}"
             for t in failed_tasks_with_feedback[-2:]  # Last 2 failed tasks with feedback
         ]) or "No recent failed tasks with validator feedback"
-        
+
         system_prompt = '''
         You are an expert parameter repair AI. Your job is to analyze a failed task and generate corrected parameters that will make the tool execute successfully.
 
@@ -477,8 +588,8 @@ class HierarchicalAgentPrompt:
         4. Ensure all required parameters are provided and valid
         5. Make minimal changes - only fix what's broken
         '''
-        
-        human_prompt = f"""
+
+        human_prompt = f'''
         --- PARAMETER REPAIR ANALYSIS ---
 
         🎯 ORIGINAL USER GOAL:
@@ -508,56 +619,62 @@ class HierarchicalAgentPrompt:
         Based on all this context, generate corrected parameters that will make this tool execute successfully AND achieve the task's goal.
         
         🚨 RESPOND WITH ONLY THE JSON OBJECT - NO OTHER TEXT.
-        """
-        
+        '''
+
         return system_prompt, human_prompt
 
-    def generate_enhanced_alternative_tool_prompt(self, task: Any, state: Any) -> tuple[str, str]:
+    def generate_enhanced_alternative_tool_prompt(self, task: Any, state: Any, all_tools) -> tuple[str, str]:
         """Generate enhanced prompt for alternative tool selection with full context."""
-        
+
         # Extract all relevant context from the task
         task_description = task.description
         current_tool = task.tool_name
-        original_goal = state.original_goal
-        
+        original_goal = getattr(state, 'original_goal', '')
+
         # Get failure context
         error_message = ""
         error_type = ""
         fail_count = 0
         failed_parameters = {}
-        
+
         if hasattr(task, 'failure_context') and task.failure_context:
-            error_message = task.failure_context.error_message
-            error_type = task.failure_context.error_type or ""
-            fail_count = task.failure_context.fail_count
-            failed_parameters = task.failure_context.failed_parameters or {}
-        
+            error_message = getattr(task.failure_context, 'error_message', '')
+            error_type = getattr(task.failure_context, 'error_type', '') or ""
+            fail_count = getattr(task.failure_context, 'fail_count', 0)
+            failed_parameters = getattr(task.failure_context, 'failed_parameters', {}) or {}
+
         # Get validator feedback if available
         validator_feedback = ""
         if error_type == "GoalValidationFailure":
             validator_feedback = error_message
-        
-        # Get all available tools (this will be populated by the calling function)
-        available_tools_info = ""
-        
+
+        # Get all available tools
+        # all_tools = AgentCoreHelpers.get_safe_tools_list() if hasattr(AgentCoreHelpers, 'get_safe_tools_list') else []
+        available_tools_info = "\n".join([
+            f"• {getattr(tool, 'name', 'N/A')}: {getattr(tool, 'description', 'N/A')}"
+            for tool in all_tools
+        ])
+
         # Get completed task history for context
-        completed_tasks = [t for t in state.tasks if t.status == "completed" and hasattr(t, 'execution_context') and t.execution_context]
+        completed_tasks = [t for t in getattr(state, 'tasks', []) if
+                           getattr(t, 'status', '') == "completed" and hasattr(t,
+                                                                               'execution_context') and t.execution_context]
         recent_completed_tasks_info = "\n".join([
-            f"• Task {t.task_id}: {t.description} ({t.tool_name}) -> {t.execution_context.analysis or 'No analysis'}"
+            f"• Task {getattr(t, 'task_id', 'N/A')}: {getattr(t, 'description', 'N/A')} ({getattr(t, 'tool_name', 'N/A')}) -> {getattr(t.execution_context, 'analysis', 'No analysis') or 'No analysis'}"
             for t in completed_tasks[-3:]  # Last 3 completed tasks
         ]) or "No recent completed tasks"
-        
+
         # Get failed tasks with validator feedback
-        failed_tasks_with_feedback = [t for t in state.tasks 
-                                     if t.status == "failed" 
-                                     and hasattr(t, 'failure_context') and t.failure_context 
-                                     and t.failure_context.error_type == "GoalValidationFailure"]
-        
+        failed_tasks_with_feedback = [t for t in getattr(state, 'tasks', [])
+                                      if getattr(t, 'status', '') == "failed"
+                                      and hasattr(t, 'failure_context') and t.failure_context
+                                      and getattr(t.failure_context, 'error_type', '') == "GoalValidationFailure"]
+
         failed_tasks_info = "\n".join([
-            f"• Task {t.task_id}: {t.description} -> Validator Feedback: {t.failure_context.error_message}"
+            f"• Task {getattr(t, 'task_id', 'N/A')}: {getattr(t, 'description', 'N/A')} -> Validator Feedback: {getattr(t.failure_context, 'error_message', 'N/A')}"
             for t in failed_tasks_with_feedback[-2:]  # Last 2 failed tasks with feedback
         ]) or "No recent failed tasks with validator feedback"
-        
+
         system_prompt = '''
         You are an expert tool selection AI. Your job is to analyze a failed task and suggest a better alternative tool that can accomplish the same goal.
 
@@ -588,8 +705,8 @@ class HierarchicalAgentPrompt:
         4. Choose the simplest tool that can accomplish the task
         5. Ensure the suggested tool actually exists in the available tools list
         '''
-        
-        human_prompt = f"""
+
+        human_prompt = f'''
         --- ALTERNATIVE TOOL ANALYSIS ---
 
         🎯 ORIGINAL USER GOAL:
@@ -618,11 +735,18 @@ class HierarchicalAgentPrompt:
         --- TOOL SELECTION INSTRUCTIONS ---
         Based on all this context, suggest a better alternative tool that can accomplish this task successfully.
         
-        🚨 RESPOND WITH ONLY THE JSON OBJECT - NO OTHER TEXT.
-        """
-        
-        return system_prompt, human_prompt
+        Consider:
+        1. The specific error type and message
+        2. How many times this task has failed
+        3. Whether parameter repair has already been attempted
+        4. What alternative tools might work better
+        5. Whether this task might benefit from decomposition
+        6. Any patterns in recent failures
 
+        🚨 RESPOND WITH ONLY THE JSON OBJECT - NO OTHER TEXT.
+        '''
+
+        return system_prompt, human_prompt
 
     def generate_parameter_repair_prompt(self, task_description: str, tool_name: str, tool_schema: dict,
                                          failed_parameters: dict, error_message: str) -> tuple[str, str]:
@@ -639,7 +763,7 @@ class HierarchicalAgentPrompt:
                 "repaired_parameters": {{ "param1": "new_value", ... }}
             }}
             '''
-        human_prompt = f"""
+        human_prompt = f'''
             --- FAILURE ANALYSIS ---
             Task: "{task_description}"
             Tool: "{tool_name}"
@@ -648,9 +772,8 @@ class HierarchicalAgentPrompt:
             ---
             Based on the schema and the error, correct the parameters.
             🚨 RESPOND WITH ONLY THE JSON OBJECT - NO OTHER TEXT.
-            """
+            '''
         return system_prompt, human_prompt
-
 
     def generate_alternative_tool_prompt(self, task_description: str, failed_tool: str, error_message: str,
                                          available_tools_str: str) -> tuple[str, str]:
@@ -667,7 +790,7 @@ class HierarchicalAgentPrompt:
                 "reasoning": "A brief explanation for your choice."
             }}
             '''
-        human_prompt = f"""
+        human_prompt = f'''
             --- FAILURE ANALYSIS ---
             Task: "{task_description}"
             Failed Tool: "{failed_tool}"
@@ -675,9 +798,8 @@ class HierarchicalAgentPrompt:
             ---
             Suggest a single, simpler, or safer alternative tool from the available list that could achieve the task's original intent.
             🚨 RESPOND WITH ONLY THE JSON OBJECT - NO OTHER TEXT.
-            """
+            '''
         return system_prompt, human_prompt
-
 
     def generate_goal_achievement_prompt(self, original_goal: str, plan_created: str, task_description: str,
                                          tool_result: str, analysis: str) -> tuple[str, str]:
@@ -715,7 +837,7 @@ class HierarchicalAgentPrompt:
                     If the tool did what it was asked to do without errors, mark it as successful.
                     '''
 
-        human_prompt = f"""
+        human_prompt = f'''
                     --- TOOL EXECUTION VALIDATION (IGNORE BROADER CONTEXT) ---
 
                     CONTEXT FOR REFERENCE ONLY (DO NOT USE FOR VALIDATION):
@@ -739,7 +861,7 @@ class HierarchicalAgentPrompt:
                     IGNORE whether it fits the bigger picture - just validate the tool execution itself.
 
                     🚨 RESPOND WITH ONLY THE JSON OBJECT - NO OTHER TEXT.
-                    """
+                    '''
 
         return system_prompt, human_prompt
 
@@ -752,7 +874,7 @@ class HierarchicalAgentPrompt:
         The output should be a single, coherent block of text.
         '''
 
-        human_prompt = f"""
+        human_prompt = f'''
         --- INSTRUCTIONS ---
         {instructions}
 
@@ -761,23 +883,22 @@ class HierarchicalAgentPrompt:
         ---
 
         Based on the instructions, process the context and provide the synthesized result.
-        """
+        '''
         return system_prompt, human_prompt
 
-
     def generate_recovery_strategy_prompt(self, task_description: str, tool_name: str,
-                                         error_message: str, error_type: str, fail_count: int,
-                                         failed_parameters: dict, tool_schema: dict,
-                                         original_goal: str, completed_tasks_context: str,
-                                         failed_tasks_context: str, available_tools: str,
-                                         strategy_hist : str) -> tuple[str, str]:
+                                          error_message: str, error_type: str, fail_count: int,
+                                          failed_parameters: dict, tool_schema: dict,
+                                          original_goal: str, completed_tasks_context: str,
+                                          failed_tasks_context: str, available_tools: str,
+                                          strategy_hist: str) -> tuple[str, str]:
         """Generate prompt for LLM-driven recovery strategy decision."""
         system_prompt = f'''
         You are an expert error recovery strategist. Your job is to analyze a failed task and determine the best recovery strategy based on comprehensive context.
 
         ✅ REQUIRED OUTPUT FORMAT (EXACT JSON OBJECT):
         {{
-            "recovery_strategy": "PARAMETER_REPAIR" | "ALTERNATIVE_TOOL" | "TASK_DECOMPOSITION" | "LLM_RECOVERY",
+            "recovery_strategy": "PARAMETER_REPAIR" | "ALTERNATIVE_TOOL" | "TASK_DECOMPOSITION",
             "reasoning": "Brief explanation of why this strategy was chosen",
             "confidence_level": "HIGH" | "MEDIUM" | "LOW",
             "estimated_success_probability": number_between_0_and_100,
@@ -792,7 +913,28 @@ class HierarchicalAgentPrompt:
         1. PARAMETER_REPAIR: Fix the parameters of the current tool to make it work correctly
         2. ALTERNATIVE_TOOL: Switch to a different tool that can accomplish the same goal
         3. TASK_DECOMPOSITION: Break the task into smaller sub-tasks for better handling
-        4. LLM_RECOVERY: Use advanced LLM reasoning to find a novel solution
+        
+        --- STRATEGY DEFINITIONS & CAPABILITIES ---
+             
+        Choose one recovery strategy:
+    
+         1. `PARAMETER_REPAIR`
+            - Fix simple errors in the current tool's parameters.
+            - Use when mistakes can be corrected with available information (typos, wrong formats, missing required fields).
+            - Do not use if another tool (e.g., `list_directory`) is needed to find missing details.
+    
+         2. `ALTERNATIVE_TOOL`
+            - Switch to a different tool when the current one is unsuitable.
+            - Use when the task requires capabilities the chosen tool lacks.
+            - Do not use if the tool is correct but its parameters are wrong.
+    
+    
+         3. `TASK_DECOMPOSITION`
+            - Break recovery into multiple steps when a single fix isn't enough.
+            - Use when you need to gather information (e.g., find a file or search syntax) before retrying.
+            - Always choose this for multi-step recovery processes.
+
+
 
         🎯 DECISION FACTORS:
         - CRITICAL RULE: Do NOT repeat a strategy that has already failed. Analyze the history above and choose a different strategy.
@@ -814,7 +956,6 @@ class HierarchicalAgentPrompt:
         1. PARAMETER_REPAIR: When the tool is correct but parameters are wrong, especially for file paths, queries, etc.
         2. ALTERNATIVE_TOOL: When the current tool is fundamentally unsuitable or keeps failing despite parameter repair
         3. TASK_DECOMPOSITION: When the task is inherently complex or has failed multiple times (>1) with different approaches
-        4. LLM_RECOVERY: When conventional approaches have failed or when creative problem-solving is needed
 
         📋 ADDITIONAL CONTEXT ANALYSIS:
         - Original Goal: The overarching objective the user wants to achieve
@@ -825,7 +966,7 @@ class HierarchicalAgentPrompt:
         - Failure Patterns: What mistakes have been made recently that should be avoided
         '''
 
-        human_prompt = f"""
+        human_prompt = f'''
         --- RECOVERY STRATEGY ANALYSIS ---
 
         🎯 ORIGINAL USER GOAL:
@@ -865,227 +1006,62 @@ class HierarchicalAgentPrompt:
         6. Any patterns in recent failures
 
         🚨 RESPOND WITH ONLY THE JSON OBJECT - NO OTHER TEXT.
-        """
+        '''
 
         return system_prompt, human_prompt
 
-    def generate_enhanced_parameter_repair_prompt(self, task: Any, state: Any, tool_schema) -> tuple[str, str]:
-        """Generate enhanced prompt for parameter repair with full context."""
-        
-        # Extract all relevant context from the task
-        task_description = task.description
-        tool_name = task.tool_name
-        original_goal = getattr(state, 'original_goal', '')
-
-        # Get failure context
-        error_message = ""
-        error_type = ""
-        fail_count = 0
-        failed_parameters = {}
-        
-        if hasattr(task, 'failure_context') and task.failure_context:
-            error_message = getattr(task.failure_context, 'error_message', '')
-            error_type = getattr(task.failure_context, 'error_type', '') or ""
-            fail_count = getattr(task.failure_context, 'fail_count', 0)
-            failed_parameters = getattr(task.failure_context, 'failed_parameters', {}) or {}
-
-        # Get validator feedback if available
-        validator_feedback = ""
-        if error_type == "GoalValidationFailure":
-            validator_feedback = error_message
-        
-        # Get completed task history for context
-        completed_tasks = [t for t in getattr(state, 'tasks', []) if getattr(t, 'status', '') == "completed" and hasattr(t, 'execution_context') and t.execution_context]
-        recent_completed_tasks_info = "\n".join([
-            f"• Task {getattr(t, 'task_id', 'N/A')}: {getattr(t, 'description', 'N/A')} ({getattr(t, 'tool_name', 'N/A')}) -> {getattr(t.execution_context, 'analysis', 'No analysis') or 'No analysis'}"
-            for t in completed_tasks[-3:]  # Last 3 completed tasks
-        ]) or "No recent completed tasks"
-        
-        # Get failed tasks with validator feedback
-        failed_tasks_with_feedback = [t for t in getattr(state, 'tasks', [])
-                                     if getattr(t, 'status', '') == "failed"
-                                     and hasattr(t, 'failure_context') and t.failure_context
-                                     and getattr(t.failure_context, 'error_type', '') == "GoalValidationFailure"]
-
-        failed_tasks_info = "\n".join([
-            f"• Task {getattr(t, 'task_id', 'N/A')}: {getattr(t, 'description', 'N/A')} -> Validator Feedback: {getattr(t.failure_context, 'error_message', 'N/A')}"
-            for t in failed_tasks_with_feedback[-2:]  # Last 2 failed tasks with feedback
-        ]) or "No recent failed tasks with validator feedback"
-        
-        system_prompt = '''
-        You are an expert parameter repair AI. Your job is to analyze a failed task and generate corrected parameters that will make the tool execute successfully.
-
-        ✅ REQUIRED OUTPUT FORMAT (EXACT JSON OBJECT):
-        {
-            "repaired_parameters": {
-                "param1": "corrected_value1",
-                "param2": "corrected_value2"
-            },
-            "reasoning": "Brief explanation of what was wrong and how it was fixed"
-        }
-
-        📋 CONTEXT ANALYSIS:
-        - Original Goal: The overarching objective the user wants to achieve
-        - Task Description: What this specific task is trying to accomplish
-        - Tool Schema: The exact parameters this tool accepts and requires
-        - Error Details: What went wrong in previous attempts
-        - Validator Feedback: If the tool ran but didn't achieve the goal, what was wrong with the output
-        - Recent Context: What has already been accomplished in previous tasks
-        - Failure Patterns: What mistakes have been made recently that should be avoided
-
-        🎯 REPAIR STRATEGY:
-        1. If it's a ToolExecutionError: Fix parameters to make the tool work correctly
-        2. If it's a GoalValidationFailure: Adjust parameters to better meet the task's actual requirements
-        3. Consider all context to avoid repeating the same mistakes
-        4. Ensure all required parameters are provided and valid
-        5. Make minimal changes - only fix what's broken
-        '''
-        
-        human_prompt = f"""
-        --- PARAMETER REPAIR ANALYSIS ---
-
-        🎯 ORIGINAL USER GOAL:
-        "{original_goal}"
-
-        📋 FAILED TASK DETAILS:
-        Task Description: "{task_description}"
-        Tool Name: "{tool_name}"
-        Error Type: "{error_type}"
-        Fail Count: {fail_count}
-        Error Message: "{error_message}"
-        Validator Feedback: "{validator_feedback}"
-
-        🔧 TOOL SCHEMA:
-        {tool_schema}
-
-        ❌ FAILED PARAMETERS:
-        {failed_parameters}
-
-        📚 RECENT COMPLETED TASKS CONTEXT:
-        {recent_completed_tasks_info}
-
-        ⚠️ RECENT FAILURE PATTERNS TO AVOID:
-        {failed_tasks_info}
-
-        --- REPAIR INSTRUCTIONS ---
-        Based on all this context, generate corrected parameters that will make this tool execute successfully AND achieve the task's goal.
-        
-        🚨 RESPOND WITH ONLY THE JSON OBJECT - NO OTHER TEXT.
+    def generate_plan_to_tasks_prompt(self, recovery_plan: list[str], available_tools_str: str) -> tuple[str, str]:
         """
-        
-        return system_prompt, human_prompt
+        Generates a prompt to convert a natural language plan into a structured list of tasks.
+        """
+        system_prompt = f'''
+        You are a highly efficient text-parsing AI. Your only job is to convert a natural language, multi-step plan into a structured JSON array of tasks.
 
-    def generate_enhanced_alternative_tool_prompt(self, task: Any, state: Any, all_tools) -> tuple[str, str]:
-        """Generate enhanced prompt for alternative tool selection with full context."""
+        --- INSTRUCTIONS ---
+        1.  You will be given a numbered list of steps in the "RECOVERY PLAN".
+        2.  For each numbered step, you must create a corresponding JSON object.
+        3.  Each JSON object must have exactly two keys: "description" and "tool_name".
+        4.  The "description" value must be the exact text of the step from the plan.
+        5.  The "tool_name" value must be the single most appropriate tool from the "AVAILABLE TOOLS" list to accomplish that step.
 
-        # Extract all relevant context from the task
-        task_description = task.description
-        current_tool = task.tool_name
-        original_goal = getattr(state, 'original_goal', '')
+        --- AVAILABLE TOOLS ---
+        {available_tools_str}
 
-        # Get failure context
-        error_message = ""
-        error_type = ""
-        fail_count = 0
-        failed_parameters = {}
+        --- 🚨 STRICT RULES 🚨 ---
+        - Return ONLY the JSON array. Do not add any commentary, explanations, or surrounding text.
+        - Do not add, skip, or modify any steps from the original plan.
+        - The `tool_name` MUST be an exact match from the provided tool list. Do not invent tools.
+        - Ensure the `description` accurately and exactly reflects the step from the plan.
 
-        if hasattr(task, 'failure_context') and task.failure_context:
-            error_message = getattr(task.failure_context, 'error_message', '')
-            error_type = getattr(task.failure_context, 'error_type', '') or ""
-            fail_count = getattr(task.failure_context, 'fail_count', 0)
-            failed_parameters = getattr(task.failure_context, 'failed_parameters', {}) or {}
+        --- EXAMPLE ---
+        RECOVERY PLAN:
+        "1. See what directories are accessible. 2. Look for any directory containing 'python' in its name. 3. List the contents of the found directory."
 
-        # Get validator feedback if available
-        validator_feedback = ""
-        if error_type == "GoalValidationFailure":
-            validator_feedback = error_message
-
-        # Get all available tools
-        # all_tools = AgentCoreHelpers.get_safe_tools_list() if hasattr(AgentCoreHelpers, 'get_safe_tools_list') else []
-        available_tools_info = "\n".join([
-            f"• {getattr(tool, 'name', 'N/A')}: {getattr(tool, 'description', 'N/A')}"
-            for tool in all_tools
-        ])
-
-        # Get completed task history for context
-        completed_tasks = [t for t in getattr(state, 'tasks', []) if getattr(t, 'status', '') == "completed" and hasattr(t, 'execution_context') and t.execution_context]
-        recent_completed_tasks_info = "\n".join([
-            f"• Task {getattr(t, 'task_id', 'N/A')}: {getattr(t, 'description', 'N/A')} ({getattr(t, 'tool_name', 'N/A')}) -> {getattr(t.execution_context, 'analysis', 'No analysis') or 'No analysis'}"
-            for t in completed_tasks[-3:]  # Last 3 completed tasks
-        ]) or "No recent completed tasks"
-
-        # Get failed tasks with validator feedback
-        failed_tasks_with_feedback = [t for t in getattr(state, 'tasks', [])
-                                     if getattr(t, 'status', '') == "failed"
-                                     and hasattr(t, 'failure_context') and t.failure_context
-                                     and getattr(t.failure_context, 'error_type', '') == "GoalValidationFailure"]
-
-        failed_tasks_info = "\n".join([
-            f"• Task {getattr(t, 'task_id', 'N/A')}: {getattr(t, 'description', 'N/A')} -> Validator Feedback: {getattr(t.failure_context, 'error_message', 'N/A')}"
-            for t in failed_tasks_with_feedback[-2:]  # Last 2 failed tasks with feedback
-        ]) or "No recent failed tasks with validator feedback"
-
-        system_prompt = '''
-        You are an expert tool selection AI. Your job is to analyze a failed task and suggest a better alternative tool that can accomplish the same goal.
-
-        ✅ REQUIRED OUTPUT FORMAT (EXACT JSON OBJECT):
-        {
-            "alternative_tool": "exact_tool_name_from_available_list",
-            "reasoning": "Brief explanation of why this tool is better for this task",
-            "expected_parameters": {
-                "param1": "example_value1",
-                "param2": "example_value2"
-            }
-        }
-
-        📋 CONTEXT ANALYSIS:
-        - Original Goal: The overarching objective the user wants to achieve
-        - Task Description: What this specific task is trying to accomplish
-        - Current Tool Issues: Why the current tool is failing
-        - Available Tools: All possible tools that could be used
-        - Error Details: What went wrong with the current approach
-        - Validator Feedback: If the tool ran but didn't achieve the goal, what was wrong with the output
-        - Recent Context: What has already been accomplished in previous tasks
-        - Failure Patterns: What mistakes have been made recently that should be avoided
-
-        🎯 SELECTION STRATEGY:
-        1. If it's a ToolExecutionError: Find a tool that won't have the same execution issues
-        2. If it's a GoalValidationFailure: Find a tool that's better suited to achieve the actual goal
-        3. Consider all context to avoid repeating the same mistakes
-        4. Choose the simplest tool that can accomplish the task
-        5. Ensure the suggested tool actually exists in the available tools list
+        YOUR JSON OUTPUT:
+        [
+            {{
+                "description": "See what directories are accessible.",
+                "tool_name": "list_allowed_directories"
+            }},
+            {{
+                "description": "Look for any directory containing 'python' in its name.",
+                "tool_name": "search_files"
+            }},
+            {{
+                "description": "List the contents of the found directory.",
+                "tool_name": "list_directory"
+            }}
+        ]
         '''
 
-        human_prompt = f"""
-        --- ALTERNATIVE TOOL ANALYSIS ---
+        human_prompt = f'''
+        RECOVERY PLAN:
+        "{recovery_plan}"
 
-        🎯 ORIGINAL USER GOAL:
-        "{original_goal}"
+        AVAILABLE TOOLS:
+        {"".join([s for s in available_tools_str])}
 
-        📋 FAILED TASK DETAILS:
-        Task Description: "{task_description}"
-        Current Tool: "{current_tool}"
-        Error Type: "{error_type}"
-        Fail Count: {fail_count}
-        Error Message: "{error_message}"
-        Validator Feedback: "{validator_feedback}"
-
-        ❌ FAILED PARAMETERS WITH CURRENT TOOL:
-        {failed_parameters}
-
-        🛠️ AVAILABLE TOOLS:
-        {available_tools_info}
-
-        📚 RECENT COMPLETED TASKS CONTEXT:
-        {recent_completed_tasks_info}
-
-        ⚠️ RECENT FAILURE PATTERNS TO AVOID:
-        {failed_tasks_info}
-
-        --- TOOL SELECTION INSTRUCTIONS ---
-        Based on all this context, suggest a better alternative tool that can accomplish this task successfully.
-
-        🚨 RESPOND WITH ONLY THE JSON OBJECT - NO OTHER TEXT.
-        """
-
+        Based on the instructions in the system prompt, convert the RECOVERY PLAN into the required JSON array of tasks.
+        🚨 RESPOND WITH ONLY THE JSON ARRAY - NO OTHER TEXT.
+        '''
         return system_prompt, human_prompt

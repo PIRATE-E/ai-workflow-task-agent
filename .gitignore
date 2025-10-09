@@ -170,6 +170,7 @@ AI_llm.sln
 reports
 .crush
 QWEN.md
+.gemini
 GEMINI.md
 # Node.js/MCP config (if not needed in root)
 package.json

@@ -226,7 +226,8 @@ if __name__ == "__main__":
                             write_to_file(received_error)
                         else:
                             print_error.print_rich(received_error)
-                        winsound.Beep(7933, 500)  # Beep sound for error notification
+                        if settings.ENABLE_SOUND_NOTIFICATIONS:
+                            winsound.Beep(7933, 500)  # Beep sound for error notification
                     # Don't exit the loop - continue listening for new connections
                     print_error.print_rich(
                         "Client disconnected, waiting for new connections..."
