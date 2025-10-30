@@ -241,14 +241,52 @@ class HierarchicalAgentPrompt:
             
             {high_fidelity_section}
             
+            🚨 **CRITICAL PARAMETER VALUE CONSTRAINT - NO HALLUCINATION ALLOWED** 🚨
+            
+            ⚠️ ABSOLUTE REQUIREMENT: You may ONLY use parameter values from these sources:
+            1. **Previous Task Results**: Paths, filenames, IDs, URLs, values explicitly mentioned in context
+            2. **Task Description Literals**: Exact values the user specified in the task description
+            3. **Safe Defaults**: ONLY if no context exists (e.g., "." for current directory)
+            
+            ❌ FORBIDDEN ACTIONS:
+            - NEVER invent file paths that weren't in previous results
+            - NEVER guess directory names or locations
+            - NEVER create filenames that weren't mentioned
+            - NEVER assume file extensions or formats not specified
+            - NEVER hallucinate IDs, keys, or identifiers
+            
+            ✅ VALUE EXTRACTION PROTOCOL:
+            - Check context summaries for [EXTRACTED: ...] sections containing concrete values
+            - Use exact paths/filenames from previous tool results
+            - If a value is needed but not in context, use minimal safe default or mark as unknown
+            - Document in your reasoning which context source each parameter came from
+            
+            📝 PARAMETER SOURCE ATTRIBUTION (MANDATORY):
+            In your reasoning, you MUST attribute each parameter value to its source:
+            - "path from Task 3 result: ./src"
+            - "filename from task description: config.py"
+            - "using safe default: current directory (.)"
+            
+            🔍 CONTEXT EXTRACTION EXAMPLES:
+            - Context: "[EXTRACTED: path=./src, files=main.py|utils.py]"
+              → Use path="./src" or filename="main.py" or "utils.py"
+            - Context: "Listed directory ./temp/python_master"
+              → Use path="./temp/python_master" (extract from context)
+            - Task Description: "Read the README.md file"
+              → Use filename="README.md" (from task literal)
+            - No context for path:
+              → Use path="." (safe default) + note "no path in context"
+            
             You have two sources of context: a concise summary of past actions and the full, raw results.
     
             --- YOUR TASK ---
             1.  **Understand History:** Use the `CONTEXT FROM PREVIOUS STEP SUMMARIES` to understand what has already been accomplished.
-            2.  **Avoid Repetition:** Your primary goal is to NOT repeat work.
-            3.  **Avoid Failed Approaches:** If failure context is provided, you MUST NOT repeat the same parameters or approach that failed.
-            4.  **Source Data Correctly:** When a tool needs data from a previous step (e.g., `write_file` needs content), you MUST source that data from the `FULL RAW RESULTS OF PREVIOUS TASKS`.
-            5.  **Generate Parameters:** Create a valid JSON object for the tool `{tool_name}` based on its schema.
+            2.  **Extract Values:** Look for [EXTRACTED: ...] sections and concrete values in context.
+            3.  **Avoid Repetition:** Your primary goal is to NOT repeat work.
+            4.  **Avoid Failed Approaches:** If failure context is provided, you MUST NOT repeat the same parameters or approach that failed.
+            5.  **Source Data Correctly:** When a tool needs data from a previous step (e.g., `write_file` needs content), you MUST source that data from the `FULL RAW RESULTS OF PREVIOUS TASKS`.
+            6.  **Constrain Values:** ONLY use values that appear in context, task description, or safe defaults.
+            7.  **Generate Parameters:** Create a valid JSON object for the tool `{tool_name}` based on its schema.
     
             --- TOOL SCHEMA for `{tool_name}` ---
             - Required Parameters: {required_params}
