@@ -473,8 +473,51 @@ class HierarchicalAgentPrompt:
             - {{'description': 'Read the content of the README.md file', 'tool_name': 'read_text_file'}}
             - {{'description': 'Collector: Review the search results and create a summary report', 'tool_name': 'perform_synthesis'}}
     
+            --- 🚨 PRE-FLIGHT SKIP DETECTION (MANDATORY) ---
+            For EACH task, assess skip probability (0-100) based on environmental constraints:
+            
+            🔍 SKIP PROBABILITY GUIDELINES:
+            
+            ⚠️ HIGH SKIP PROBABILITY (70-100) - Only for VERIFIABLY impossible tasks:
+            ✗ Task requires credentials/API keys that aren't available (SMTP, OAuth, database passwords)
+            ✗ Task requires network connectivity for remote operations (API calls, web scraping) but offline
+            ✗ Parent task was skipped → dependent tasks should cascade skip
+            ✗ Required files/resources VERIFIABLY don't exist and cannot be created
+            ✗ Tool explicitly unavailable in the available tools list above
+            
+            ⚡ MEDIUM SKIP PROBABILITY (30-69):
+            • Task depends on external service that may be unreachable (third-party APIs)
+            • Task requires user interaction that may not be available (manual approval, input)
+            • Task has preconditions that may not be met (specific file format, data structure)
+            
+            ✅ LOW SKIP PROBABILITY (0-29):
+            • Task is self-contained with all dependencies available
+            • Task uses available tools with all required information provided in goal
+            • Task has no external dependencies or environmental constraints
+            
+            🚨 CRITICAL RULES FOR SKIP ASSESSMENT:
+            1. **DO NOT** skip based on task complexity alone - complex tasks get decomposed, NOT skipped
+            2. **DO NOT** skip based on "looks difficult" or "seems hard" - only environmental/resource constraints
+            3. **ONLY** use high skip probability (70+) for VERIFIABLE impossibility (missing credentials, offline, parent skipped)
+            4. If skip_probability ≥ 70, you MUST provide a clear, specific skip_reason explaining the constraint
+            5. Default to LOW skip probability (0-29) unless clear environmental constraint exists
+    
             ✅ REQUIRED OUTPUT FORMAT (JSON ARRAY):
-            [{{"description": "Specific description of what this tool will accomplish", "tool_name": "exact_tool_name_from_available_list", "requires_high_fidelity_context": boolean_optional}}]
+            [{{
+                "description": "Specific description of what this tool will accomplish", 
+                "tool_name": "exact_tool_name_from_available_list", 
+                "requires_high_fidelity_context": boolean_optional,
+                "skip_probability": integer 0-100 (MANDATORY - assess environmental constraints per guidelines),
+                "skip_reason": "Clear explanation of constraint (REQUIRED if skip_probability >= 70, otherwise optional)"
+            }}]
+            
+            🚨 EXAMPLE WITH SKIP DETECTION:
+            [
+                {{"description": "Search GitHub for recent issues", "tool_name": "google_search", "skip_probability": 15, "requires_high_fidelity_context": false}},
+                {{"description": "Send email notification to team@company.com", "tool_name": "send_email", "skip_probability": 85, "skip_reason": "No SMTP credentials configured in environment"}},
+                {{"description": "Read configuration from config.json", "tool_name": "read_text_file", "skip_probability": 20, "requires_high_fidelity_context": false}},
+                {{"description": "Collector: Synthesize findings into report", "tool_name": "perform_synthesis", "skip_probability": 10, "requires_high_fidelity_context": false}}
+            ]
     
             📋 NEW RULE: THE "COLLECTOR" PATTERN (MANDATORY)
             If a future task requires the combined output of several previous tasks (e.g., writing a final report, summarizing multiple sources), you MUST insert a dedicated "Collector" task right before it.
@@ -936,7 +979,7 @@ class HierarchicalAgentPrompt:
 
         ✅ REQUIRED OUTPUT FORMAT (EXACT JSON OBJECT):
         {{
-            "recovery_strategy": "PARAMETER_REPAIR" | "ALTERNATIVE_TOOL" | "TASK_DECOMPOSITION",
+            "recovery_strategy": "PARAMETER_REPAIR" | "ALTERNATIVE_TOOL" | "TASK_DECOMPOSITION" | "SKIP",
             "reasoning": "Brief explanation of why this strategy was chosen",
             "confidence_level": "HIGH" | "MEDIUM" | "LOW",
             "estimated_success_probability": number_between_0_and_100,
@@ -951,6 +994,7 @@ class HierarchicalAgentPrompt:
         1. PARAMETER_REPAIR: Fix the parameters of the current tool to make it work correctly
         2. ALTERNATIVE_TOOL: Switch to a different tool that can accomplish the same goal
         3. TASK_DECOMPOSITION: Break the task into smaller sub-tasks for better handling
+        4. SKIP: Skip this task gracefully when it cannot be completed due to environmental constraints
         
         --- STRATEGY DEFINITIONS & CAPABILITIES ---
              
@@ -971,6 +1015,140 @@ class HierarchicalAgentPrompt:
             - Break recovery into multiple steps when a single fix isn't enough.
             - Use when you need to gather information (e.g., find a file or search syntax) before retrying.
             - Always choose this for multi-step recovery processes.
+            
+         4. `SKIP` ⚠️ **USE WITH CAUTION - ONLY FOR UNRECOVERABLE ENVIRONMENTAL CONSTRAINTS**
+            - Skip this task gracefully when it CANNOT be completed due to environmental/resource constraints.
+            - This is a LAST RESORT strategy - only use when recovery is genuinely impossible.
+            
+            🚨 **MANDATORY CONDITIONS - ALL MUST BE TRUE:**
+            
+            ✅ **Condition 1: Unrecoverable Environmental Constraint**
+               - Authentication required but NO credentials available (checked environment, no API keys, no SMTP config)
+               - Permission denied and CANNOT be escalated (verified insufficient privileges)
+               - Required resource CONFIRMED missing and CANNOT be created (file doesn't exist, API endpoint down)
+               - Network/connectivity issue that CANNOT be resolved (offline mode, blocked endpoint)
+               - Parent task was skipped → dependent child MUST skip (cascade effect)
+               
+            ✅ **Condition 2: Multiple Failure Attempts**
+               - fail_count >= 2 (at least TWO previous failures)
+               - OR fail_count = 1 but error clearly shows environmental constraint (authentication, permission, missing resource)
+               
+            ✅ **Condition 3: Recovery Already Attempted**
+               - At least ONE recovery strategy already tried (PARAMETER_REPAIR, ALTERNATIVE_TOOL, or TASK_DECOMPOSITION)
+               - OR error type clearly indicates no recovery possible (authentication with no credentials)
+               
+            ❌ **DO NOT SKIP IF:**
+               - ✗ Task is merely complex or difficult (use TASK_DECOMPOSITION instead)
+               - ✗ Error is temporary/transient (network timeout, rate limit - these can be retried)
+               - ✗ Parameters just need fixing (use PARAMETER_REPAIR instead)
+               - ✗ Alternative tool might work (use ALTERNATIVE_TOOL instead)
+               - ✗ Task hasn't been attempted yet (skip is only for FAILED tasks, not pending)
+               - ✗ Only 1 failure and it's a fixable error (try recovery first)
+               
+            📊 **SKIP DECISION TREE:**
+            ```
+            1. Is there a VERIFIABLE environmental constraint?
+               NO → Don't skip, try recovery strategy
+               YES → Continue to step 2
+               
+            2. Has the task failed at least ONCE with recovery attempted?
+               NO → Don't skip yet, try recovery first
+               YES → Continue to step 3
+               
+            3. Can this constraint be resolved through recovery?
+               YES → Don't skip, try appropriate recovery (PARAMETER_REPAIR/ALTERNATIVE_TOOL/TASK_DECOMPOSITION)
+               NO → Continue to step 4
+               
+            4. Is this a cascaded skip from parent task?
+               YES → SKIP immediately (mandatory cascade)
+               NO → Continue to step 5
+               
+            5. Have we exhausted reasonable recovery attempts?
+               NO → Try one more recovery strategy
+               YES → SKIP (graceful degradation)
+            ```
+            
+            ✅ **VALID SKIP SCENARIOS (Examples):**
+            
+            **Scenario A: Authentication Required**
+            ```
+            Task: "Send email notification to team@company.com"
+            Error: "SMTP authentication failed - no credentials configured"
+            Fail Count: 2
+            History: PARAMETER_REPAIR tried, ALTERNATIVE_TOOL tried
+            Environment: No SMTP_USER, SMTP_PASS in environment variables
+            
+            Decision: SKIP ✅
+            Reasoning: "Authentication credentials are required but not available in environment. 
+                       Both parameter repair and alternative tools have failed. Task cannot proceed 
+                       without credentials which are not accessible to the system."
+            Confidence: HIGH
+            Success Probability: 0
+            ```
+            
+            **Scenario B: Permission Denied**
+            ```
+            Task: "Write configuration to /etc/system/config.json"
+            Error: "Permission denied - insufficient privileges to write to /etc/system/"
+            Fail Count: 2
+            History: PARAMETER_REPAIR tried (failed), ALTERNATIVE_TOOL tried (failed)
+            
+            Decision: SKIP ✅
+            Reasoning: "System-level write permissions required but not available. Cannot escalate 
+                       privileges within workflow. Both repair and alternative approaches failed."
+            Confidence: HIGH
+            Success Probability: 0
+            ```
+            
+            **Scenario C: Resource Missing (Cascade Skip)**
+            ```
+            Task: "Analyze data from output.csv"
+            Error: "File not found: output.csv"
+            Context: Previous task "Generate output.csv" was SKIPPED
+            Fail Count: 1
+            
+            Decision: SKIP ✅
+            Reasoning: "Required input file output.csv does not exist because parent task that should 
+                       create it was skipped. This is a mandatory cascade skip."
+            Confidence: HIGH
+            Success Probability: 0
+            ```
+            
+            ❌ **INVALID SKIP SCENARIOS (DO NOT SKIP):**
+            
+            **Scenario D: Complex But Achievable**
+            ```
+            Task: "Search GitHub issues and create comprehensive markdown report"
+            Error: "Task too complex for single tool call"
+            Fail Count: 2
+            
+            Decision: TASK_DECOMPOSITION ✅ (NOT SKIP!)
+            Reasoning: "Task is complex but ACHIEVABLE through decomposition. Break into: 
+                       1) Search GitHub, 2) Analyze results, 3) Format markdown, 4) Write report"
+            ```
+            
+            **Scenario E: Fixable Parameter Error**
+            ```
+            Task: "Read file from /home/user/documents/report.txt"
+            Error: "File not found: /home/user/documents/report.txt"
+            Fail Count: 1
+            History: No recovery attempted yet
+            
+            Decision: PARAMETER_REPAIR ✅ (NOT SKIP!)
+            Reasoning: "File path might be incorrect. Use list_directory to find correct path, 
+                       then retry with corrected path."
+            ```
+            
+            **Scenario F: Transient Network Error**
+            ```
+            Task: "Fetch data from API endpoint https://api.example.com/data"
+            Error: "Connection timeout after 30 seconds"
+            Fail Count: 1
+            
+            Decision: PARAMETER_REPAIR ✅ (NOT SKIP!)
+            Reasoning: "Network timeout is transient. Retry with exponential backoff or 
+                       check network connectivity first."
+            ```
 
 
 
@@ -994,6 +1172,7 @@ class HierarchicalAgentPrompt:
         1. PARAMETER_REPAIR: When the tool is correct but parameters are wrong, especially for file paths, queries, etc.
         2. ALTERNATIVE_TOOL: When the current tool is fundamentally unsuitable or keeps failing despite parameter repair
         3. TASK_DECOMPOSITION: When the task is inherently complex or has failed multiple times (>1) with different approaches
+        4. SKIP: ONLY when environmental constraints make task completion impossible (authentication missing, permission denied, required resource unavailable, parent task skipped). Requires fail_count >= 2 OR clear environmental constraint + at least one recovery attempted. DO NOT skip for complexity or difficulty - use TASK_DECOMPOSITION instead.
 
         📋 ADDITIONAL CONTEXT ANALYSIS:
         - Original Goal: The overarching objective the user wants to achieve

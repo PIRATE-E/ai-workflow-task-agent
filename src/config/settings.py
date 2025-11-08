@@ -48,6 +48,9 @@ DEFAULT_RAG_FILES_PROCESSED_TRIPLES_PATH = (
         BASE_DIR / "RAG" / "RAG_FILES" / "processed_triple.json"
 )
 
+# Task management configuration
+SKIP_THRESHOLD = int(os.getenv("SKIP_THRESHOLD", 70))  # Skip tasks with skip_probability >= this value
+
 # Logging configuration
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"

@@ -70,7 +70,7 @@ class EXECUTION_CONTEXT(BaseModel):
 
 
 class FAILURE_CONTEXT_STRATEGY(BaseModel):
-    recovery_strategy: Literal["PARAMETER_REPAIR", "ALTERNATIVE_TOOL", "TASK_DECOMPOSITION", "NO_STRATEGY"] = Field(
+    recovery_strategy: Literal["PARAMETER_REPAIR", "ALTERNATIVE_TOOL", "TASK_DECOMPOSITION", "NO_STRATEGY", "SKIP"] = Field(
         default="PARAMETER_REPAIR",
         description="The recovery strategy attempted"
     )
@@ -437,7 +437,95 @@ class AgentCoreHelpers:
             # Safe fallback
             return ["list_directory", "google_search", "write_file", "perform_synthesis"]
 
-    # ^^^^^^^^^^^^^^ these are tool list helpers ^^^^^^^^^^^^^^^^^^ 
+    # ^^^^^^^^^^^^^^ these are tool list helpers ^^^^^^^^^^^^^^^^^^
+    @staticmethod
+    def evaluate_skip_cascade(current_task: TASK, skipped_tasks: list[TASK]) -> tuple[bool, str]:
+        """
+        Evaluate if the current task should be skipped based on previous skips.
+
+        Uses RULE-BASED dependency detection (NO AI calls needed):
+        1. PARENT-CHILD: Sub-tasks depend on parent tasks (via float IDs)
+        2. SEQUENTIAL: Task N depends on Task N-1 if it references N-1's output
+        3. RESOURCE: Task B depends on Task A if it needs A's file/data
+
+        Returns:
+            tuple[bool, str]: (should_skip, reason)
+        """
+        # Early exit: no skipped tasks means no cascade possible
+        if len(skipped_tasks) == 0:
+            return False, "No skipped tasks to evaluate for cascade skip."
+
+        # Extract current task info for analysis
+        current_id = current_task.task_id
+        current_desc = current_task.description.lower() if current_task.description else ""
+        current_params = current_task.execution_context.parameters if current_task.execution_context else {}
+
+        # DEPENDENCY TYPE 1: PARENT-CHILD RELATIONSHIP (via float IDs)
+        # Example: Task 1.1, 1.2 are children of Task 1
+        # If parent (1) is skipped, children (1.1, 1.2) should also skip
+        if isinstance(current_id, str) and '.' in current_id:
+            # Extract parent ID from current task (e.g., "1" from "1.1" or "1.1" from "1.1.2")
+            parent_id = current_id.rsplit('.', 1)[0]  # Get parent by removing last segment
+
+            # Check if parent task is in skipped list
+            for skipped in skipped_tasks:
+                skipped_id_str = str(skipped.task_id)
+                if skipped_id_str == parent_id:
+                    return True, f"Parent task {parent_id} was skipped. This sub-task cannot proceed without parent."
+
+        # DEPENDENCY TYPE 2: SEQUENTIAL DEPENDENCY
+        # If current task's description mentions a previous skipped task's tool or references "previous task"
+        # Example: Task 2 says "Use search results from previous task" → depends on Task 1
+        for skipped in skipped_tasks:
+            skipped_tool = skipped.tool_name.lower() if skipped.tool_name else ""
+
+            # Check if current task description explicitly mentions the skipped task's tool
+            # e.g., "write the search results" when google_search was skipped
+            if skipped_tool and skipped_tool in current_desc:
+                return True, f"Task references '{skipped_tool}' which was skipped (Task {skipped.task_id})."
+
+            # Check for explicit sequential references like "previous task", "from earlier", etc.
+            sequential_keywords = ["previous task", "earlier task", "from task", "using the"]
+            if any(keyword in current_desc for keyword in sequential_keywords):
+                # Conservative: only skip if the skipped task was IMMEDIATELY before current task
+                try:
+                    current_id_num = float(str(current_id).split('-')[0]) if isinstance(current_id, str) else float(current_id)
+                    skipped_id_num = float(str(skipped.task_id).split('-')[0]) if isinstance(skipped.task_id, str) else float(skipped.task_id)
+
+                    # If skipped task is right before current (e.g., Task 1 skipped, Task 2 current)
+                    if abs(current_id_num - skipped_id_num) <= 1.0:
+                        return True, f"Task has sequential dependency on skipped Task {skipped.task_id} (detected via context keywords)."
+                except (ValueError, TypeError):
+                    pass  # Skip numeric comparison if IDs aren't numeric
+
+        # DEPENDENCY TYPE 3: RESOURCE DEPENDENCY
+        # If current task's parameters reference a file/resource that should have been created by skipped task
+        # Example: Task A creates "report.txt", Task B needs "report.txt" → B depends on A
+        if isinstance(current_params, dict):
+            # Check if current task parameters contain file paths
+            param_values = [str(v).lower() for v in current_params.values() if v]
+
+            for skipped in skipped_tasks:
+                # Check if skipped task was supposed to create/modify a file
+                skipped_params = skipped.execution_context.parameters if skipped.execution_context else {}
+                if isinstance(skipped_params, dict):
+                    skipped_values = [str(v).lower() for v in skipped_params.values() if v]
+
+                    # Look for common file references between current and skipped task parameters
+                    for current_val in param_values:
+                        for skipped_val in skipped_values:
+                            # If both tasks reference the same file path
+                            if len(current_val) > 5 and len(skipped_val) > 5:  # Ignore short strings
+                                if current_val in skipped_val or skipped_val in current_val:
+                                    # Check if skipped task was a write operation (likely creates the file)
+                                    if skipped.tool_name in ["mcp_filesystem_write_file", "write_file", "create_file"]:
+                                        return True, f"Task requires file resource from skipped Task {skipped.task_id} (file: {skipped_val[:50]})."
+
+        # DEFAULT: No clear dependency detected - DO NOT skip (conservative approach)
+        # Better to attempt execution and fail explicitly than skip incorrectly
+        return False, "No clear dependency on skipped tasks detected."
+
+
 
     class ErrorFallbackHelpers:
         """Enhanced helper functions for error fallback node with LLM-driven decision making."""
@@ -735,7 +823,7 @@ class AgentCoreHelpers:
                 strategy_result = ModelManager.convert_to_json(response.content)
 
                 # Validate that we got a valid strategy
-                valid_strategies = ["PARAMETER_REPAIR", "ALTERNATIVE_TOOL", "TASK_DECOMPOSITION", "LLM_RECOVERY"]
+                valid_strategies = ["PARAMETER_REPAIR", "ALTERNATIVE_TOOL", "TASK_DECOMPOSITION", "LLM_RECOVERY", "SKIP"]
                 recovery_strategy = strategy_result.get("recovery_strategy", "PARAMETER_REPAIR") if isinstance(
                     strategy_result, dict) else "PARAMETER_REPAIR"
 
@@ -1305,15 +1393,43 @@ class AgentGraphCore:
             #     # Defensive: never fail planning because of enforcement
             #     pass
 
-            actual_tasks = [
-                TASK(
+            # Get skip threshold from settings (default 70)
+            skip_threshold = getattr(settings, 'SKIP_THRESHOLD', 70)
+
+            actual_tasks = []
+            for idx, item in enumerate(filtered_tasks):
+                skip_probability = item.get("skip_probability", 0)
+                skip_reason = item.get("skip_reason", "")
+
+                # Determine initial status based on skip probability
+                initial_status: Literal["pending", "skip"] = "skip" if skip_probability >= skip_threshold else "pending"
+
+                # Log skip decisions for visibility
+                if initial_status == "skip":
+                    debug_info("Initial Planner - Pre-Flight Skip",
+                              f"Task {idx + 1} marked as SKIP (probability: {skip_probability}%): {item['description'][:60]}...",
+                              metadata={
+                                  "task_id": str(idx + 1),
+                                  "skip_reason": skip_reason,
+                                  "skip_probability": skip_probability,
+                                  "threshold": skip_threshold
+                              })
+
+                task = TASK(
                     task_id=str(idx + 1),
                     description=item["description"],
                     tool_name=item["tool_name"],
-                    requires_high_fidelity_context=item.get("requires_high_fidelity_context", False),  # Pass the flag
-                    required_context=REQUIRED_CONTEXT(source_node="initial_planner"),
-                ) for idx, item in enumerate(filtered_tasks)
-            ]
+                    status=initial_status,  # 🔥 Set status based on skip probability
+                    requires_high_fidelity_context=item.get("requires_high_fidelity_context", False),
+                    required_context=REQUIRED_CONTEXT(
+                        source_node="initial_planner",
+                        pre_execution_context={
+                            "skip_probability": skip_probability,
+                            "skip_reason": skip_reason
+                        } if skip_probability > 0 else None
+                    ),
+                )
+                actual_tasks.append(task)
         else:
             # Final fallback if all attempts fail
             actual_tasks = []
@@ -1346,6 +1462,7 @@ class AgentGraphCore:
         This is a critical routing node that determines whether to:
         - Proceed with normal task execution (AGENT_PERFORM_TASK)
         - Trigger error recovery procedures (AGENT_PERFORM_ERROR_FALLBACK)
+        - Skip tasks marked in pre-flight check (status='skip')
 
         The decision is based on task failure count and retry limits, implementing
         a graduated response system for handling task failures.
@@ -1357,6 +1474,72 @@ class AgentGraphCore:
         tasks = state.tasks
         current_task = next((t for t in tasks if t.task_id == current_task_id), None)
 
+        # Handle pre-flight skipped tasks - create execution context and mark as ready for task_planner
+        if current_task and current_task.status == "skip":
+            skip_reason = "No reason provided"
+            skip_probability = 0
+            if current_task.required_context and current_task.required_context.pre_execution_context:
+                skip_reason = current_task.required_context.pre_execution_context.get("skip_reason", skip_reason)
+                skip_probability = current_task.required_context.pre_execution_context.get("skip_probability", 0)
+
+            debug_info("Classifier - Skip Handler",
+                      f"Task {current_task_id} was PRE-FLIGHT SKIPPED (prob: {skip_probability}%): {skip_reason}",
+                      metadata={
+                          "task_id": current_task_id,
+                          "skip_reason": skip_reason,
+                          "skip_probability": skip_probability,
+                          "task_description": current_task.description[:60] + "..."
+                      })
+
+            # Create minimal execution context so task appears "complete" to workflow
+            if not current_task.execution_context:
+                current_task.execution_context = EXECUTION_CONTEXT(
+                    tool_name=current_task.tool_name,
+                    parameters={},
+                    result=f"⏭️ Task skipped: {skip_reason}",
+                    analysis=f"Pre-flight check (probability: {skip_probability}%) determined this task should be skipped: {skip_reason}",
+                    goal_achieved=False
+                )
+
+            # Task remains in skip status and has execution_context, so it will be treated as "done"
+            # The workflow will route to task_planner to select next pending task
+            # We still set persona to allow normal flow through router
+            return {
+                "tasks": tasks,
+                "executed_nodes": state.executed_nodes + ["subAGENT_classifier"],
+                "persona": "AGENT_PERFORM_TASK"  # Use normal persona so router works
+            }
+
+        # handle that if the previous task got skipped and this task is depend on that (cascade skip effect)
+        elif current_task.status == "pending":
+            skipped_tasks = [t for t in tasks if t.status == "skip"]
+            should_skip, reason = AgentCoreHelpers.evaluate_skip_cascade(current_task, skipped_tasks)
+            if should_skip:
+                debug_info("Classifier - Cascade Skip Handler",
+                           f"Task {current_task_id} is being SKIPPED due to dependency on skipped tasks: {reason}",
+                           metadata={
+                               "task_id": current_task_id,
+                               "skip_reason": reason,
+                               "task_description": current_task.description[:60] + "..."
+                           })
+
+                # Create minimal execution context so task appears "complete" to workflow
+                if not current_task.execution_context:
+                    current_task.execution_context = EXECUTION_CONTEXT(
+                        tool_name=current_task.tool_name,
+                        parameters={},
+                        result=f"⏭️ Task skipped due to dependency: {reason}",
+                        analysis=f"Cascade skip effect triggered by dependency on skipped tasks: {reason}",
+                        goal_achieved=False
+                    )
+
+                current_task.status = "skip"  # Mark task as skipped
+
+                return {
+                    "tasks": tasks,
+                    "executed_nodes": state.executed_nodes + ["subAGENT_classifier"],
+                    "persona": "AGENT_PERFORM_TASK"  # Use normal persona so router works
+                }
         # 🔍 CRITICAL DECISION: Determine execution persona based on task readiness and failure history
         persona = "AGENT_PERFORM_TASK"
 
@@ -1372,14 +1555,18 @@ class AgentGraphCore:
                 AgentStatusUpdater.update_status("complexity_analysis", task_id=current_task_id,
                                                  extra_info="FAILED: Exceeded retry limit")
                 debug_error("Classifier",
-                            f"Task {current_task_id} has failed {current_task.failure_context.fail_count} times. Exceeded retry limit. Marking as permanently failed.",
+                            f"Task {current_task_id} has failed {current_task.failure_context.fail_count} times. Exceeded retry limit of 2 attempts. Marking as permanently failed.",
                             metadata={"function name": "__subAGENT_classifier", "task_id": current_task_id,
                                       "fail_count": current_task.failure_context.fail_count,
                                       "max_retries": current_task.max_retries})
                 current_task.status = "failed"
                 persona = "AGENT_PERFORM_ERROR_FALLBACK"
-            elif current_task.failure_context.fail_count >= current_task.max_retries:
+            elif current_task.failure_context.fail_count >= 2:
                 persona = "AGENT_PERFORM_ERROR_FALLBACK"
+            elif current_task.failure_context.fail_count >= current_task.max_retries:
+                # if the task got more failures than max retries, we skip it
+                persona = "AGENT_PERFORM_ERROR_FALLBACK"
+                current_task.status = "skip"
 
         # print_log_message(f"Task ID: {current_task_id}, Persona: {persona}", "Classifier")
         debug_info("Classifier", f"Task ID: {current_task_id}, Persona: {persona}",
@@ -1397,6 +1584,13 @@ class AgentGraphCore:
         current_task: TASK = next((task for task in tasks if task.task_id == current_task_id), None)
 
         if current_task:
+            # 🔥 SKIP BYPASS: Skip parameter generation for skipped tasks
+            if current_task.status == "skip":
+                debug_info("Parameter Generator - Skip Bypass",
+                           "Task is skipped, bypassing parameter generation.",
+                           metadata={"function name": "subAGENT_parameter_generator", "task_id": current_task_id})
+                return {"tasks": tasks, "executed_nodes": state.executed_nodes + ["subAGENT_parameter_generator"]}
+
             if current_task.status == "pending" and current_task.execution_context and \
                     isinstance(current_task.execution_context.parameters,
                                dict) and current_task.execution_context.parameters:
@@ -1603,6 +1797,20 @@ class AgentGraphCore:
             debug_error("Task Executor", f"Could not find current task with ID {current_task_id}",
                         metadata={"function name": "__subAGENT_task_executor", "current_task_id": current_task_id})
             return {"workflow_status": "FAILED"}
+
+        # 🔥 SKIP BYPASS: Tasks already marked as skip bypass execution entirely
+        if current_task.status == "skip":
+            debug_info("Task Executor - Skip Bypass",
+                      f"Task {current_task_id} is SKIPPED, bypassing execution",
+                      metadata={
+                          "task_id": current_task_id,
+                          "skip_reason": current_task.execution_context.result if current_task.execution_context else "Pre-flight skip"
+                      })
+            # Task already has execution_context from classifier, just pass through
+            return {
+                "tasks": updated_tasks,
+                "executed_nodes": state.executed_nodes + ["subAGENT_task_executor"],
+            }
 
         # --- VIRTUAL TOOL INTERCEPTION ---
         if current_task.tool_name == "perform_synthesis":
@@ -1825,6 +2033,15 @@ class AgentGraphCore:
             else:
                 current_task.execution_context.analysis = f"Task {current_task.tool_name} completed successfully."
 
+        # 🔥 SKIP HANDLER: Generate analysis for skipped tasks
+        elif current_task.status == "skip" and current_task.execution_context and current_task.execution_context.result:
+            # Handle skipped tasks by summarizing the skip reason
+            skip_summary = f"Task was skipped. Reason: {current_task.execution_context.result}"
+            current_task.execution_context.analysis = skip_summary
+            debug_info("Context Synthesizer - Skip Handler",
+                       f"Generated analysis for SKIPPED Task {current_task_id}: '{skip_summary}'",
+                       metadata={"function name": "__subAGENT_context_synthesizer", "task_id": current_task_id})
+
         return {"tasks": tasks}
 
     @classmethod
@@ -1836,7 +2053,20 @@ class AgentGraphCore:
         current_task_id = state.current_task_id
         current_task = next((t for t in tasks if t.task_id == current_task_id), None)
 
-        if current_task and current_task.status == "completed" and current_task.execution_context:
+        # 🔥 SKIP BYPASS: Skip goal validation for skipped tasks entirely.
+        if current_task and current_task.status == "skip":
+            debug_info("Goal Validator - Skip Bypass",
+                      f"Task {current_task_id} is SKIPPED, bypassing goal validation",
+                      metadata={
+                          "task_id": current_task_id,
+                          "skip_reason": current_task.execution_context.result if current_task.execution_context else "Pre-flight skip"
+                      })
+            # Task already has execution_context from classifier, just pass through
+            return {
+                "tasks": tasks,
+                "executed_nodes": state.executed_nodes + ["subAGENT_goal_validator"],
+            }
+        elif current_task and current_task.status == "completed" and current_task.execution_context:
             prompt_generator = HierarchicalAgentPrompt()
             system_prompt, human_prompt = prompt_generator.generate_goal_achievement_prompt(
                 original_goal=state.original_goal,
@@ -2024,7 +2254,7 @@ class AgentGraphCore:
                 completed_tasks = [t for t in updated_tasks if
                                    t.status == "completed" and t.execution_context and t.execution_context.result]
                 current_task.status = "skip"  # Mark as like this while we handle decomposition
-                # this is the issue it pass the only last strategy context
+                # this is the issue it passes the only last strategy context
                 parent_context = {
                     "original_goal": state.original_goal,
                     "completed_tasks_history": completed_tasks,
@@ -2121,6 +2351,35 @@ class AgentGraphCore:
                     }
                 else:
                     current_task.status = "failed"
+
+            elif strategy == "SKIP":
+                current_task.status = "skip"
+                current_task.execution_context = EXECUTION_CONTEXT(
+                    tool_name=current_task.tool_name,
+                    parameters={},
+                    result="Task skipped as per recovery strategy.",
+                    analysis="Task was skipped to allow workflow progression.",
+                    goal_achieved=False,
+
+                )
+
+                current_task.failure_context.strategy_history.append(
+                    FAILURE_CONTEXT_STRATEGY(
+                        recovery_strategy="SKIP",
+                        reasoning=recovery_decision.get("reasoning", "Skipping task as per recovery strategy."),
+                        confidence_level=recovery_decision.get("confidence_level", "HIGH"),
+                        estimated_success_probability=recovery_decision.get("estimated_success_probability", 0),
+                        next_steps=recovery_decision.get("next_steps", "task got skipped as per strategy"),
+                        outcome="APPLIED",
+                        details={"description": current_task.description,
+                                 "error_message": getattr(current_task.failure_context, "error_message", None)}
+                    )
+                )
+
+                return {
+                    "tasks": updated_tasks,
+                    "executed_nodes": state.executed_nodes + ["subAGENT_error_fallback"],
+                }
             else:
                 current_task.status = "failed"
 
@@ -2164,14 +2423,17 @@ class AgentGraphCore:
         # If the last completed task was a sub-task (e.g., '1.1-abc'), update its parent
         if isinstance(last_completed_id, str) and '-' in last_completed_id:  # Check for new string format
             # Extract parent_id from string, e.g., '1' from '1.1-abc'
-            parent_id_prefix = last_completed_id.split('.')[0]
+            parent_id_prefix = last_completed_id.rsplit('.')[0] # immediate parent before dot
             parent_task = next((t for t in tasks if str(t.task_id) == parent_id_prefix), None)  # Find parent by prefix
             if parent_task and parent_task.status == "in_progress":
                 # Find sibling tasks that share the same parent prefix
                 sibling_tasks = [t for t in tasks if
                                  isinstance(t.task_id, str) and t.task_id.startswith(f"{parent_id_prefix}.")]
-                if all(t.status in ["completed", "failed"] for t in sibling_tasks):
+                # 🔥 Include skip in terminal states to handle skipped sub-tasks
+                TERMINAL_STATES = ["completed", "failed", "skip"]
+                if all(t.status in TERMINAL_STATES for t in sibling_tasks):
                     failed_subtasks = [t for t in sibling_tasks if t.status == "failed"]
+                    skipped_subtasks = [t for t in sibling_tasks if t.status == "skip"]
                     if not parent_task.execution_context:
                         parent_task.execution_context = EXECUTION_CONTEXT(
                             tool_name=parent_task.tool_name,
@@ -2179,10 +2441,13 @@ class AgentGraphCore:
                         )
                     if failed_subtasks:
                         parent_task.status = "failed"
-                        parent_task.execution_context.analysis = f"Failed due to {len(failed_subtasks)} failed subtasks."
+                        skip_msg = f", {len(skipped_subtasks)} skipped" if skipped_subtasks else ""
+                        parent_task.execution_context.analysis = f"Failed due to {len(failed_subtasks)} failed subtasks{skip_msg}."
                     else:
                         parent_task.status = "completed"
-                        parent_task.execution_context.analysis = f"Successfully completed {len(sibling_tasks)} subtasks."
+                        completed_count = len([t for t in sibling_tasks if t.status == "completed"])
+                        skip_msg = f" ({len(skipped_subtasks)} skipped)" if skipped_subtasks else ""
+                        parent_task.execution_context.analysis = f"Successfully completed {completed_count} of {len(sibling_tasks)} subtasks{skip_msg}."
 
         # 🌉 DUAL CONTEXT BRIDGE: Collect the full history of completed tasks AND failed tasks with validator feedback
         completed_tasks = [t for t in tasks if t.status == "completed"]
@@ -2227,37 +2492,76 @@ class AgentGraphCore:
         debug_info("--- NODE: Finalizer ---", "Generating final response consolidating all task results",
                    metadata={"function name": "__subAGENT_finalizer"})
 
-        all_results = []
         tasks = state.tasks
-        for task in tasks:
-            if task.execution_context and task.execution_context.result:
-                # Clean up the task result to remove raw Python representations
-                result_content = task.execution_context.result
 
-                # If the result contains Python list/dict representations, clean them up
-                try:
-                    import json as _json
-                    # Try to extract just the meaningful content from MCP tool responses
-                    if isinstance(result_content, str) and result_content.startswith("✅ **Action"):
-                        # Extract the actual result from the MCP response format
-                        if "Result: [{'type': 'text', 'text':" in result_content:
-                            # Extract the text content from the MCP response format
-                            import re
-                            text_match = re.search(r"'text':\s*'([^']+)'", result_content)
-                            if text_match:
-                                extracted_text = text_match.group(1)
-                                # Unescape newlines and clean up
-                                extracted_text = extracted_text.replace('\n', '\n').replace("\'", "'")
-                                result_content = extracted_text
+        # 🔥 CATEGORIZE tasks by status for clear visibility and skip awareness
+        completed_tasks = [t for t in tasks if t.status == "completed"]
+        failed_tasks = [t for t in tasks if t.status == "failed"]
+        skipped_tasks = [t for t in tasks if t.status == "skip"]
 
-                    all_results.append(f"Task {task.task_id} ({task.tool_name}): {result_content}")
-                except Exception:
-                    # Fallback to original content if parsing fails
-                    all_results.append(f"Task {task.task_id} ({task.tool_name}): {task.execution_context.result}")
+        # Debug logging with skip statistics
+        debug_info("Finalizer - Task Summary",
+                   f"Workflow completed: {len(completed_tasks)} completed, {len(skipped_tasks)} skipped, {len(failed_tasks)} failed",
+                   metadata={
+                       "function name": "__subAGENT_finalizer",
+                       "completed_count": len(completed_tasks),
+                       "skipped_count": len(skipped_tasks),
+                       "failed_count": len(failed_tasks),
+                       "total_count": len(tasks),
+                       "completion_rate": f"{len(completed_tasks)/len(tasks)*100:.1f}%" if tasks else "0%",
+                       "skip_rate": f"{len(skipped_tasks)/len(tasks)*100:.1f}%" if tasks else "0%"
+                   })
 
-            elif task.failure_context:
-                all_results.append(
-                    f"Task {task.task_id} ({task.tool_name}) failed: {task.failure_context.error_message}")
+        # Build categorized results with clear status indicators
+        all_results = []
+
+        # ✅ COMPLETED TASKS - Show successful task outcomes
+        if completed_tasks:
+            all_results.append(f"\n✅ COMPLETED TASKS ({len(completed_tasks)}/{len(tasks)} total tasks):")
+            for task in completed_tasks:
+                if task.execution_context and task.execution_context.result:
+                    # Clean up the task result to remove raw Python representations
+                    result_content = task.execution_context.result
+
+                    # If the result contains Python list/dict representations, clean them up
+                    try:
+                        import json as _json
+                        # Try to extract just the meaningful content from MCP tool responses
+                        if isinstance(result_content, str) and result_content.startswith("✅ **Action"):
+                            # Extract the actual result from the MCP response format
+                            if "Result: [{'type': 'text', 'text':" in result_content:
+                                # Extract the text content from the MCP response format
+                                import re
+                                text_match = re.search(r"'text':\s*'([^']+)'", result_content)
+                                if text_match:
+                                    extracted_text = text_match.group(1)
+                                    # Unescape newlines and clean up
+                                    extracted_text = extracted_text.replace('\n', '\n').replace("\'", "'")
+                                    result_content = extracted_text
+
+                        all_results.append(f"  • Task {task.task_id} ({task.tool_name}): {result_content}")
+                    except Exception:
+                        # Fallback to original content if parsing fails
+                        all_results.append(f"  • Task {task.task_id} ({task.tool_name}): {task.execution_context.result}")
+
+        # ⏭️ SKIPPED TASKS - Explicitly highlight skipped tasks with reasons
+        if skipped_tasks:
+            all_results.append(f"\n⏭️ SKIPPED TASKS ({len(skipped_tasks)}/{len(tasks)} total tasks):")
+            for task in skipped_tasks:
+                if task.execution_context and task.execution_context.result:
+                    # Skip result already formatted as "⏭️ Task skipped: reason" from error_fallback
+                    skip_reason = task.execution_context.result
+                    all_results.append(f"  • Task {task.task_id} ({task.tool_name}): {skip_reason}")
+                else:
+                    # Fallback if execution_context somehow missing
+                    all_results.append(f"  • Task {task.task_id} ({task.tool_name}): ⏭️ Skipped (reason unknown)")
+
+        # ❌ FAILED TASKS - Show task failures
+        if failed_tasks:
+            all_results.append(f"\n❌ FAILED TASKS ({len(failed_tasks)}/{len(tasks)} total tasks):")
+            for task in failed_tasks:
+                error_message = task.failure_context.error_message if task.failure_context else "Unknown error"
+                all_results.append(f"  • Task {task.task_id} ({task.tool_name}): {error_message}")
 
         prompt_generator = HierarchicalAgentPrompt()
         system_prompt, human_prompt = prompt_generator.generate_final_response_prompt(
@@ -2293,13 +2597,23 @@ class AgentGraphCore:
         # If we got any parsed JSON from the LLM, consider it a successful LLM response.
         if parsed is not None:
             final_response_obj = parsed
-            # Determine overall workflow status based on task outcomes
+            # Determine overall workflow status based on task outcomes (with skip awareness)
             any_failed = any(getattr(t, 'status', None) == 'failed' for t in tasks)
             any_goal_false = any(
                 (t.status == 'completed' and t.execution_context and t.execution_context.goal_achieved is False)
                 for t in tasks
             )
-            workflow_status = "FAILED" if (any_failed or any_goal_false) else "COMPLETED"
+            any_skipped = any(getattr(t, 'status', None) == 'skip' for t in tasks)
+
+            # Enhanced status determination with skip awareness
+            if any_failed or any_goal_false:
+                workflow_status = "FAILED"
+            elif any_skipped and len(completed_tasks) > 0:
+                workflow_status = "COMPLETED_WITH_SKIPS"  # Partial success - some tasks completed, some skipped
+            elif any_skipped and len(completed_tasks) == 0:
+                workflow_status = "ALL_SKIPPED"  # Nothing accomplished - all tasks skipped
+            else:
+                workflow_status = "COMPLETED"  # Full success - all tasks completed
             debug_info("Finalizer", "LLM produced parsable JSON. Returning parsed object as final_response.",
                        metadata={"function name": "__subAGENT_finalizer", "parsed_preview": str(parsed)[:200],
                                  "workflow_status": workflow_status})
@@ -2342,13 +2656,23 @@ class AgentGraphCore:
 
             if repaired is not None:
                 final_response_obj = repaired
-                # Determine overall workflow status based on task outcomes
+                # Determine overall workflow status based on task outcomes (with skip awareness)
                 any_failed = any(getattr(t, 'status', None) == 'failed' for t in tasks)
                 any_goal_false = any(
                     (t.status == 'completed' and t.execution_context and t.execution_context.goal_achieved is False)
                     for t in tasks
                 )
-                workflow_status = "FAILED" if (any_failed or any_goal_false) else "COMPLETED"
+                any_skipped = any(getattr(t, 'status', None) == 'skip' for t in tasks)
+
+                # Enhanced status determination with skip awareness
+                if any_failed or any_goal_false:
+                    workflow_status = "FAILED"
+                elif any_skipped and len(completed_tasks) > 0:
+                    workflow_status = "COMPLETED_WITH_SKIPS"  # Partial success
+                elif any_skipped and len(completed_tasks) == 0:
+                    workflow_status = "ALL_SKIPPED"  # Nothing accomplished
+                else:
+                    workflow_status = "COMPLETED"  # Full success
                 debug_info("Finalizer", "Repaired final response successfully and returning as final_response.",
                            metadata={"function name": "__subAGENT_finalizer", "response_preview": str(repaired)[:200],
                                      "workflow_status": workflow_status})
@@ -2466,9 +2790,10 @@ class AgentGraphCore:
         # print_log_message("--- ROUTER: Task Planner ---", "Router")
         debug_info("--- ROUTER: Task Planner ---", "Routing based on task planner decision",
                    metadata={"function name": "__router_task_planner"})
-        # Check if all tasks are completed or failed
+        # Check if all tasks are in terminal states (completed, failed, OR skip)
         tasks = state.tasks
-        all_tasks_finished = all(t.status in ["completed", "failed"] for t in tasks)
+        TERMINAL_STATES = ["completed", "failed", "skip"]  # 🔥 Include skip to prevent workflow hangs
+        all_tasks_finished = all(t.status in TERMINAL_STATES for t in tasks)
 
         if all_tasks_finished:
             return "subAGENT_finalizer"
