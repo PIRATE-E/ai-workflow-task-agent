@@ -49,6 +49,9 @@ class ChatInitializer:
         self.initialize_neo4j()
         self._register_slash_commands()
 
+        # Register logging handlers
+        self._register_logging_handlers()
+
         self.ToolResponseManager = None  # Initialize ToolResponseManager later
 
     @rich_exception_handler("Core Classes Setup")
@@ -79,7 +82,7 @@ class ChatInitializer:
 
             self.ToolResponseManager = ToolResponseManager()
 
-            # Set the socket connection for logging
+            # Set the socket connection for system_logging
             settings.socket_con = SocketManager.get_socket_con()
 
             # register the exit listener
@@ -566,3 +569,36 @@ class ChatInitializer:
             body="Core slash commands registered successfully.",
             metadata={},
         )
+
+
+    def _register_logging_handlers(self):
+        """Register logging handlers for the chat application."""
+        pass  # Implement logging handler registration as needed
+
+        from ..system_logging.on_time_registry import OnTimeRegistry
+        from ..system_logging.handlers.handler_base import TextHandler
+
+        async def register_handlers():
+            ##### this is the place which register the all logging handlers #####
+            tasks = [
+                asyncio.to_thread(OnTimeRegistry().register, TextHandler()),
+            ]
+            await asyncio.gather(*tasks)
+
+        def run_async_init():
+            try:
+                loop = asyncio.get_event_loop()
+            except RuntimeError:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+            loop.run_until_complete(register_handlers())
+
+        init_thread = threading.Thread(target=run_async_init)
+        init_thread.start()
+        init_thread.join()  # Wait for completion
+        debug_info(
+            heading="Logging Handlers Registered",
+            body="Core logging handlers registered successfully.",
+            metadata={},
+        )
+

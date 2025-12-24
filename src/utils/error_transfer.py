@@ -27,6 +27,8 @@ class SocketCon:
             self.client_socket = _client_socket
 
     def send_error(self, error_message: str, close_socket: bool = False):
+        if "\n" not in  error_message:
+            error_message += "\n" # Ensure message ends with newline easy to parse in the receiver
         with self._lock:
             try:
                 #     check whether the socket is connected
@@ -153,11 +155,53 @@ def write_to_file(text: str, mode="a"):
     pass
 
 
+def new_logger_write(text: str):
+    """
+    Process incoming debug messages and dispatch to logging system.
+    Converts DebugMessage protocol to LogEntry protocol before dispatching.
+    """
+    try:
+        # Use absolute imports to work when run as __main__
+        from src.system_logging.dispatcher import Dispatcher
+        from src.system_logging.adapter import ProtocolAdapter
+
+        # Convert DebugMessage JSON to LogEntry JSON
+        # parse multiple messages if present
+        messages = text.strip().split("\n")
+        for message in messages:
+            converted_json = ProtocolAdapter.convert_to_log_entry_json(message)
+
+            # Dispatch to logging system
+            disp = Dispatcher()
+            disp.dispatch(converted_json)
+
+    except ImportError as e:
+        # If system_logging not available, fall back to file write
+        print(f"[IMPORT_ERROR] Logging system not available: {e}", file=sys.stderr)
+        write_to_file(text)
+    except Exception as e:
+        # Catch-all for unexpected errors
+        print(f"[LOGGER_ERROR] {e}", file=sys.stderr)
+        write_to_file(text)
+
+
 if __name__ == "__main__":
     # Check for existing instance and create lock file
     if not create_lock_file():
         print("Exiting: Another server instance is already running")
         sys.exit(1)
+
+    # Register logging handlers for this subprocess
+    try:
+        from src.system_logging.on_time_registry import OnTimeRegistry
+        from src.system_logging.handlers.handler_base import TextHandler
+
+        registry = OnTimeRegistry()
+        registry.register(TextHandler())
+        print("✅ Logging handlers registered in error_transfer subprocess")
+    except Exception as e:
+        print(f"⚠️  Could not register logging handlers: {e}")
+        # Continue anyway - will fall back to write_to_file
 
     # Register cleanup function
     atexit.register(cleanup_lock_file)
@@ -173,7 +217,7 @@ if __name__ == "__main__":
             markup=True,  # Enable Rich markup
             log_time=True,  # Add timestamps to logs
             log_path=False,
-        )  # Don't show file paths in logs  # Initialize rich console for logging
+        )  # Don't show file paths in logs  # Initialize rich console for system_logging
         settings.debug_console = console  # Set debug console for the application
         print_error = RichErrorPrint(console)  # Initialize rich error printing
     except Exception as e:
@@ -222,8 +266,23 @@ if __name__ == "__main__":
                             )
                             break  # Client disconnected or error occurred
                         if isinstance(received_error, str):
-                            print_error.print_rich(f"{received_error}")
-                            write_to_file(received_error)
+                            # Split by newline to handle multiple messages sent together
+                            # TCP may concatenate multiple sends into one recv()
+                            messages = received_error.split('\n')
+
+                            for single_message in messages:
+                                single_message = single_message.strip()
+                                if not single_message:  # Skip empty lines
+                                    continue
+
+                                # Display each message separately in Rich console
+                                print_error.print_rich(f"{single_message}")
+
+                                # Legacy logging (write to error_log.txt)
+                                write_to_file(single_message)
+
+                                # New categorized logging system
+                                new_logger_write(single_message)
                         else:
                             print_error.print_rich(received_error)
                         if settings.ENABLE_SOUND_NOTIFICATIONS:
