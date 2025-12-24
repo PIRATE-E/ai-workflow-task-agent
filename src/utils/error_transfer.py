@@ -249,7 +249,7 @@ if __name__ == "__main__":
         listening = True
         SocketCon.got_killed = False  # Flag to indicate if the server was killed
 
-        write_to_file("", mode="w")  # Clear the log file on startup
+        # write_to_file("", mode="w")  # Clear the log file on startup (now removed and replaced by new logging system)
         print_error.print_rich("Server is listening...")
 
         while listening and not SocketCon.got_killed:
@@ -279,7 +279,7 @@ if __name__ == "__main__":
                                 print_error.print_rich(f"{single_message}")
 
                                 # Legacy logging (write to error_log.txt)
-                                write_to_file(single_message)
+                                # write_to_file(single_message) # now get removed and successfully replaced by new logging system
 
                                 # New categorized logging system
                                 new_logger_write(single_message)
