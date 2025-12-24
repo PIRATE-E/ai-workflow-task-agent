@@ -53,7 +53,7 @@ class UniversalMCPWrapper:
 
         # --- END OF LOGIC ---
 
-        # Safe debug logging
+        # Safe debug system_logging
         from src.ui.diagnostics.debug_helpers import debug_info
 
         debug_info(

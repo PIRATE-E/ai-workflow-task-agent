@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Test script to demonstrate the logging system
+Test script to demonstrate the system_logging system
 Run this after starting the log server: python utils/error_transfer.py
 """
 
@@ -15,8 +15,8 @@ from utils.socket_manager import socket_manager
 
 
 def test_logging():
-    """Test the socket-based logging system"""
-    print("🧪 Testing the logging system...")
+    """Test the socket-based system_logging system"""
+    print("🧪 Testing the system_logging system...")
 
     # Get the socket connection
     socket_con = socket_manager.get_socket_connection()
@@ -102,7 +102,7 @@ def test_socket_manager_singleton():
 
 
 def run_all_tests():
-    """Run all logging system tests"""
+    """Run all system_logging system tests"""
     print("=" * 60)
     print("🧪 LOGGING SYSTEM TEST SUITE")
     print("=" * 60)

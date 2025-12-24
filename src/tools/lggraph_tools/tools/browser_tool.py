@@ -247,7 +247,7 @@ class BrowserHandler:
 
             # Prepare environment with UTF-8 encoding to handle emojis in browser_use logs
             env = os.environ.copy()
-            env['PYTHONIOENCODING'] = 'utf-8'  # Force UTF-8 for subprocess I/O (fixes emoji logging)
+            env['PYTHONIOENCODING'] = 'utf-8'  # Force UTF-8 for subprocess I/O (fixes emoji system_logging)
 
             self.process = subprocess.Popen(
                 cmd,
@@ -390,7 +390,7 @@ def browser_use_tool(query: str, head_less_mode: bool = True, log: bool = True, 
     Args:
         query: The task/query to be executed by the browser agent
         head_less_mode: Whether to run the browser in headless mode
-        log: Whether to enable logging to browser.txt
+        log: Whether to enable system_logging to browser.txt
         keep_alive: Whether to keep the browser alive after execution
         
     Returns:
@@ -401,7 +401,7 @@ def browser_use_tool(query: str, head_less_mode: bool = True, log: bool = True, 
         return handler.result
     except Exception as e:
         error_msg = f"browser_use_tool failed with exception: {e}"
-        # Try to log the error if logging is enabled
+        # Try to log the error if system_logging is enabled
         if log:
             try:
                 log_path = settings.BASE_DIR / "basic_logs" / "browser.txt"
@@ -409,7 +409,7 @@ def browser_use_tool(query: str, head_less_mode: bool = True, log: bool = True, 
                 with open(log_path, "a", encoding="utf-8") as f:
                     f.write(f"\n[ERROR] {error_msg}\n")
             except:
-                pass  # Ignore logging errors
+                pass  # Ignore system_logging errors
         return error_msg
 
 

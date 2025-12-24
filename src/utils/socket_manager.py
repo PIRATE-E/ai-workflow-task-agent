@@ -121,9 +121,9 @@ class SocketManager:
             elif log_display_mode == "file":
                 # Option 3: Log to file
                 log_file = (
-                    settings.BASE_DIR.parent / "basic_logs" / "error_log.txt"
-                )  ######
-                print(log_file.exists(), "error transfer path exists")
+                    settings.BASE_DIR / "basic_logs" / "error_log.txt"
+                )  # Fixed: should be src/basic_logs, not project_root/basic_logs
+                print(f"Log file exists: {log_file.exists()}, path: {log_file}")
                 with log_file.open("w") as f:
                     self._log_server_process = subprocess.Popen(
                         [sys.executable, error_transfer_path], stdout=f, stderr=f
@@ -255,7 +255,7 @@ class SocketManager:
         if self._socket_con is None:
             try:
                 if not getattr(settings, "ENABLE_SOCKET_LOGGING", False):
-                    print("Socket logging is disabled in settings")
+                    print("Socket system_logging is disabled in settings")
                     return None
 
                 # First, try to connect to existing server

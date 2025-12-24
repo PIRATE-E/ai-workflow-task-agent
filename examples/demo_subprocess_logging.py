@@ -30,7 +30,7 @@ def demo_automatic_logging():
     console.print("\n📋 This demo shows how your lggraph.py will now work:")
     console.print("   1. ✅ Automatically starts log server when needed")
     console.print("   2. ✅ No need to manually run utils/error_transfer.py")
-    console.print("   3. ✅ Handles all logging seamlessly")
+    console.print("   3. ✅ Handles all system_logging seamlessly")
     console.print("   4. ✅ Cleans up when application exits")
 
     console.print("\n🔄 Starting demonstration...")
@@ -189,7 +189,7 @@ socket_manager.close_connection()
     console.print("   🚀 Fully automatic - no manual server startup needed")
     console.print("   🔄 Self-managing - handles crashes and restarts")
     console.print("   🧹 Clean - proper resource cleanup")
-    console.print("   🛡️ Robust - graceful fallback if logging fails")
+    console.print("   🛡️ Robust - graceful fallback if system_logging fails")
     console.print("   👥 User-friendly - works out of the box")
 
 

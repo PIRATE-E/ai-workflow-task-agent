@@ -1217,7 +1217,7 @@ class AgentGraphCore:
     🎯 PRODUCTION FEATURES:
     - Defensive programming patterns throughout
     - Graceful degradation when tools unavailable
-    - Comprehensive logging and error tracking
+    - Comprehensive system_logging and error tracking
     - Integration with existing agent_mode_node.py system
 
     The system embodies enterprise-grade reliability while maintaining the flexibility
@@ -2499,7 +2499,7 @@ class AgentGraphCore:
         failed_tasks = [t for t in tasks if t.status == "failed"]
         skipped_tasks = [t for t in tasks if t.status == "skip"]
 
-        # Debug logging with skip statistics
+        # Debug system_logging with skip statistics
         debug_info("Finalizer - Task Summary",
                    f"Workflow completed: {len(completed_tasks)} completed, {len(skipped_tasks)} skipped, {len(failed_tasks)} failed",
                    metadata={

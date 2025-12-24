@@ -5,7 +5,7 @@ using the new hierarchical AgentGraphCore system.
 
 Features:
     - Complete integration with AgentGraphCore for all agent operations
-    - Robust error handling and debug logging
+    - Robust error handling and debug system_logging
     - Full support for complex task decomposition and execution
     - Designed for extensibility and integration with LangGraph
 

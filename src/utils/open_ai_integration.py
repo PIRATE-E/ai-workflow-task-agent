@@ -158,7 +158,7 @@ class OpenAIIntegration:
         if not prompt and not messages:
             raise ValueError("Prompt cannot be empty.")
 
-        # Enhanced logging for debugging
+        # Enhanced system_logging for debugging
         from src.ui.diagnostics.debug_helpers import debug_api_call
 
         if prompt:
@@ -210,7 +210,7 @@ class OpenAIIntegration:
                         stream=stream,
                     )
 
-                # Enhanced response logging
+                # Enhanced response system_logging
                 from src.ui.diagnostics.debug_helpers import debug_api_call
 
                 debug_api_call(
@@ -340,7 +340,7 @@ class OpenAIIntegration:
         if not hasattr(self, "_initialized"):
             raise ValueError("OpenAI integration not initialized")
 
-        # Enhanced logging for debugging
+        # Enhanced system_logging for debugging
         from src.ui.diagnostics.debug_helpers import debug_api_call
 
         if prompt:
@@ -382,7 +382,7 @@ class OpenAIIntegration:
                 timeout=OPENAI_TIMEOUT,
             )
 
-            # Enhanced response logging
+            # Enhanced response system_logging
             # if settings.socket_con:
             #     settings.socket_con.send_error(f"[DEBUG] OpenAI async API call completed successfully")
 

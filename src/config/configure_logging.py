@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Configuration helper for LangGraph Chatbot logging
-Helps you set up the best logging configuration for your needs
+Configuration helper for LangGraph Chatbot system_logging
+Helps you set up the best system_logging configuration for your needs
 """
 
 from rich.panel import Panel
@@ -12,7 +12,7 @@ from src.config import settings
 
 
 def show_current_config():
-    """Show current logging configuration"""
+    """Show current system_logging configuration"""
     console = settings.console
     console.print(Panel.fit("🔧 Current Logging Configuration", style="bold blue"))
 
@@ -31,7 +31,7 @@ def show_current_config():
 def recommend_configuration():
     """Recommend the best configuration based on user needs"""
     console = settings.console
-    console.print("\n🎯 Let's find the best logging setup for you!")
+    console.print("\n🎯 Let's find the best system_logging setup for you!")
 
     # Ask about use case
     use_case = Prompt.ask(
@@ -84,7 +84,7 @@ def recommend_configuration():
 
 
 def update_config_file(new_mode):
-    """Update the config.py file with new logging mode"""
+    """Update the config.py file with new system_logging mode"""
     console = settings.console
     config_path = "config.py"
     from pathlib import Path
@@ -123,7 +123,7 @@ def update_config_file(new_mode):
 
 
 def test_configuration():
-    """Test the current logging configuration"""
+    """Test the current system_logging configuration"""
     console = settings.console
     console.print("\n🧪 Testing current configuration...")
 

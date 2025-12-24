@@ -22,7 +22,7 @@ class FileSystemWrapper:
         # Call the filesystem tool (now returns structured response)
         result = filesystem.file_system_tool(**kwargs)
 
-        # Safe debug logging
+        # Safe debug system_logging
         from src.ui.diagnostics.debug_helpers import debug_info
 
         debug_info(

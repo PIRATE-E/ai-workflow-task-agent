@@ -23,16 +23,16 @@ def simulate_lggraph_startup():
     if socket_con:
         console.print("✅ Socket connection established!")
         console.print("   📋 Log server subprocess started automatically")
-        console.print("   🔗 Connection ready for logging")
+        console.print("   🔗 Connection ready for system_logging")
         return socket_con
     else:
         console.print("⚠️ Socket connection not available")
-        console.print("   📋 Will fall back to console logging")
+        console.print("   📋 Will fall back to console system_logging")
         return None
 
 
 def simulate_lggraph_operations(socket_con):
-    """Simulate typical lggraph.py operations with logging"""
+    """Simulate typical lggraph.py operations with system_logging"""
     console = settings.console
     console.print("\n🔄 Simulating typical lggraph.py operations...")
 
@@ -112,8 +112,8 @@ def main():
 
     console.print("📋 This test simulates your lggraph.py workflow:")
     console.print("   1. Application startup with automatic log server")
-    console.print("   2. Normal operations with logging")
-    console.print("   3. Error handling with logging")
+    console.print("   2. Normal operations with system_logging")
+    console.print("   3. Error handling with system_logging")
     console.print("   4. Clean shutdown with subprocess cleanup")
 
     try:
@@ -127,7 +127,7 @@ def main():
         console.print("\n📋 Results:")
         console.print("   ✅ Your lggraph.py will now work completely automatically")
         console.print("   ✅ No manual log server startup required")
-        console.print("   ✅ All logging handled seamlessly")
+        console.print("   ✅ All system_logging handled seamlessly")
         console.print("   ✅ Clean shutdown with proper cleanup")
 
         console.print("\n🚀 Ready to use:")

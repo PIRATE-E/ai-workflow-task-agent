@@ -8,7 +8,7 @@ It enhances error handling with beautiful, informative tracebacks that show:
 - Variable values at the time of error
 - Call stack with context
 - Syntax highlighting for better readability
-- Integration with socket logging system
+- Integration with socket system_logging system
 
 Usage:
     from src.ui.diagnostics.rich_traceback_manager import RichTracebackManager
@@ -43,7 +43,7 @@ class RichTracebackManager:
 
     Features:
     - Beautiful, informative tracebacks with syntax highlighting
-    - Integration with socket logging system
+    - Integration with socket system_logging system
     - Context-aware error reporting
     - Variable inspection at error points
     - Automatic error categorization

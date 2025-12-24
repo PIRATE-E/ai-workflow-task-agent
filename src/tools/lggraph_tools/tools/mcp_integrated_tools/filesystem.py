@@ -15,7 +15,7 @@ def file_system_tool(**kwargs) -> str | dict | list[dict[str, Any]]:
     """
 
     try:
-        # Safe debug logging
+        # Safe debug system_logging
         from src.ui.diagnostics.debug_helpers import debug_info
 
         debug_info(

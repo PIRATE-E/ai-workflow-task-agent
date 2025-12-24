@@ -53,7 +53,7 @@ class browser_agent(BaseModel):
         default=True,
     )
     log: bool = Field(
-        description="Set to True to enable logging of browser actions to a file.",
+        description="Set to True to enable system_logging of browser actions to a file.",
         default=True,
     )
     keep_alive: bool = Field(

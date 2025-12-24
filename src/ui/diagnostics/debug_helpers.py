@@ -1,13 +1,13 @@
 """
 Debug Helper Functions for AI-Agent-Workflow Project
 
-This module provides convenient, structured debug logging and message sending utilities for the AI-Agent-Workflow project.
-It provides a clean, structured debug logging system for diagnostics, analytics, and debugging.
+This module provides convenient, structured debug system_logging and message sending utilities for the AI-Agent-Workflow project.
+It provides a clean, structured debug system_logging system for diagnostics, analytics, and debugging.
 
 Features:
     - Unified debug message sending (info, warning, error, critical) with metadata support
     - Tool and API call reporting for analytics
-    - Performance and error logging with context
+    - Performance and error system_logging with context
     - Direct debug message printing for UI diagnostics
     - Clean debug message routing and error handling
 

@@ -128,7 +128,7 @@ def demo_file_logging():
             log_file_path = os.path.join(
                 os.path.dirname(__file__), "utils", "socket_server.log"
             )
-            console.print(f"✅ Log server started with file logging!")
+            console.print(f"✅ Log server started with file system_logging!")
             console.print(f"📄 Logs will be written to: {log_file_path}")
 
             # Send some demo messages
@@ -164,7 +164,7 @@ def demo_file_logging():
                 console.print("📄 Log file not found yet (may be created later)")
 
         else:
-            console.print("❌ Failed to start file logging server")
+            console.print("❌ Failed to start file system_logging server")
 
     finally:
         config.LOG_DISPLAY_MODE = original_mode
@@ -245,8 +245,8 @@ def main():
 
     console.print("\n🎯 Demo Options:")
     console.print("1. Show current log activity")
-    console.print("2. Demo separate window logging")
-    console.print("3. Demo file-based logging")
+    console.print("2. Demo separate window system_logging")
+    console.print("3. Demo file-based system_logging")
     console.print("4. Interactive log demo")
     console.print("5. Show all options and exit")
 

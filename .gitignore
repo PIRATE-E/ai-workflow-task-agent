@@ -172,6 +172,8 @@ reports
 QWEN.md
 .gemini
 GEMINI.md
+# custom memory file
+memory.jsonl
 # Node.js/MCP config (if not needed in root)
 package.json
 

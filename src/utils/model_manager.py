@@ -28,7 +28,7 @@ except ImportError:  # Fallback (older path compatibility)
     safe_execute = getattr(_rtm, "safe_execute", lambda f, *a, **k: f(*a, **k))  # type: ignore
 
 # 🔧 COMPLETELY ISOLATED DEBUG LOGGING - NO IMPORTS, NO DEPENDENCIES
-# (Replaced by debug_helpers unified logging)
+# (Replaced by debug_helpers unified system_logging)
 
 
 class ModelManager(ChatOllama):
@@ -386,7 +386,7 @@ class ModelManager(ChatOllama):
         cls, response: Union[str, dict, list, BaseMessage]
     ) -> Union[dict, list]:
         """
-        🔧 ENHANCED v4.0: JSON extraction with COMPLETELY ISOLATED logging (no recursion possible)
+        🔧 ENHANCED v4.0: JSON extraction with COMPLETELY ISOLATED system_logging (no recursion possible)
 
         Args:
             response: Response to convert (can be string, dict, list, or BaseMessage)

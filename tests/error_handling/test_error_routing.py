@@ -48,7 +48,7 @@ def test_error_routing():
         print("✅ Debug console connected - errors will route to debug window")
         settings.socket_con = socket_con
     else:
-        print("❌ Debug console not connected - start socket logging first")
+        print("❌ Debug console not connected - start socket system_logging first")
         print("   Run: python src/utils/error_transfer.py")
         return
 
