@@ -5,7 +5,10 @@ handlers are responsible for processing log entries and directing them to approp
 """
 import os
 from abc import ABC, abstractmethod
+from pathlib import Path
 from typing import Dict, TextIO
+from datetime import datetime
+from src.config.settings import LOG_TEXT_HANDLER_ROTATION_TIME_LIMIT_HOURS, LOG_TEXT_HANDLER_ROTATION_SIZE_LIMIT_MB
 
 from ..protocol import LogEntry
 
@@ -47,6 +50,11 @@ class TextHandler(Handler):
     name = "TextHandler"
     writers: Dict[str, TextIO] = {}
 
+    # file rotation settings
+    rotation_size_limit = LOG_TEXT_HANDLER_ROTATION_SIZE_LIMIT_MB
+
+    time_rotation_limit = LOG_TEXT_HANDLER_ROTATION_TIME_LIMIT_HOURS
+
     def should_handle(self, log_entry: LogEntry, *args) -> bool:
         """
         Determine if this handler should process the given log entry.
@@ -82,11 +90,17 @@ class TextHandler(Handler):
             log_dir.mkdir(parents=True, exist_ok=True)
             log_file_path = log_dir / f"log_{file_name.value}.txt"
 
+            # apply the log file for rotation check
+            rotation_checks = self._text_file_rotation(log_file_path)
+
+            file_mode = 'a' if not rotation_checks.get('rotate', False) else 'w'
+
             # Open with UTF-8 encoding to support emojis and international characters
-            TextHandler.writers[file_name.value] = open(log_file_path, 'w', 1, encoding='utf-8')
+            TextHandler.writers[file_name.value] = open(log_file_path, file_mode, 1, encoding='utf-8')
+            TextHandler.writers[file_name.value].write("" if file_mode == 'w' else f"\n\n{'='*20} New Logging Session Started at {datetime.now().isoformat()} {'='*20}\n\n")
             TextHandler.writers[file_name.value].flush()
 
-        from ..formater import TextFormater
+        from ..formatter import TextFormater
         formater = TextFormater.format(log_entry)
         TextHandler.writers[file_name.value].write(f"{formater} \n")
 
@@ -99,3 +113,23 @@ class TextHandler(Handler):
             writer.close()
         TextHandler.writers.clear()
         pass
+
+    def _text_file_rotation(self, file_path:Path):
+        """
+        Rotate log files if they exceed a certain size (e.g., 5MB or TIME).
+        check for defined time or size limit and rotate accordingly.
+        :return:
+        """
+
+        # check for file size
+        file_size = file_path.stat().st_size
+
+        if not file_path.exists():
+            return {'rotate': True}
+
+        if file_size > self.rotation_size_limit:  # 5 MB size limit
+            return {'rotate': True}
+
+        if datetime.fromtimestamp(file_path.stat().st_mtime).timestamp() + self.time_rotation_limit < datetime.now().timestamp(): # 24 hours time limit
+            return {'rotate': True}
+        return {'rotate': False}

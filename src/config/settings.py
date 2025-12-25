@@ -67,6 +67,12 @@ ENABLE_SOUND_NOTIFICATIONS = (
 # 'file' - Logs to file (socket_server.log)
 # 'console' - Shows logs in same console (can be messy)
 LOG_DISPLAY_MODE = os.getenv("LOG_DISPLAY_MODE", "separate_window")
+LOG_TEXT_HANDLER_ROTATION_SIZE_LIMIT_MB = int(
+    os.getenv("LOG_TEXT_HANDLER_ROTATION_SIZE_LIMIT_MB", 5 * 1024 * 1024)
+)  # 5 MB
+LOG_TEXT_HANDLER_ROTATION_TIME_LIMIT_HOURS = int(
+    os.getenv("LOG_TEXT_HANDLER_ROTATION_TIME_LIMIT_HOURS", 24 * 60 * 60)
+)  # 24 hours
 
 # Development/Production mode
 DEBUG = os.getenv("DEBUG", "false").lower() == "true"
