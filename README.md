@@ -5,9 +5,17 @@
 [![Python 3.13+](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/downloads/)
 [![LangGraph](https://img.shields.io/badge/LangGraph-Latest-green.svg)](https://langchain-ai.github.io/langgraph/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Version](https://img.shields.io/badge/Version-v1.8.0-brightgreen.svg)]()
+[![Version](https://img.shields.io/badge/Version-v1.9.0-brightgreen.svg)]()
 
 ---
+
+## 🚀 What's New (v1.9.0 – December 2025)
+- ✅ **Professional Logging System** - Clean architecture with multi-file routing, 84% code reduction
+- ✅ **Logging for Developers** - Separate log files per category (MCP, API, Tools, Agent, Errors)
+- ✅ **Dynamic Log Routing** - Keyword-based automatic categorization
+- ✅ **SOLID Architecture** - Extensible handlers, formatters, and routers
+- ✅ **Reports System** - Comprehensive documentation in `reports/` folder
+- ✅ **API Migration Planning** - Architecture ready for client-server transformation
 
 ## 🚀 What's New (v1.8.0 – September 2025)
 - ✅ **Browser Agent Integration** - Automated web browsing with browser-use tool wrapper
@@ -23,11 +31,13 @@
 
 ## ✨ Current Status
 - **Production Readiness**: 95% → Stability improved via circuit breaker + MCP hardening
+- **Logging System**: Professional multi-file logging with dynamic routing (see `src/system_logging/README.md`)
 - **MCP**: Fully dynamic via .mcp.json at project root (path set in settings.MCP_CONFIG.MCP_CONFIG_PATH)
 - **Agent Mode**: More reliable parameter generation and MCP tool execution
 - **Browser Automation**: Integrated browser-use tool for web automation tasks
 - **DevOps**: Container-first workflow supported (build and run via docker-compose)
 - **Compatibility**: Python 3.13 baseline; legacy 3.11 works with requirements.txt
+- **Documentation**: Extensive reports in `reports/` folder with learning-focused tutorials
 
 ---
 
@@ -90,6 +100,19 @@ This is a **production-ready consumer desktop AI assistant** with enterprise-gra
 - **Structured Diagnostics**: Transport-agnostic logging with metadata-rich events
 - **Socket-Based Routing**: Network-based log aggregation for clean separation
 - **Performance Monitoring**: Error categorization, frequency tracking, and debugging statistics
+
+### 📝 **Professional Logging System** (New in v1.9.0)
+- **Multi-File Logging**: Automatic routing to category-specific log files
+  - `log_MCP_SERVER.txt` - MCP server operations
+  - `log_API_CALL.txt` - OpenAI/NVIDIA API calls
+  - `log_TOOL_EXECUTION.txt` - Tool execution logs
+  - `log_AGENT_WORKFLOW.txt` - Agent workflow logs
+  - `log_ERROR_TRACEBACK.txt` - Error tracebacks
+- **Clean Architecture**: SOLID principles with single-responsibility components
+- **Dynamic Routing**: Keyword-based categorization (no code changes needed)
+- **Extensible Handlers**: Add custom handlers/formatters easily
+- **84% Code Reduction**: Adapter reduced from 210 to 34 lines
+- **Developer Documentation**: Full guide at `src/system_logging/README.md`
 
 ### 📡 **Event-Driven Architecture**
 - **RichStatusListener**: Automatic status updates with Rich.status integration

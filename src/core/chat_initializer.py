@@ -8,7 +8,8 @@ from threading import Thread
 from typing import Awaitable
 
 from langgraph.graph.state import CompiledStateGraph
-from rich import console, prompt, inspect
+from rich import console, inspect
+from rich import prompt as rich_prompt  # Renamed to avoid conflict
 
 from src.config import settings
 from src.config.settings import PNG_FILE_PATH
@@ -27,6 +28,9 @@ from src.utils.socket_manager import SocketManager
 
 from src.utils.listeners.exit_listener import ExitListener
 # mcp.md servers integration
+
+# Modern CLI input handler
+from src.ui.chatInputHandler import InputHandler
 
 
 class ChatInitializer:
@@ -427,10 +431,14 @@ class ChatInitializer:
                 raise ValueError(
                     "Chat is not properly initialized. Please ensure all components are set up."
                 )
+            # testing new chat input
+            # user_input = prompt.Prompt.ask(
+            #     "[bold cyan]You[/bold cyan]", default="", show_default=False
+            # )
 
-            user_input = prompt.Prompt.ask(
-                "[bold cyan]You[/bold cyan]", default="", show_default=False
-            )
+            user_input = InputHandler().get_user_input()
+
+
             if user_input.lower() == "exit" or settings.exit_flag:
                 self.console.print("[bold red]Exiting the chat...[/bold red]")
                 try:
