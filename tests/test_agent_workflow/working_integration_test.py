@@ -4,15 +4,22 @@ This test demonstrates the hierarchical agent system actually working with real 
 """
 
 import sys
+from pathlib import Path
+
+# Add project root to path
+project_root = Path(__file__).resolve().parents[2]
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
+
+
+import sys
 import os
 import tempfile
 import time
 from pathlib import Path
 
 # Add the project root to Python path
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 if project_root not in sys.path:
-    sys.path.insert(0, project_root)
 
 try:
     # Import hierarchical agent system

@@ -5,6 +5,15 @@ Includes error handling, retry logic, and comprehensive validation.
 """
 
 import sys
+from pathlib import Path
+
+# Add project root to path
+project_root = Path(__file__).resolve().parents[1]
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
+
+
+import sys
 import os
 import asyncio
 import time
@@ -12,8 +21,6 @@ import json
 from pathlib import Path
 
 # Add project root to path
-project_root = Path(__file__).parent.parent
-sys.path.insert(0, str(project_root))
 
 from src.config import settings
 from src.core.chat_initializer import ChatInitializer

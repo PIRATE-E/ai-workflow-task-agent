@@ -76,12 +76,14 @@ class ModelManager(ChatOllama):
             self._initialized = True
 
             # Check if this should use OpenAI integration
+            if len(kwargs) == 0 or "model" not in kwargs:
+                kwargs["model"] = settings.API_DEFAULT_API_MODEL
             if kwargs.get("model") in ModelManager.api_model_list:
                 try:
                     # For OpenAI models, create integration and mark as OpenAI mode
                     ModelManager._openai_integration = OpenAIIntegration(
                         api_key=kwargs.get("api_key", settings.OPEN_AI_API_KEY),
-                        model=kwargs.get("model", settings.GPT_MODEL),
+                        model=kwargs.get("model", settings.API_DEFAULT_API_MODEL),
                     )
                     ModelManager._is_openai_mode = True
                     # Still initialize ChatOllama with a default model to avoid issues

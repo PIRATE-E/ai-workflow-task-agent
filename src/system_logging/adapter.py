@@ -1,5 +1,6 @@
-import datetime
 import json
+
+from src.utils.timestamp_util import get_formatted_timestamp
 
 
 class ProtocolAdapter:
@@ -13,7 +14,7 @@ class ProtocolAdapter:
 
             # Extract fields
             data = debug_data.get("data", {})
-            timestamp = debug_data.get("timestamp", datetime.datetime.now().isoformat())
+            timestamp = debug_data.get("timestamp", get_formatted_timestamp())
 
             # PRESERVE HEADING IN METADATA (Don't lose it!)
             metadata = data.get("metadata", {})

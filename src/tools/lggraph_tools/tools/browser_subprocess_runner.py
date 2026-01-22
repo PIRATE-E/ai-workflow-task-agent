@@ -10,9 +10,16 @@ and Chromium can function normally without os.dup2() interference.
 """
 import asyncio
 import json
+import queue
 import sys
 import traceback
 from pathlib import Path
+from threading import Thread
+
+import psutil
+from browser_use import Agent, Browser
+from browser_use.browser.events import BrowserStopEvent, BrowserKillEvent
+from browser_use.browser.watchdogs.local_browser_watchdog import LocalBrowserWatchdog
 
 
 def main():
@@ -45,8 +52,6 @@ def main():
         sys.stdout.flush()
 
         # Import browser_use and dependencies (after stdout is already redirected by parent)
-        from browser_use import Agent, Browser
-        from browser_use.agent.views import AgentHistoryList
 
         # Import project dependencies
         # Add project root to path
@@ -175,7 +180,7 @@ def main():
             print("[SUBPROCESS] Initializing ModelManager and BrowserUseCompatibleLLM...")
             sys.stdout.flush()
 
-            model_manager = ModelManager(model="moonshotai/kimi-k2-instruct")
+            model_manager = ModelManager()
             browser_use_llm = BrowserUseCompatibleLLM(model_manager)
 
             print("[SUBPROCESS] Starting Browser instance...")
@@ -185,6 +190,7 @@ def main():
                 headless=headless,
                 keep_alive=keep_alive,
                 record_video_dir=settings.BASE_DIR / "basic_logs" / "browser_videos" if result_file else None,
+                user_data_dir=settings.BROWSER_USE_USER_PROFILE_PATH if result_file else None,
             )
 
             print("[SUBPROCESS] Creating Agent...")
@@ -203,20 +209,31 @@ def main():
             sys.stdout.flush()
 
             try:
-                result: AgentHistoryList = await agent.run()
+                ### we have to apply the monkey patch here for the keep_alive bug
+                LocalBrowserWatchdog.on_BrowserStopEvent = on_BrowserStopEvent
+                running_agent_task = asyncio.create_task(agent.run())
+                # Keep-alive mode: monitoring completed, exit when browser is closed by user
+                if keep_alive:
+                    res = queue.Queue()
+                    monitering_browser_process(res)
+                await asyncio.create_task(load_custom_sessions(browser)) # this doesn't break
+                result = await running_agent_task
+                await asyncio.create_task(save_custom_sessions(browser))
+
                 print("[SUBPROCESS] Agent execution completed!")
                 sys.stdout.flush()
             except Exception as agent_error:
                 print(f"[SUBPROCESS] CRITICAL: agent.run() failed: {agent_error}")
                 print(traceback.format_exc())
                 sys.stdout.flush()
-                raise
+                sys.exit(1)
 
             print("[SUBPROCESS] Closing agent and browser...")
             sys.stdout.flush()
 
             await agent.close()
-            await browser.stop()
+            # await browser.stop() # this would kill the browser even if keep_alive is True
+            ## delete the session data
 
             print("[SUBPROCESS] Cleanup completed!")
             sys.stdout.flush()
@@ -247,8 +264,18 @@ def main():
         print(f"[SUBPROCESS] Result written to {result_file}")
         sys.stdout.flush()
 
-        sys.exit(0)
-
+        if not keep_alive:
+            print("[SUBPROCESS] Exiting subprocess.")
+            sys.stdout.flush()
+            sys.exit(0)
+        else:
+            if 'res' in locals() and  res.get():
+                print("[SUBPROCESS] Keep-alive monitoring completed, exiting subprocess.")
+                sys.stdout.flush()
+                sys.exit(0)
+            print("[SUBPROCESS] QUEUE is empty, exiting subprocess.")
+            sys.stdout.flush()
+            sys.exit(0)
     except Exception as e:
         # Write error result to file
         error_result = {
@@ -271,6 +298,262 @@ def main():
             pass  # If we can't write to file, error is already printed to stderr
 
         sys.exit(1)
+
+
+async def load_custom_sessions(browser: Browser):
+    """Load custom browser sessions if needed
+
+    This function waits for the browser to be ready (up to 30 seconds) before attempting to load session data.
+    It restores the current URL, form data, and scroll position from a saved session file if available.
+    """
+    ### we have to wait until the browser is not connected
+    async def wait_until_browser_ready():
+        max_wait = 30  # seconds
+        waited = 0
+        while browser._cdp_client_root is None and waited < max_wait:
+            print(f"[SUBPROCESS] Waited for browser to be ready... {waited}seconds upto {max_wait}seconds")
+            await asyncio.sleep(1)
+            waited += 1
+
+        if browser._cdp_client_root is None:
+            raise RuntimeError(f"Browser did not become ready in time. CDP client is still None. wated for {waited} seconds.")
+
+
+    await wait_until_browser_ready()
+    import json
+    import aiofiles
+    from src.config import settings
+    from pathlib import Path
+    session_data = {}
+    session_file_path = Path(settings.BROWSER_USE_USER_PROFILE_PATH) / "custom_sessions.json"
+    if not session_file_path.exists():
+        print("[SUBPROCESS] No custom session file found, starting fresh.")
+        return
+    async with aiofiles.open(session_file_path, 'r', encoding='utf-8') as f:
+        content = await f.read()
+        session_data = json.loads(content)
+
+    current_url = session_data.get('current_url', None)
+    form_data:dict = session_data.get('form_data', {})
+    scroll_pos = session_data.get('scroll_position', {'x': 0, 'y': 0})
+
+    if current_url:
+        from browser_use.browser.events import NavigateToUrlEvent
+        await browser.event_bus.dispatch(NavigateToUrlEvent(url=current_url))
+        await asyncio.sleep(3)
+
+        # fill form data
+        cdp_session = await browser.get_or_create_cdp_session()
+        form_data_string = json.dumps(form_data)
+
+        restore_form_script = f"""
+        (function() {{
+                const formData = {form_data_string};
+                let restoredCount = 0;
+                
+                for (const [key, value] of Object.entries(formData)) {{
+                    // Try to find input by name, id, or aria-label
+                    let input = document.querySelector(`input[name="${{key}}"]`) ||
+                               document.querySelector(`textarea[name="${{key}}"]`) ||
+                               document.querySelector(`select[name="${{key}}"]`) ||
+                               document.querySelector(`#${{key}}`) ||
+                               document.querySelector(`input[aria-label="${{key}}"]`);
+                    
+                    if (input) {{
+                        input.value = value;
+                        // Trigger input event so React/Vue/Angular detect the change
+                        input.dispatchEvent(new Event('input', {{ bubbles: true }}));
+                        input.dispatchEvent(new Event('change', {{ bubbles: true }}));
+                        restoredCount++;
+                    }}
+                }}
+                
+                return restoredCount;
+            }})();
+        """
+
+        restore_result = await cdp_session.cdp_client.send.Runtime.evaluate(
+            params={'expression': restore_form_script, 'returnByValue': True},
+            session_id=cdp_session.session_id
+        )
+
+        print(f"[SUBPROCESS] Restored {restore_result.get('result', {}).get('value', 0)} out of {len(form_data)} form fields.")
+
+
+        # scroll to position
+        scroll_script = f"""
+        (function() {{
+            window.scrollTo({scroll_pos['x']}, {scroll_pos['y']});
+            return true;
+        }})();
+        """
+
+        await cdp_session.cdp_client.send.Runtime.evaluate(
+            params={'expression': scroll_script, 'returnByValue': True},
+            session_id=cdp_session.session_id
+        )
+
+        print("[SUBPROCESS] Restored scroll position.")
+    else:
+        ## no session to restore
+        print("[SUBPROCESS] No URL found in custom session data to restore.")
+        pass
+
+    print(f"[SUBPROCESS] Loaded custom session data: {session_data}")
+    sys.stdout.flush()
+    return
+
+
+async def save_custom_sessions(browser: Browser):
+    """Save custom browser sessions if needed (placeholder)."""
+    current_url = await browser.get_current_page_url()
+    cdp_session = await browser.get_or_create_cdp_session()
+
+    form_data_script = """
+    (function() {
+            const formData = {};
+            const inputs = document.querySelectorAll('input, textarea, select');
+            inputs.forEach(input => {
+                const key = input.name || input.id || input.getAttribute('aria-label');
+                if (key && input.value) {
+                    formData[key] = input.value;
+                }
+            });
+            return formData;
+        })();
+    """
+
+    form_result = await cdp_session.cdp_client.send.Runtime.evaluate(
+        params={'expression': form_data_script, 'returnByValue': True},
+        session_id=cdp_session.session_id
+    )
+    form_data = form_result.get('result', {}).get('value', {})
+
+    # Extract scroll position via JavaScript
+    scroll_script = """
+            (function() {
+                return {
+                    x: window.scrollX || window.pageXOffset || 0,
+                    y: window.scrollY || window.pageYOffset || 0
+                };
+            })();
+            """
+
+    scroll_result = await cdp_session.cdp_client.send.Runtime.evaluate(
+        params={'expression': scroll_script, 'returnByValue': True},
+        session_id=cdp_session.session_id
+    )
+    scroll_pos = scroll_result.get('result', {}).get('value', {'x': 0, 'y': 0})
+
+
+    ## now save them into the local storage
+    ## todo this needs to be secure but in future this is currently in development
+    from src.utils.timestamp_util import get_formatted_timestamp
+    timestamp = get_formatted_timestamp()
+    session_data = {
+        'current_url': current_url,  # ← Fixed key name
+        'form_data': form_data,
+        'scroll_position': scroll_pos,
+        'timestamp': timestamp
+    }
+
+    import json
+    import aiofiles
+    from src.config import settings
+    from pathlib import Path
+    session_file_path = Path(settings.BROWSER_USE_USER_PROFILE_PATH) / 'custom_sessions.json'
+    async with aiofiles.open(session_file_path, 'w', encoding='utf-8') as f:
+        content = json.dumps(session_data, indent=2)
+        await f.write(content)
+
+    print(f"[SUBPROCESS] Custom session saved to {session_file_path}")
+    sys.stdout.flush()
+
+
+async def on_BrowserStopEvent(self, event: BrowserStopEvent) -> None:
+    """Monkey patched stop watchdog to prevent browser from closing if keep_alive is True."""
+    force_kill = getattr(event, 'force', False)  # ✅ Corrected: use 'force' not 'force_close'
+    browser_profile = getattr(self.browser_session, 'browser_profile', None)
+    keep_alive = getattr(browser_profile, 'keep_alive', False)
+    if self._subprocess and self.browser_session.is_local:
+        if keep_alive and not force_kill:
+            print("[SUBPROCESS] Keep alive is True, skipping browser stop. applying monkey patch.")
+            sys.stdout.flush()
+            return
+    # ✅ Corrected: use self.event_bus.dispatch() (synchronous, no await)
+    self.event_bus.dispatch(BrowserKillEvent())
+
+
+
+async def watch_process_alive() -> bool:
+    """
+    Monitor the ghost process (browser's parent) and exit when it dies.
+
+    The ghost process is created by browser-use/Playwright and owns Chrome.
+    When user closes browser, Chrome dies → ghost detects it → ghost exits.
+    We detect ghost's death and exit gracefully.
+    """
+    #     this would watch the process of chrome and the ghost process of sub runner to calculate that does user closed the browser or not if keep alive is true
+    #     if the processes are running sleep for 5 seconds then again wait till the browser process didn't close
+    browser_pid = None
+    browser_actual_parent_runner_pid = None
+    browser_ghost_parent_runner_pid = None
+    killer_flag = -1
+
+    def get_browser_process_info():
+        nonlocal browser_pid, browser_actual_parent_runner_pid, browser_ghost_parent_runner_pid, killer_flag
+        try:
+            for process in psutil.process_iter(['pid', 'name', 'cmdline', 'ppid']):
+                try:
+                    if 'chrome' in process.info['name'].lower() or 'chromium' in process.info['name'].lower():
+                        cmdline = ' '.join(process.info['cmdline']).lower()
+                        if '--remote-debugging-port' in cmdline:
+                            browser_pid = process.info['pid']
+                            browser_ghost_parent_runner_pid = process.info['ppid']
+                            browser_actual_parent_runner_pid = browser_ghost_parent_runner_pid.parent().pid if psutil.pid_exists(browser_ghost_parent_runner_pid) else None
+                            print(
+                                f"[SUBPROCESS] Detected browser process PID: {browser_pid}, Parent (ghost) PID: {browser_actual_parent_runner_pid}, Parent actual browser runner PID: {browser_actual_parent_runner_pid}")
+                            sys.stdout.flush()
+                            break
+                except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+                    continue
+            if browser_pid is not None and browser_ghost_parent_runner_pid is not None and browser_actual_parent_runner_pid is not None:
+                if killer_flag == -1: # that means this is executing first time and we found the process
+                    killer_flag += 1
+            if browser_pid is not None and browser_ghost_parent_runner_pid is not None and browser_actual_parent_runner_pid is not None:
+                if killer_flag == -1:  # that means we didn't find the process yet
+                    pass
+                elif killer_flag == 0:  # that means we found the process once, but now it's gone
+                    print(f"[SUBPROCESS] Browser process PID: {browser_pid} has exited.")
+                    sys.stdout.flush()
+                    killer_flag += 1
+                    return True
+        except Exception as e:
+            print(f"[SUBPROCESS] Failed to get browser process info: {e}")
+            sys.stdout.flush()
+
+    while killer_flag <= 0:
+        await asyncio.sleep(5)
+        if get_browser_process_info():
+            break
+    return True
+
+def monitering_browser_process(result_que:queue.Queue):
+    def monitering_task(res_que:queue.Queue):
+        loop = asyncio.new_event_loop()
+        try:
+            asyncio.set_event_loop(loop)
+            res_que.put(loop.run_until_complete(watch_process_alive()))
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+        finally:
+            loop.close()
+        pass
+    t = Thread(target=monitering_task, daemon=True, args=(result_que, ))
+    t.start()
+    return t
+
 
 
 if __name__ == '__main__':

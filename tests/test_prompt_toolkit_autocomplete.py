@@ -14,8 +14,15 @@ import sys
 from pathlib import Path
 
 # Add project root to path
-project_root = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(project_root))
+project_root = Path(__file__).resolve().parents[1]
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
+
+
+import sys
+from pathlib import Path
+
+# Add project root to path
 
 # First, register the slash commands (normally done by ChatInitializer)
 from src.slash_commands.on_run_time_register import OnRunTimeRegistry

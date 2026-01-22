@@ -5,13 +5,20 @@ This test directly imports only what's needed and tests the core functionality.
 """
 
 import sys
+from pathlib import Path
+
+# Add project root to path
+project_root = Path(__file__).resolve().parents[2]
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
+
+
+import sys
 import os
 import time
 import threading
 
 # Add project root to path
-project_root = os.path.join(os.path.dirname(__file__), "..", "..")
-sys.path.append(project_root)
 
 from rich.console import Console
 

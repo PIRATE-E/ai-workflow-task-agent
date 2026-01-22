@@ -31,7 +31,8 @@ DEFAULT_MODEL = os.getenv("DEFAULT_MODEL", "llava-llama3:latest")
 CYPHER_MODEL = os.getenv("CYPHER_MODEL", "deepseek-r1:8b")
 CLASSIFIER_MODEL = os.getenv("CLASSIFIER_MODEL", "llama3.1:8b")
 GPT_MODEL = os.getenv("GPT_MODEL", "openai/gpt-oss-120b")
-KIMI_MODEL = os.getenv("KIMI_MODEL", "moonshotai/kimi-k2-instruct")
+KIMI_MODEL = os.getenv("KIMI_MODEL", "moonshotai/kimi-k2-instruct-0905")
+API_DEFAULT_API_MODEL = KIMI_MODEL
 OPEN_AI_API_KEY = os.getenv("OPENAI_API_KEY", "your_openai_api_key_here")
 
 # API endpoints
@@ -53,7 +54,6 @@ SKIP_THRESHOLD = int(os.getenv("SKIP_THRESHOLD", 70))  # Skip tasks with skip_pr
 
 # Logging configuration
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
-LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 
 # Feature flags
 ENABLE_SOCKET_LOGGING = os.getenv("ENABLE_SOCKET_LOGGING", "true").lower() == "true"
@@ -73,6 +73,7 @@ LOG_TEXT_HANDLER_ROTATION_SIZE_LIMIT_MB = int(
 LOG_TEXT_HANDLER_ROTATION_TIME_LIMIT_HOURS = int(
     os.getenv("LOG_TEXT_HANDLER_ROTATION_TIME_LIMIT_HOURS", 24 * 60 * 60)
 )  # 24 hours
+LOG_ROTATION_ALWAYS_ON = os.getenv("LOG_ROTATION_ALWAYS_ON", "true").lower() == "true" ##### set to true for debugging only
 
 # Development/Production mode
 DEBUG = os.getenv("DEBUG", "false").lower() == "true"
@@ -135,6 +136,7 @@ recursion_limit = int(os.getenv("RECURSION_LIMIT", 500))  ## recursion limit for
 BROWSER_USE_ENABLED = os.getenv("BROWSER_USE_ENABLED", "true").lower() == "true"
 BROWSER_USE_TIMEOUT = int(os.getenv("BROWSER_USE_TIMEOUT", 1300))  # Timeout in seconds (default 1300s = 20min)
 BROWSER_USE_LOG_FILE = "browser.txt"
+BROWSER_USE_USER_PROFILE_PATH = os.getenv("BROWSER_USE_USER_PROFILE_PATH", str(BASE_DIR.parent.parent / "./profiles/main_profile"))
 
 
 # mcp.md configs

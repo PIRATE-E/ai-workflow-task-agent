@@ -1,10 +1,10 @@
 import uuid
-from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any, Literal
 
 from langgraph.constants import END
 from pydantic import BaseModel, Field
 
+from src.utils.timestamp_util import get_formatted_timestamp
 from .hierarchical_agent_prompts import HierarchicalAgentPrompt
 from ...config import settings
 # Fixed imports - use relative imports instead of src.
@@ -56,7 +56,7 @@ class REQUIRED_CONTEXT(BaseModel):
     source_node: str = Field(..., description="Which node created this task")
     triggering_task_id: str | int | float | None = Field(default=None,
                                                          description="The ID of the parent task that spawned this one")
-    creation_timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    creation_timestamp: str = Field(default_factory=lambda: get_formatted_timestamp())
     pre_execution_context: dict | None = Field(default=None,
                                                description="Any context relevant before executing the task")
 
@@ -82,7 +82,7 @@ class FAILURE_CONTEXT_STRATEGY(BaseModel):
     next_steps: str | None = Field(default=None, description="Recommended next steps after this strategy")
     outcome: Literal["FAILURE", "APPLIED", "NOT_APPLIED"] = Field(default="NOT_APPLIED",
                                                                   description="Outcome after attempting this strategy")
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc).strftime('%Y-%m-%d %I:%M:%S.%f %p'),
+    timestamp: str = Field(default_factory=lambda: get_formatted_timestamp(),
                                 description="Timestamp when this strategy was attempted")
 
     details: dict[str, Any] | None = Field(default={},
@@ -92,7 +92,7 @@ class FAILURE_CONTEXT_STRATEGY(BaseModel):
 class FAILURE_CONTEXT(BaseModel):
     error_message: str = Field(..., description="Detailed error message from the last failure")
     fail_count: int = Field(description="number of times the task has failed", default=1, ge=1)
-    last_failure_timestamp: datetime | None = Field(default=None, description="Timestamp of the last failure")
+    last_failure_timestamp: str | None = Field(default=None, description="Timestamp of the last failure")
     stack_trace: str | None = Field(default=None, description="Stack trace or debug info from the failure")
     recovery_actions: dict[str, Any] | None = Field(default=None, description="Any recovery actions taken")
     error_type: str | None = Field(default=None, description="Type or category of the error")
@@ -101,7 +101,7 @@ class FAILURE_CONTEXT(BaseModel):
     strategy_history: list[FAILURE_CONTEXT_STRATEGY] | None = Field(default_factory=list,
                                                                     description="History of all recovery strategies attempted with outcomes")  # <-- NEW FIELD
     # Cooldown timestamp to avoid tight retry loops
-    next_attempt_timestamp: datetime | None = Field(default=None, description="Earliest time allowed for next retry")
+    next_attempt_timestamp: str | None = Field(default=None, description="Earliest time allowed for next retry")
 
 
 class subAgent_CONTEXT(BaseModel):
@@ -112,9 +112,9 @@ class subAgent_CONTEXT(BaseModel):
     subAgent_tasks: TaskListType | None = Field(default=None, description="List of tasks assigned to the sub-agent")
     parent_task_id: str | int | float | None = Field(default=None,
                                                      description="The ID of the parent task that spawned this sub-agent")
-    creation_timestamp: datetime | None = Field(default=None,
+    creation_timestamp: str | None = Field(default=None,
                                                 description="Timestamp of when the sub-agent was created")
-    completion_timestamp: datetime | None = Field(default=None, description="Timestamp of completion")
+    completion_timestamp: str | None = Field(default=None, description="Timestamp of completion")
     notes: str | None = Field(default=None, description="Additional notes about the sub-agent's operations")
     result: str | None = Field(default=None, description="Overall result from the sub-agent's operations")
 
@@ -138,7 +138,7 @@ class TASK(BaseModel):
     failure_context: FAILURE_CONTEXT | None = Field(default=None, description="Context for any failures")
     subAgent_context: subAgent_CONTEXT | None = Field(default=None, description="Context for sub-agents")
     # Optional earliest next attempt timestamp (for exponential backoff / cooldown)
-    next_attempt_at: datetime | None = Field(default=None,
+    next_attempt_at: str | None = Field(default=None,
                                              description="Earliest timestamp when this task can be attempted again")
 
 
@@ -317,7 +317,7 @@ class AgentCoreHelpers:
         )
 
         try:
-            model = ModelManager(model="moonshotai/kimi-k2-instruct")
+            model = ModelManager()
             response = model.invoke([
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": human_prompt},
@@ -409,7 +409,7 @@ class AgentCoreHelpers:
                 ["tool1", "tool2", "tool3"]
                 '''
 
-            model = ModelManager(model="moonshotai/kimi-k2-instruct")
+            model = ModelManager()
             response = model.invoke([
                 {"role": "system",
                  "content": "You are a tool recommendation expert. Select the most relevant tools for the given task."},
@@ -564,7 +564,7 @@ class AgentCoreHelpers:
             )
 
             try:
-                model = ModelManager(model="moonshotai/kimi-k2-instruct")
+                model = ModelManager()
                 response = model.invoke([
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": human_prompt},
@@ -620,7 +620,7 @@ class AgentCoreHelpers:
             hierarchy_prompt = HierarchicalAgentPrompt()
             system_prompt, human_prompt = hierarchy_prompt.generate_plan_to_tasks_prompt(whole_context, available_tools_str)
             try:
-                model = ModelManager(model="moonshotai/kimi-k2-instruct")
+                model = ModelManager()
                 response = model.invoke([
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": human_prompt},
@@ -687,7 +687,7 @@ class AgentCoreHelpers:
             )
 
             try:
-                model = ModelManager(model="moonshotai/kimi-k2-instruct")
+                model = ModelManager()
                 response = model.invoke([
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": human_prompt},
@@ -815,7 +815,7 @@ class AgentCoreHelpers:
             )
 
             try:
-                model = ModelManager(model="moonshotai/kimi-k2-instruct")
+                model = ModelManager()
                 response = model.invoke([
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": human_prompt},
@@ -1168,7 +1168,7 @@ class AgentCoreHelpers:
                 task.description, task.tool_name, tool_schema, task.depth, parent_context=spawn_reason
             )
 
-            model = ModelManager(model="moonshotai/kimi-k2-instruct")
+            model = ModelManager()
             response = model.invoke([
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": human_prompt},
@@ -1256,7 +1256,7 @@ class AgentGraphCore:
                 error_feedback=error_feedback  # Pass feedback from previous failed attempt
             )
 
-            model = ModelManager(model="moonshotai/kimi-k2-instruct")
+            model = ModelManager()
             response = model.invoke([
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": human_prompt},
@@ -1698,7 +1698,7 @@ class AgentGraphCore:
                 requires_high_fidelity=current_task.requires_high_fidelity_context,  # 🚨 NEW: Pass high-fidelity flag
             )
 
-            model = ModelManager(model="moonshotai/kimi-k2-instruct")
+            model = ModelManager()
             response = model.invoke([
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": human_prompt},
@@ -1727,7 +1727,7 @@ class AgentGraphCore:
                 current_task.failure_context = FAILURE_CONTEXT(
                     error_message=error_message,
                     fail_count=(current_task.failure_context.fail_count + 1) if current_task.failure_context else 1,
-                    last_failure_timestamp=datetime.now(timezone.utc),
+                    last_failure_timestamp=get_formatted_timestamp(),
                     error_type="ParameterValidationError",
                     failed_parameters=parameters,
                 )
@@ -1850,7 +1850,7 @@ class AgentGraphCore:
                         current_task.execution_context, 'result',
                         None) else f"Parent task {current_task.task_id} failed without explicit failure_context."),
                     fail_count=1,
-                    last_failure_timestamp=datetime.now(timezone.utc),
+                    last_failure_timestamp=get_formatted_timestamp(),
                     error_type="SyntheticFailureContext",
                     failed_parameters=synthetic_failed_params,
                     strategy_history=[]
@@ -1986,7 +1986,7 @@ class AgentGraphCore:
             current_task.failure_context = FAILURE_CONTEXT(
                 error_message=str(e),
                 fail_count=preserved_fail_count,
-                last_failure_timestamp=datetime.now(timezone.utc),
+                last_failure_timestamp=get_formatted_timestamp(),
                 error_type="UnhandledException",
                 failed_parameters=preserved_failed_parameters,
                 strategy_history=preserved_strategy_history,
@@ -2011,7 +2011,7 @@ class AgentGraphCore:
                 depth=current_task.depth
             )
 
-            model = ModelManager(model="moonshotai/kimi-k2-instruct")
+            model = ModelManager()
             response = model.invoke([
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": human_prompt},
@@ -2079,7 +2079,7 @@ class AgentGraphCore:
                 analysis=current_task.execution_context.analysis or "N/A"
             )
 
-            model = ModelManager(model="moonshotai/kimi-k2-instruct")
+            model = ModelManager()
             response = model.invoke([
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": human_prompt},
@@ -2568,7 +2568,7 @@ class AgentGraphCore:
             all_results, state.original_goal,
         )
 
-        model = ModelManager(model="moonshotai/kimi-k2-instruct")
+        model = ModelManager()
         response = model.invoke([
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": human_prompt},
@@ -2643,7 +2643,7 @@ class AgentGraphCore:
                 "}\n\nReturn only the JSON object, nothing else."
             )
 
-            model = ModelManager(model="moonshotai/kimi-k2-instruct")
+            model = ModelManager()
             repair_resp = model.invoke([
                 {"role": "system", "content": repair_system},
                 {"role": "user", "content": repair_human},
@@ -2935,7 +2935,7 @@ class Spawn_subAgent:
             parent_task.description, parent_task.tool_name, tool_schema, parent_task.depth, parent_context=reason
         )
 
-        model = ModelManager(model="moonshotai/kimi-k2-instruct")
+        model = ModelManager()
         response = model.invoke([
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": human_prompt},
@@ -3023,7 +3023,7 @@ class Spawn_subAgent:
             recovery_plan=recovery_plan
         )
 
-        model = ModelManager(model="moonshotai/kimi-k2-instruct")
+        model = ModelManager()
         response = model.invoke([
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": human_prompt},
@@ -3170,7 +3170,7 @@ class Spawn_subAgent:
                     parent_task.execution_context, 'result',
                     None) else f"Parent task {parent_task.task_id} failed without explicit failure_context."),
                 fail_count=1,
-                last_failure_timestamp=datetime.now(timezone.utc),
+                last_failure_timestamp=get_formatted_timestamp(),
                 error_type="SyntheticFailureContext",
                 failed_parameters=synthetic_failed_params,
                 strategy_history=[]
@@ -3200,7 +3200,7 @@ class Spawn_subAgent:
             subAgent_status="active",
             subAgent_tasks=subtasks,
             parent_task_id=parent_task.task_id,
-            creation_timestamp=datetime.now(timezone.utc),
+            creation_timestamp=get_formatted_timestamp(),
             notes=f"Spawned for: {spawn_reason}",
         )
 

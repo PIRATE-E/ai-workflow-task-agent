@@ -4,14 +4,21 @@ Deep analysis and testing of OpenAI Integration for error detection.
 """
 
 import sys
+from pathlib import Path
+
+# Add project root to path
+project_root = Path(__file__).resolve().parents[1]
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
+
+
+import sys
 import os
 import asyncio
 import time
 from pathlib import Path
 
 # Add project root to path
-project_root = Path(__file__).parent.absolute()
-sys.path.insert(0, str(project_root))
 
 
 def test_openai_basic_functionality():

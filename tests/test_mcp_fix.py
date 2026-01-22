@@ -1,10 +1,18 @@
+import sys
+from pathlib import Path
+
+# Add project root to path
+project_root = Path(__file__).resolve().parents[1]
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
+
+
 #!/usr/bin/env python3
 """Test script to verify MCP fixes"""
 
 import sys
 import os
 
-sys.path.append(os.path.join(os.path.dirname(__file__), "src"))
 
 from src.mcp.load_config import McpConfigFile
 from src.mcp.mcp_register_structure import Command

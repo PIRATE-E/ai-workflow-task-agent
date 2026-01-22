@@ -4,15 +4,22 @@ This demonstrates a realistic user scenario from start to finish.
 """
 
 import sys
+from pathlib import Path
+
+# Add project root to path
+project_root = Path(__file__).resolve().parents[2]
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
+
+
+import sys
 import os
 import tempfile
 import json
 from unittest.mock import Mock, patch
 
 # Add the project root to Python path
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 if project_root not in sys.path:
-    sys.path.insert(0, project_root)
 
 try:
     from src.agents.agentic_orchestrator.AgentGraphCore import (

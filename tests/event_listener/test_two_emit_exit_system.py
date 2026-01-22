@@ -8,12 +8,20 @@ This test verifies that the exit system only exits when BOTH tickets are receive
 """
 
 import sys
+from pathlib import Path
+
+# Add project root to path
+project_root = Path(__file__).resolve().parents[2]
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
+
+
+import sys
 import time
 import threading
 from unittest.mock import patch, MagicMock
 
 # Add project root to path
-sys.path.insert(0, 'c:/Users/pirat/PycharmProjects/AI_llm')
 
 from src.utils.listeners.exit_listener import ExitListener
 from src.utils.listeners.event_listener import EventListener
