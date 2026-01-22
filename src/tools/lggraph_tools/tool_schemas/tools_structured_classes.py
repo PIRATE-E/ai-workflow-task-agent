@@ -49,8 +49,8 @@ class browser_agent(BaseModel):
         description="A high-level objective for the autonomous browser agent. Describe the end goal (e.g., 'Find and summarize the latest AI news from Google News') rather than step-by-step instructions. The agent will handle the decomposition and execution.",
     )
     head_less_mode: bool = Field(
-        description="Set to True to run the browser in headless mode (without a GUI). Set to False to see the browser window.",
-        default=True,
+        description="Set to True to run the browser in headless mode (without a GUI *invisible to user*). Set to False to make user see the browser window (visible to user).",
+        default=False,
     )
     log: bool = Field(
         description="Set to True to enable system_logging of browser actions to a file.",
@@ -58,5 +58,5 @@ class browser_agent(BaseModel):
     )
     keep_alive: bool = Field(
         description="Set to True to keep the browser alive after execution for debugging purposes.",
-        default=False,
+        default=True,
     )

@@ -1,9 +1,9 @@
-import datetime
 import json
 
-from .router import Router
-from ..system_logging.on_time_registry import OnTimeRegistry
-from ..system_logging.protocol import LogEntry
+from src.system_logging.router import Router
+from src.system_logging.on_time_registry import OnTimeRegistry
+from src.system_logging.protocol import LogEntry
+from src.utils.timestamp_util import get_formatted_timestamp
 
 
 class Dispatcher:
@@ -97,7 +97,7 @@ class Dispatcher:
                 LOG_TYPE=LogCategory.OTHER,
                 LOG_LEVEL=LogLevel.ERROR,
                 MESSAGE=str(json_data.get('MESSAGE', message)),
-                TIME_STAMP=datetime.datetime.now().isoformat(),
+                TIME_STAMP=get_formatted_timestamp(),
                 METADATA=json_data.get('METADATA', {})
             )
         return log_entry

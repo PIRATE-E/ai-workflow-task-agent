@@ -4,6 +4,15 @@ Test script to verify that lggraph.py integration works correctly
 This simulates the key parts of lggraph.py that use the socket manager
 """
 
+import sys
+from pathlib import Path
+
+# Add project root to path
+project_root = Path(__file__).resolve().parents[2]
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
+
+
 import time
 
 from utils.socket_manager import socket_manager

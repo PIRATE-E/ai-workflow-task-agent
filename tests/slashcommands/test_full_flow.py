@@ -4,12 +4,19 @@ Test script to verify the full flow: User Input -> Parser -> ExecutionAr.
 """
 
 import sys
+from pathlib import Path
+
+# Add project root to path
+project_root = Path(__file__).resolve().parents[2]
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
+
+
+import sys
 import os
 import time
 
 # Add the project root to Python path
-project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-sys.path.insert(0, project_root)
 start_time = time.perf_counter()
 from src.slash_commands.executionar import ExecutionAr
 from src.slash_commands.parser import ParseCommand

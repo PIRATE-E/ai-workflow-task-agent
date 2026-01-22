@@ -32,102 +32,7 @@ from src.ui.diagnostics.debug_helpers import debug_info
 T = TypeVar('T', bound=BaseModel)
 
 
-class BrowserUseCompatibleLLM:
-    """Adapter to make ModelManager compatible with browser_use's BaseChatModel protocol"""
 
-    def __init__(self, model_manager: ModelManager):
-        self._model_manager = model_manager
-        self.model = ModelManager.current_model or 'default'
-        self._verified_api_keys = getattr(model_manager, '_verified_api_keys', False)
-
-    @property
-    def provider(self) -> str:
-        model_name = getattr(self, 'model', 'default').lower()
-        if 'gpt' in model_name: return 'openai'
-        if 'claude' in model_name: return 'anthropic'
-        if 'llama' in model_name or 'mistral' in model_name: return 'ollama'
-        return 'unknown'
-
-    @property
-    def name(self) -> str:
-        return getattr(self, 'model', 'default_model')
-
-    @property
-    def model_name(self) -> str:
-        return getattr(self, 'model', 'default')
-
-    @overload
-    async def ainvoke(self, messages: List[BaseMessage], output_format: None = None) -> ChatInvokeCompletion[str]:
-        ...  # pragma: no cover
-
-    @overload
-    async def ainvoke(self, messages: List[BaseMessage], output_format: type[T]) -> ChatInvokeCompletion[T]:
-        ...  # pragma: no cover
-
-    async def ainvoke(
-            self,
-            messages: List[BaseMessage],
-            output_format: Optional[type[T]] = None
-    ) -> ChatInvokeCompletion[T] | ChatInvokeCompletion[str]:
-        """
-        Convert browser_use messages to LangChain format and invoke the model
-        """
-        # Convert browser_use messages to LangChain format
-        langchain_messages = []
-        for msg in messages:
-            # Handle different message types
-            if isinstance(msg, UserMessage):
-                from langchain_core.messages import HumanMessage
-                content = msg.text if hasattr(msg, 'text') else str(msg.content)
-                langchain_messages.append(HumanMessage(content=content))
-            elif isinstance(msg, SystemMessage):
-                from langchain_core.messages import SystemMessage as LangChainSystemMessage
-                content = msg.text if hasattr(msg, 'text') else str(msg.content)
-                langchain_messages.append(LangChainSystemMessage(content=content))
-            elif isinstance(msg, AssistantMessage):
-                from langchain_core.messages import AIMessage
-                content = msg.text if hasattr(msg, 'text') else str(msg.content)
-                langchain_messages.append(AIMessage(content=content or ''))
-            else:
-                from langchain_core.messages import HumanMessage
-                langchain_messages.append(HumanMessage(content=str(msg)))
-        try:
-            response = await asyncio.get_running_loop().run_in_executor(
-                None, self._model_manager.invoke, langchain_messages
-            )
-            usage = None
-            if hasattr(response, 'response_metadata'):
-                metadata = response.response_metadata
-                prompt_tokens = metadata.get('prompt_eval_count', 0) or metadata.get('prompt_tokens', 0)
-                completion_tokens = metadata.get('eval_count', 0) or metadata.get('completion_tokens', 0)
-                total_tokens = prompt_tokens + completion_tokens
-                if prompt_tokens > 0 or completion_tokens > 0:
-                    from browser_use.llm.views import ChatInvokeUsage
-                    usage = ChatInvokeUsage(prompt_tokens=prompt_tokens, completion_tokens=completion_tokens,
-                                            total_tokens=total_tokens)
-
-            if output_format is None:
-                completion = response.content if hasattr(response, 'content') else str(response)
-                return ChatInvokeCompletion[str](completion=completion, usage=usage)
-            else:
-                try:
-                    if hasattr(response, 'content') and isinstance(response.content, str):
-                        import json
-                        try:
-                            json_content = json.loads(response.content)
-                            completion = output_format.model_validate(json_content)
-                            return ChatInvokeCompletion[T](completion=completion, usage=usage)
-                        except (json.JSONDecodeError, Exception):
-                            completion = output_format.model_validate(response.content)
-                            return ChatInvokeCompletion[T](completion=completion, usage=usage)
-                    else:
-                        completion = output_format.model_validate(response.content)
-                        return ChatInvokeCompletion[T](completion=completion, usage=usage)
-                except Exception:
-                    completion = response.content if hasattr(response, 'content') else str(response)
-                    return ChatInvokeCompletion[str](completion=completion, usage=usage)
-        except Exception as e:
-            raise e
 
 
 
@@ -197,7 +102,7 @@ class BrowserHandler:
         # result_file_name = f"browser_result_{uuid.uuid4().hex}.json"
         # self.result_file = settings.BASE_DIR / "basic_logs" / result_file_name
         # self.result_file.parent.mkdir(parents=True, exist_ok=True)
-        self.result_file = settings.BROWSER_USE_LOG_FILE
+        self.result_file = Path(settings.BROWSER_USE_LOG_FILE).resolve()
 
         # Prepare arguments for subprocess
         args_dict = {
@@ -415,11 +320,11 @@ def browser_use_tool(query: str, head_less_mode: bool = True, log: bool = True, 
 
 if __name__ == '__main__':
     # test_query = "/agent you have to open browser in which open nvidia nim api website where you have to get knowledge about the models it offers for developers those model are text-to-text generation capabilities you have to then provide me best model for agentic and bigger context window !! to accomplish best among them you have to keep comparing with each others into ai benchmark websites !! after which you have to just provide me one model name !! who is best agentic model and long context model !! https://build.nvidia.com/explore/discover this is the website url !!"
-    test_query = "/agent Navigate to YouTube, search for Eminem, identify most liked song by checking like counts"
+    test_query = "/agent Navigate to YouTube, search the night we met, identify the official music video, play it, and keep alive, log to the true."
     print(f"Invoking browser_use_tool for query: '{test_query}'")
 
     # Run the tool and get the result directly
-    final_response = browser_use_tool(query=test_query, head_less_mode=False, log=True)
+    final_response = browser_use_tool(query=test_query, head_less_mode=False, log=True, keep_alive=True)
 
     print(f"\n--- Standalone Execution Result ---")
     print(final_response)

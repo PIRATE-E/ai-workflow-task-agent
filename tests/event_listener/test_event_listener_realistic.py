@@ -17,6 +17,15 @@ Usage:
     python tests/test_event_listener_realistic.py
 """
 
+import sys
+from pathlib import Path
+
+# Add project root to path
+project_root = Path(__file__).resolve().parents[2]
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
+
+
 import threading
 import time
 import random
@@ -29,8 +38,6 @@ from rich.table import Table
 import sys
 import os
 
-project_root = os.path.join(os.path.dirname(__file__), "..", "..")
-sys.path.append(project_root)
 
 from src.utils.listeners.rich_status_listen import RichStatusListener
 from src.utils.listeners.event_listener import EventListener

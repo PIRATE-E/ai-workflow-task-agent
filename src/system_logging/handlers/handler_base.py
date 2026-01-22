@@ -8,10 +8,8 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Dict, TextIO
 from datetime import datetime
-from src.config.settings import LOG_TEXT_HANDLER_ROTATION_TIME_LIMIT_HOURS, LOG_TEXT_HANDLER_ROTATION_SIZE_LIMIT_MB
-
-from ..protocol import LogEntry
-
+from src.config.settings import LOG_TEXT_HANDLER_ROTATION_TIME_LIMIT_HOURS, LOG_TEXT_HANDLER_ROTATION_SIZE_LIMIT_MB, LOG_ROTATION_ALWAYS_ON
+from src.system_logging.protocol import LogEntry
 
 class Handler(ABC):
     name: str
@@ -121,11 +119,14 @@ class TextHandler(Handler):
         :return:
         """
 
-        # check for file size
-        file_size = file_path.stat().st_size
-
         if not file_path.exists():
             return {'rotate': True}
+
+        if LOG_ROTATION_ALWAYS_ON:
+            return {'rotate': True}
+
+        # check for file size
+        file_size = file_path.stat().st_size
 
         if file_size > self.rotation_size_limit:  # 5 MB size limit
             return {'rotate': True}

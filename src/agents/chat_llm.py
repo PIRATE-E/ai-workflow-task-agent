@@ -56,7 +56,7 @@ def generate_llm_response(state) -> dict:
         "Think about what the user really wants to know, considering everything we've discussed together."
     )
     messages_with_system_prompt = [HumanMessage(content=system_prompt)]
-    llm = ModelManager(model=settings.GPT_MODEL, temperature=0.7, format="json")
+    llm = ModelManager(temperature=0.7, format="json")
 
     with console.status("[bold green]Thinking...[/bold green]", spinner="dots"):
         stream = llm.stream(messages_with_system_prompt)

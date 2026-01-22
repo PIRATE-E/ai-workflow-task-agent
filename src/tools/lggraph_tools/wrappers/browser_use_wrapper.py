@@ -4,11 +4,12 @@ from src.tools.lggraph_tools.tools.browser_tool import browser_use_tool
 
 
 class BrowserUseWrapper:
-    def __init__(self, query: str, head_less_mode: bool, log, keep_alive):
-        self.query = query
-        self.head_less_mode = head_less_mode
-        self.log = log
-        self.keep_alive = keep_alive
+    def __init__(self, **kwargs):
+
+        self.query = kwargs.get("query", "")
+        self.head_less_mode = kwargs.get("head_less_mode", False)
+        self.log = kwargs.get("log", True)
+        self.keep_alive = kwargs.get("keep_alive", True)
         self._run_browser_use()
 
     def _run_browser_use(self):

@@ -38,6 +38,9 @@ from typing import Dict, Any, Optional, Union
 
 from rich.console import RenderableType
 
+# Import centralized timestamp utility
+from src.utils.timestamp_util import get_formatted_timestamp
+
 
 # Helper: robust JSON serializer to handle datetimes, Enums, dataclasses, and other objects
 def _default_json_serializer(obj):
@@ -192,7 +195,7 @@ class DebugMessage:
         self.obj_type = self._safe_enum_to_string(obj_type)
         self.data_type = self._safe_enum_to_string(data_type)
         self.data = data
-        self.timestamp = timestamp or datetime.now().isoformat()
+        self.timestamp = timestamp or get_formatted_timestamp()
 
     def _safe_enum_to_string(self, value):
         """Safely convert enum to string without IDE interference"""
