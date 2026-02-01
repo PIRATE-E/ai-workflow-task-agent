@@ -26,6 +26,8 @@ def main():
     """Main entry point for the subprocess runner."""
     args_dict = {}  # Initialize to avoid reference errors
 
+    # keep_alive monitoring queue (set when keep_alive=True inside the async runner)
+    monitor_queue: queue.Queue | None = None
 
     if len(sys.argv) < 2:
         error_result = {
@@ -169,6 +171,15 @@ def main():
                     raise e
 
         # Run the browser agent
+        async def run_browser_agent_v2():
+            ## run the browser agent using new packages
+            from .browser_tool.runner import Runner, BrowserRequiredConfig
+            runner = Runner(BrowserRequiredConfig(
+                query=query,
+                headless=headless,
+                keep_alive=keep_alive
+            ))
+
         async def run_browser_agent():
             """Execute the browser agent and return the result."""
             if settings.AIMessage is None and settings.HumanMessage is None:
@@ -212,13 +223,15 @@ def main():
                 ### we have to apply the monkey patch here for the keep_alive bug
                 LocalBrowserWatchdog.on_BrowserStopEvent = on_BrowserStopEvent
                 running_agent_task = asyncio.create_task(agent.run())
-                # Keep-alive mode: monitoring completed, exit when browser is closed by user
-                if keep_alive:
-                    res = queue.Queue()
-                    monitering_browser_process(res)
-                await asyncio.create_task(load_custom_sessions(browser)) # this doesn't break
+
+                # Keep-alive mode: start monitoring immediately (before awaiting agent.run())
+                nonlocal monitor_queue
+                if keep_alive and monitor_queue is None:
+                    monitor_queue = queue.Queue()
+                    monitering_browser_process(monitor_queue)
+
+                await asyncio.create_task(load_custom_sessions(browser))  # this doesn't break
                 result = await running_agent_task
-                await asyncio.create_task(save_custom_sessions(browser))
 
                 print("[SUBPROCESS] Agent execution completed!")
                 sys.stdout.flush()
@@ -264,18 +277,31 @@ def main():
         print(f"[SUBPROCESS] Result written to {result_file}")
         sys.stdout.flush()
 
+        # IMPORTANT: In keep_alive mode, DO NOT exit immediately.
+        # We must wait until monitoring detects the browser is closed.
         if not keep_alive:
             print("[SUBPROCESS] Exiting subprocess.")
             sys.stdout.flush()
             sys.exit(0)
-        else:
-            if 'res' in locals() and  res.get():
-                print("[SUBPROCESS] Keep-alive monitoring completed, exiting subprocess.")
+
+        print("[SUBPROCESS] keep_alive=True -> waiting for browser to close...")
+        sys.stdout.flush()
+
+        if monitor_queue is not None:
+            try:
+                ok = monitor_queue.get(timeout=60 * 60 * 24)  # effectively 'wait forever'
+                print(f"[SUBPROCESS] Keep-alive monitoring completed (ok={ok}), exiting subprocess.")
                 sys.stdout.flush()
                 sys.exit(0)
-            print("[SUBPROCESS] QUEUE is empty, exiting subprocess.")
-            sys.stdout.flush()
-            sys.exit(0)
+            except Exception as e:
+                print(f"[SUBPROCESS] Keep-alive monitoring wait failed: {e}")
+                print(traceback.format_exc())
+                sys.stdout.flush()
+                sys.exit(0)
+
+        print("[SUBPROCESS] keep_alive=True but monitoring queue not found; exiting to avoid zombie subprocess.")
+        sys.stdout.flush()
+        sys.exit(0)
     except Exception as e:
         # Write error result to file
         error_result = {
@@ -406,6 +432,9 @@ async def load_custom_sessions(browser: Browser):
 
 async def save_custom_sessions(browser: Browser):
     """Save custom browser sessions if needed (placeholder)."""
+    if browser._cdp_client_root is None and not hasattr(browser, '_cdp_client_root'):
+        print("[SUBPROCESS] Browser CDP client not ready, skipping session save.")
+        return
     current_url = await browser.get_current_page_url()
     cdp_session = await browser.get_or_create_cdp_session()
 
@@ -503,54 +532,86 @@ async def watch_process_alive() -> bool:
     def get_browser_process_info():
         nonlocal browser_pid, browser_actual_parent_runner_pid, browser_ghost_parent_runner_pid, killer_flag
         try:
-            for process in psutil.process_iter(['pid', 'name', 'cmdline', 'ppid']):
-                try:
-                    if 'chrome' in process.info['name'].lower() or 'chromium' in process.info['name'].lower():
-                        cmdline = ' '.join(process.info['cmdline']).lower()
-                        if '--remote-debugging-port' in cmdline:
-                            browser_pid = process.info['pid']
-                            browser_ghost_parent_runner_pid = process.info['ppid']
-                            browser_actual_parent_runner_pid = browser_ghost_parent_runner_pid.parent().pid if psutil.pid_exists(browser_ghost_parent_runner_pid) else None
-                            print(
-                                f"[SUBPROCESS] Detected browser process PID: {browser_pid}, Parent (ghost) PID: {browser_actual_parent_runner_pid}, Parent actual browser runner PID: {browser_actual_parent_runner_pid}")
-                            sys.stdout.flush()
-                            break
-                except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
-                    continue
-            if browser_pid is not None and browser_ghost_parent_runner_pid is not None and browser_actual_parent_runner_pid is not None:
-                if killer_flag == -1: # that means this is executing first time and we found the process
+            if killer_flag <= 0:
+                for process in psutil.process_iter(['pid', 'name', 'cmdline', 'ppid']):
+                            try:
+                                name = (process.info.get('name') or '').lower()
+                                if 'chrome' in name or 'chromium' in name:
+                                    cmdline = ' '.join(process.info.get('cmdline') or []).lower()
+                                    if '--remote-debugging-port' in cmdline:
+                                        browser_pid = process.info['pid']
+                                        browser_ghost_parent_runner_pid = process.info['ppid']
+                                        browser_actual_parent_runner_pid = None
+                                        try:
+                                            if psutil.pid_exists(browser_ghost_parent_runner_pid):
+                                                parent_process = psutil.Process(browser_ghost_parent_runner_pid)
+                                                browser_actual_parent_runner_pid = parent_process.ppid()
+                                        except (psutil.NoSuchProcess, psutil.AccessDenied):
+                                            browser_actual_parent_runner_pid = None
+
+                                        print(
+                                            f"[SUBPROCESS] Detected browser process PID: {browser_pid}, Parent (ghost) PID: {browser_ghost_parent_runner_pid}, Grand-parent PID: {browser_actual_parent_runner_pid}")
+                                        sys.stdout.flush()
+                                        break
+                            except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+                                continue
+
+            if killer_flag == -1: # that means this is executing first time
+                if browser_pid:
+                    # that means we found the process
                     killer_flag += 1
-            if browser_pid is not None and browser_ghost_parent_runner_pid is not None and browser_actual_parent_runner_pid is not None:
-                if killer_flag == -1:  # that means we didn't find the process yet
+                    # resetting the variables for next check
+                    browser_pid = None
+                    browser_ghost_parent_runner_pid = None
+                    browser_actual_parent_runner_pid = None
+            elif killer_flag == 0:  # that means we did found the process earlier
+                # and if the browser process is still not none means browser is still running after getting found
+                if browser_pid:
+                    # erase it now !! 
+                    browser_pid = None
+                    browser_ghost_parent_runner_pid = None
+                    browser_actual_parent_runner_pid = None
                     pass
-                elif killer_flag == 0:  # that means we found the process once, but now it's gone
-                    print(f"[SUBPROCESS] Browser process PID: {browser_pid} has exited.")
-                    sys.stdout.flush()
+                else:
+                    # that means we found the browser process earlier but now its gone
+                    print(f"[SUBPROCESS] Detected browser process has exited.")
                     killer_flag += 1
-                    return True
+                pass
+                # now check that does it gone away or not
         except Exception as e:
             print(f"[SUBPROCESS] Failed to get browser process info: {e}")
             sys.stdout.flush()
 
     while killer_flag <= 0:
-        await asyncio.sleep(5)
+        await asyncio.sleep(3)
         if get_browser_process_info():
             break
     return True
 
-def monitering_browser_process(result_que:queue.Queue):
-    def monitering_task(res_que:queue.Queue):
+
+def monitering_browser_process(result_que: queue.Queue) -> Thread:
+    """Start a daemon thread that runs an asyncio loop to monitor browser closure.
+
+    It will put True into result_que once the browser is closed.
+    """
+
+    def _runner(q: queue.Queue):
         loop = asyncio.new_event_loop()
         try:
             asyncio.set_event_loop(loop)
-            res_que.put(loop.run_until_complete(watch_process_alive()))
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
+            q.put(loop.run_until_complete(watch_process_alive()))
+        except Exception as e:
+            print(f"[SUBPROCESS][MONITOR] Monitoring thread crashed: {e}")
+            print(traceback.format_exc())
+            sys.stdout.flush()
+            q.put(True)  # fail-open so parent can unblock
         finally:
-            loop.close()
-        pass
-    t = Thread(target=monitering_task, daemon=True, args=(result_que, ))
+            try:
+                loop.close()
+            except Exception:
+                pass
+
+    t = Thread(target=_runner, daemon=True, args=(result_que,))
     t.start()
     return t
 
