@@ -43,7 +43,6 @@ class BrowserHandler:
     running_processes: List[subprocess.Popen] = []
 
     # Flag to switch between legacy subprocess and new Runner-based execution
-    USE_RUNNER: bool = True  # Set to False to use legacy subprocess approach
 
     def __init__(self, query: str, head_less_mode: bool = False, log: bool = True, keep_alive: bool = True):
         if not self.enabled:
@@ -60,10 +59,7 @@ class BrowserHandler:
 
     def _run_with_process_management(self) -> str:
         """
-        [LEGACY] Manages the subprocess using subprocess.Popen and returns the result or error message.
-
-        NOTE: This is the legacy subprocess-based approach. For the new event-driven
-        Runner approach, set USE_RUNNER = True (default).
+        Manages the subprocess using subprocess.Popen and returns the result or error message.
         """
         # # Create unique result file for this execution
         # result_file_name = f"browser_result_{uuid.uuid4().hex}.json"
@@ -80,7 +76,7 @@ class BrowserHandler:
         }
 
         # Get path to the subprocess runner script
-        runner_script = Path(__file__).parent / "browser_subprocess_runner.py"
+        runner_script = Path(__file__).parent/ "browser_tool" / "browser_subprocess_runner.py"
 
         # Build command
         cmd = [sys.executable, str(runner_script), json.dumps(args_dict)]

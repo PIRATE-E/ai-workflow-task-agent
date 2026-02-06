@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import sys
 from enum import Enum
 from queue import Queue
 from typing import TYPE_CHECKING, Callable, Awaitable
@@ -142,10 +143,10 @@ class Handler(metaclass=HandlerMeta):
         print(f"[Handler] 🚀 Executing {driver_class_name}")
 
         # Get methods defined ONLY in the driver class, not inherited from Handler
-        driver_methods = set(dir(self.__class__)) - set(dir(Handler))
+        driver_attributes : list[str] = [k for k in self.__class__.__dict__.keys() if k not in Handler.__dict__.keys()]  # get all attributes of all drivers class
 
         # Get all callable methods from the driver instance
-        for attr_name in driver_methods:
+        for attr_name in driver_attributes:
             # Skip private/magic methods, execute_method itself, and enum_value
             if attr_name.startswith('_') or attr_name in ['execute', 'execute_method', 'enum_value']:
                 continue
@@ -156,7 +157,8 @@ class Handler(metaclass=HandlerMeta):
             if not callable(attr_value):
                 continue
 
-            print(f"[Handler]   → Running {attr_name}()")
+            print(f"[Handler]   → Running {attr_name}()", flush=True)
+            sys.stdout.flush()
 
             try:
                 # Check if it's async or sync

@@ -24,8 +24,10 @@ import queue
 import sys
 import traceback
 from pathlib import Path
-from threading import Thread
+from threading import Thread, RLock
 from typing import TYPE_CHECKING
+
+import psutil
 
 if TYPE_CHECKING:
     from ..runner import Runner
@@ -90,7 +92,7 @@ class PreRequirementsCustomEvent(Handler):
         if importlib.util.find_spec("browser_use") is None:
             raise ImportError("browser_use package not installed!")
 
-        print("✅ browser_use installed")
+        print("✅ browser_use installed", flush=True)
         return {"browser_use": "installed"}
 
 
@@ -139,7 +141,7 @@ class SetupDriver(Handler):
             instance.event_bus.dispatch(BrowserKillEvent())
 
         LocalBrowserWatchdog.on_BrowserStopEvent = on_BrowserStopEvent
-        print("✅ Applied monkey patch on watchdog")
+        print("✅ Applied monkey patch on watchdog", flush=True)
         return {"monkey_patch": "applied"}
 
     async def create_browser_compatible_llm(self):
@@ -182,7 +184,8 @@ class SetupDriver(Handler):
                 return getattr(self, 'model', 'default')
 
             @overload
-            async def ainvoke(self, messages: List[BaseMessage], output_format: None = None) -> ChatInvokeCompletion[str]:
+            async def ainvoke(self, messages: List[BaseMessage], output_format: None = None) -> ChatInvokeCompletion[
+                str]:
                 ...
 
             @overload
@@ -260,14 +263,14 @@ class SetupDriver(Handler):
             settings.AIMessage = LangChainAIMessage
             settings.HumanMessage = LangChainHumanMessage
 
-        print("[DRIVER] Initializing ModelManager and BrowserUseCompatibleLLM...")
+        print("[DRIVER] Initializing ModelManager and BrowserUseCompatibleLLM...", flush=True)
         model_manager = ModelManager()
         browser_use_llm = BrowserUseCompatibleLLM(model_manager)
 
         # Store on runner for later use
-        self.runner._SetupDriver__llm = browser_use_llm
+        self.runner.llm = browser_use_llm
 
-        print("✅ BrowserUseCompatibleLLM created")
+        print("✅ BrowserUseCompatibleLLM created", flush=True)
         return {"llm": "created", "model": browser_use_llm.model}
 
     async def create_browser_instance(self):
@@ -278,9 +281,9 @@ class SetupDriver(Handler):
         from browser_use import Browser
         from src.config import settings
 
-        config = self.runner.__config
+        config = self.runner.config
 
-        print("[DRIVER] Starting Browser instance...")
+        print("[DRIVER] Starting Browser instance...", flush=True)
         browser = Browser(
             headless=config.headless,
             keep_alive=config.keep_alive,
@@ -289,9 +292,10 @@ class SetupDriver(Handler):
         )
 
         # Store on runner for later use
-        self.runner._Runner__browser = browser
+        self.runner.browser = browser
+        await browser.start()
 
-        print("✅ Browser instance created")
+        print("✅ Browser instance created", flush=True)
         return {"browser": "created", "headless": config.headless}
 
     async def create_agent_instance(self):
@@ -301,9 +305,9 @@ class SetupDriver(Handler):
         """
         from browser_use import Agent
 
-        config = self.runner.__config
-        llm = self.runner._SetupDriver__llm
-        browser = self.runner._Runner__browser
+        config = self.runner.config
+        llm = self.runner.llm
+        browser = self.runner.browser
 
         print("[DRIVER] Creating Agent...")
         agent = Agent(
@@ -316,9 +320,9 @@ class SetupDriver(Handler):
         )
 
         # Store on runner for later use
-        self.runner._Runner__agent = agent
+        self.runner.agent = agent
 
-        print("✅ Agent created")
+        print("✅ Agent created", flush=True)
         return {"agent": "created", "task": config.query[:50] + "..." if len(config.query) > 50 else config.query}
 
 
@@ -340,6 +344,7 @@ class OnStartDriver(Handler):
     """
 
     enum_value = HandlerEnums.ON_START
+
     # No huge_error - session loading failure is not critical
 
     def __init__(self, runner_instance: 'Runner'):
@@ -350,8 +355,8 @@ class OnStartDriver(Handler):
 
         From browser_subprocess_runner.py lines 287-298.
         """
-        browser = self.runner._Runner__browser
-        config = self.runner.__config
+        browser = self.runner.browser
+        config = self.runner.config
 
         max_wait = config.browser_ready_timeout or 30
         waited = 0
@@ -364,7 +369,7 @@ class OnStartDriver(Handler):
         if browser._cdp_client_root is None:
             raise RuntimeError(f"Browser did not become ready in {waited} seconds. CDP client is still None.")
 
-        print("✅ Browser is ready (CDP connected)")
+        print("✅ Browser is ready (CDP connected)", flush=True)
         return {"browser_ready": True, "wait_time": waited}
 
     async def load_custom_sessions(self):
@@ -376,10 +381,11 @@ class OnStartDriver(Handler):
         import aiofiles
         from src.config import settings
 
-        browser = self.runner._Runner__browser
-        config = self.runner.__config
+        browser = self.runner.browser
+        config = self.runner.config
 
-        session_file_path = Path(config.user_data_dir or settings.BROWSER_USE_USER_PROFILE_PATH) / "custom_sessions.json"
+        session_file_path = Path(
+            config.user_data_dir or settings.BROWSER_USE_USER_PROFILE_PATH) / "custom_sessions.json"
 
         if not session_file_path.exists():
             print("[DRIVER] No custom session file found, starting fresh.")
@@ -394,7 +400,7 @@ class OnStartDriver(Handler):
         scroll_pos = session_data.get('scroll_position', {'x': 0, 'y': 0})
 
         if not current_url:
-            print("[DRIVER] No URL found in session data.")
+            print("[DRIVER] No URL found in session data.", flush=True)
             return {"session_loaded": False, "reason": "no_url"}
 
         # Navigate to saved URL
@@ -432,7 +438,7 @@ class OnStartDriver(Handler):
             session_id=cdp_session.session_id
         )
         restored_count = restore_result.get('result', {}).get('value', 0)
-        print(f"[DRIVER] Restored {restored_count}/{len(form_data)} form fields.")
+        print(f"[DRIVER] Restored {restored_count}/{len(form_data)} form fields.", flush=True)
 
         # Restore scroll position
         scroll_script = f"""
@@ -446,7 +452,7 @@ class OnStartDriver(Handler):
             session_id=cdp_session.session_id
         )
 
-        print(f"✅ Session restored: {current_url}")
+        print(f"✅ Session restored: {current_url}", flush=True)
         return {"session_loaded": True, "url": current_url, "form_fields": restored_count}
 
 
@@ -473,66 +479,93 @@ class OnRunningDriver(Handler):
 
     def __init__(self, runner_instance: 'Runner'):
         self.runner = runner_instance
+        # FIX: Use queue.Queue (sync) not asyncio.Queue (async) for threading
+        self.runner.monitor_queue = queue.Queue()
+
+        self.lock = RLock()
+
+        # FIX: Move these from class variables to instance variables
+        self.killer_flag = {'started': False, 'got_run': False, 'should_kill': False}
+        self.browser_pid = None
+        self.ghost_pid = None
+
+    def __get_info_browser_pid(self):
+        """Get the browser subprocess PID."""
+        for process in psutil.process_iter(['pid', 'name', 'cmdline', 'ppid']):
+            try:
+                name = (process.info.get('name') or '').lower()
+                if 'chrome' in name or 'chromium' in name:
+                    cmdline = ' '.join(process.info.get('cmdline') or []).lower()
+                    if '--remote-debugging-port' in cmdline:
+                        self.browser_pid = process.info['pid']
+                        self.ghost_pid = process.info['ppid']
+                        browser_actual_parent_runner_pid = None
+                        try:
+                            if psutil.pid_exists(self.ghost_pid):
+                                parent_process = psutil.Process(self.ghost_pid)
+                                browser_actual_parent_runner_pid = parent_process.ppid()
+                        except (psutil.NoSuchProcess, psutil.AccessDenied):
+                            browser_actual_parent_runner_pid = None
+
+                        print(
+                            f"[SUBPROCESS] Detected browser process PID: {self.browser_pid}, Parent (ghost) PID: {self.ghost_pid}, Grand-parent PID: {browser_actual_parent_runner_pid}",
+                            flush=True)
+                        sys.stdout.flush()
+                        return
+            except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess) as e:
+                print(f"[SUBPROCESS] Process iteration error: {e}", flush=True)
+                continue
+
+        # Reset if not found
+        self.browser_pid = None
+        self.ghost_pid = None
+
+    async def __watch_process_alive(self):
+        """Monitor browser process lifecycle with proper state transitions."""
+        while not self.killer_flag['should_kill']:
+            self.__get_info_browser_pid()
+
+            # State machine logic
+            if self.browser_pid and not self.killer_flag['started']:
+                # Browser started
+                self.killer_flag['started'] = True
+                print(f"[DRIVER] Browser started - PID: {self.browser_pid}", flush=True)
+                sys.stdout.flush()
+
+            elif self.browser_pid and self.killer_flag['started'] and not self.killer_flag['got_run']:
+                # Agent began execution
+                self.killer_flag['got_run'] = True
+                print("[DRIVER] Agent execution started", flush=True)
+                sys.stdout.flush()
+
+            elif not self.browser_pid and self.killer_flag['started'] and self.killer_flag['got_run']:
+                # Browser died AFTER running = critical
+                self.killer_flag['should_kill'] = True
+                print("[DRIVER] ⚠️ Browser crashed during execution!", flush=True)
+                sys.stdout.flush()
+
+            print(f"[DRIVER] Monitor state: {self.killer_flag}", flush=True)
+            sys.stdout.flush()
+            await asyncio.sleep(3)
+
+            # Only queue if state changed (don't flood queue)
+            if self.killer_flag['should_kill']:
+                try:
+                    self.runner.monitor_queue.put_nowait(self.killer_flag['should_kill'])
+                except queue.Full:
+                    pass
 
     async def start_browser_monitoring(self):
         """Start monitoring thread to watch if browser is still alive.
 
         From browser_subprocess_runner.py lines 560-590.
         """
-        import psutil
-
-        config = self.runner.__config
-
-        if not config.keep_alive:
-            print("[DRIVER] keep_alive=False, skipping browser monitoring")
-            return {"monitoring": "skipped", "reason": "keep_alive=False"}
-
-        monitor_queue = queue.Queue()
-
-        async def watch_process_alive() -> bool:
-            """Monitor browser process and detect when user closes it."""
-            browser_pid = None
-            killer_flag = -1
-
-            def get_browser_process_info():
-                nonlocal browser_pid, killer_flag
-                try:
-                    if killer_flag <= 0:
-                        for process in psutil.process_iter(['pid', 'name', 'cmdline', 'ppid']):
-                            try:
-                                name = (process.info.get('name') or '').lower()
-                                if 'chrome' in name or 'chromium' in name:
-                                    cmdline = ' '.join(process.info.get('cmdline') or []).lower()
-                                    if '--remote-debugging-port' in cmdline:
-                                        browser_pid = process.info['pid']
-                                        print(f"[DRIVER] Detected browser PID: {browser_pid}")
-                                        break
-                            except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
-                                continue
-
-                    if killer_flag == -1:
-                        if browser_pid:
-                            killer_flag += 1
-                            browser_pid = None
-                    elif killer_flag == 0:
-                        if browser_pid:
-                            browser_pid = None
-                        else:
-                            print("[DRIVER] Browser process has exited.")
-                            killer_flag += 1
-                except Exception as e:
-                    print(f"[DRIVER] Failed to get browser process info: {e}")
-
-            while killer_flag <= 0:
-                await asyncio.sleep(3)
-                get_browser_process_info()
-            return True
 
         def _runner(q: queue.Queue):
             loop = asyncio.new_event_loop()
             try:
                 asyncio.set_event_loop(loop)
-                q.put(loop.run_until_complete(watch_process_alive()))
+                q.put(loop.run_until_complete(self.__watch_process_alive()))
             except Exception as e:
                 print(f"[DRIVER] Monitoring thread crashed: {e}")
                 q.put(True)
@@ -542,12 +575,8 @@ class OnRunningDriver(Handler):
                 except Exception:
                     pass
 
-        t = Thread(target=_runner, daemon=True, args=(monitor_queue,))
-        t.start()
-
-        # Store for later cleanup
-        self.runner._Runner__monitor_queue = monitor_queue
-        self.runner._Runner__monitor_thread = t
+        self.runner.monitor_thread = Thread(target=_runner, daemon=True, args=(self.runner.monitor_queue,))
+        self.runner.monitor_thread.start()
 
         print("✅ Browser monitoring started")
         return {"monitoring": "started"}
@@ -557,7 +586,7 @@ class OnRunningDriver(Handler):
 
         From browser_subprocess_runner.py lines 215-218.
         """
-        agent = self.runner._Runner__agent
+        agent = self.runner.agent
 
         print("[DRIVER] Starting agent execution...")
         sys.stdout.flush()
@@ -566,7 +595,7 @@ class OnRunningDriver(Handler):
             result = await agent.run()
 
             # Store result on runner
-            self.runner._Runner__agent_result = result
+            self.runner.agent_result = result
 
             print("[DRIVER] Agent execution completed!")
             return {"agent_run": "completed"}
@@ -595,6 +624,7 @@ class OnCompleteDriver(Handler):
     """
 
     enum_value = HandlerEnums.ON_COMPLETE
+
     # No huge_error - saving failure shouldn't crash
 
     def __init__(self, runner_instance: 'Runner'):
@@ -605,7 +635,7 @@ class OnCompleteDriver(Handler):
 
         From browser_subprocess_runner.py lines 227-228.
         """
-        agent_result = getattr(self.runner, '_Runner__agent_result', None)
+        agent_result = getattr(self.runner, 'agent_result', None)
 
         if agent_result is None:
             print("[DRIVER] No agent result found!")
@@ -614,7 +644,7 @@ class OnCompleteDriver(Handler):
         final_result = str(agent_result.final_result())
 
         # Store for later use
-        self.runner._Runner__final_result = final_result
+        self.runner.final_result = final_result
 
         result_preview = final_result[:200] + "..." if len(final_result) > 200 else final_result
         print(f"[DRIVER] Final result: {result_preview}")
@@ -629,8 +659,8 @@ class OnCompleteDriver(Handler):
         from src.config import settings
         from src.utils.timestamp_util import get_formatted_timestamp
 
-        browser = self.runner._Runner__browser
-        config = self.runner.__config
+        browser = self.runner.browser
+        config = self.runner.config
 
         if browser._cdp_client_root is None:
             print("[DRIVER] Browser CDP client not ready, skipping session save.")
@@ -684,14 +714,15 @@ class OnCompleteDriver(Handler):
             }
 
             # Save to file
-            session_file_path = Path(config.user_data_dir or settings.BROWSER_USE_USER_PROFILE_PATH) / 'custom_sessions.json'
+            session_file_path = Path(
+                config.user_data_dir or settings.BROWSER_USE_USER_PROFILE_PATH) / 'custom_sessions.json'
             async with aiofiles.open(session_file_path, 'w', encoding='utf-8') as f:
                 await f.write(json.dumps(session_data, indent=2))
 
-            print(f"✅ Session saved to {session_file_path}")
+            print(f"✅ Session saved to {session_file_path}", flush=True)
             return {"session_saved": True, "url": current_url}
         except Exception as e:
-            print(f"[DRIVER] Failed to save session: {e}")
+            print(f"[DRIVER] Failed to save session: {e}", flush=True)
             return {"session_saved": False, "error": str(e)}
 
     async def write_result_to_file(self):
@@ -699,11 +730,11 @@ class OnCompleteDriver(Handler):
 
         From browser_subprocess_runner.py lines 233-238.
         """
-        config = self.runner.__config
-        final_result = getattr(self.runner, '_Runner__final_result', None)
+        config = self.runner.config
+        final_result = getattr(self.runner, 'final_result', None)
 
         if config.file_path is None:
-            print("[DRIVER] No result file path configured, skipping file write.")
+            print("[DRIVER] No result file path configured, skipping file write.", flush=True)
             return {"file_written": False, "reason": "no_path"}
 
         result_data = {
@@ -714,7 +745,7 @@ class OnCompleteDriver(Handler):
         with open(config.file_path, 'w', encoding='utf-8') as f:
             json.dump(result_data, f, ensure_ascii=False, indent=2)
 
-        print(f"✅ Result written to {config.file_path}")
+        print(f"✅ Result written to {config.file_path}", flush=True)
         return {"file_written": True, "path": str(config.file_path)}
 
 
@@ -739,15 +770,15 @@ class OnExceptionDriver(Handler):
 
     async def log_exception(self):
         """Log the exception details."""
-        exception = getattr(self.runner, '_Runner__last_exception', None)
+        exception = getattr(self.runner, 'last_exception', None)
 
         if exception is None:
             print("[DRIVER] No exception to log.")
             return {"exception_logged": False}
 
-        print(f"❌ Exception occurred: {type(exception).__name__}: {exception}")
+        print(f"❌ Exception occurred: {type(exception).__name__}: {exception}", flush=True)
         traceback_str = traceback.format_exc()
-        print(traceback_str)
+        print(traceback_str, flush=True)
 
         return {"exception_logged": True, "type": type(exception).__name__, "message": str(exception)}
 
@@ -756,8 +787,8 @@ class OnExceptionDriver(Handler):
 
         From browser_subprocess_runner.py lines 267-277.
         """
-        config = self.runner.__config
-        exception = getattr(self.runner, '_Runner__last_exception', None)
+        config = self.runner.config
+        exception = getattr(self.runner, 'last_exception', None)
 
         if config.file_path is None:
             return {"error_written": False, "reason": "no_path"}
@@ -771,10 +802,10 @@ class OnExceptionDriver(Handler):
         try:
             with open(config.file_path, 'w', encoding='utf-8') as f:
                 json.dump(error_result, f, ensure_ascii=False, indent=2)
-            print(f"❌ Error written to {config.file_path}")
+            print(f"❌ Error written to {config.file_path}", flush=True)
             return {"error_written": True, "path": str(config.file_path)}
         except Exception as e:
-            print(f"[DRIVER] Failed to write error file: {e}")
+            print(f"[DRIVER] Failed to write error file: {e}", flush=True)
             return {"error_written": False, "error": str(e)}
 
 
@@ -797,28 +828,47 @@ class TeardownDriver(Handler):
     """
 
     enum_value = HandlerEnums.TEAR_DOWN
+
     # No huge_error - cleanup should be best-effort
 
     def __init__(self, runner_instance: 'Runner'):
+        from src.config.settings import BROWSER_USE_TIMEOUT
         self.runner = runner_instance
+        print("[DRIVER] Starting teardown... waiting for monitor system to actually tell us its decision ", flush=True)
+        self.runner.monitor_thread and self.runner.monitor_thread.join(timeout=BROWSER_USE_TIMEOUT)
+        self.runner.monitor_thread.is_alive() and print("[DRIVER] Monitor thread is still alive after timeout, proceeding with teardown.", flush=True)
+
+    async def __emit_kill_browser_event(self):
+        """
+        Emit the BrowserKillEvent to trigger browser shutdown.
+        """
+        try:
+            if self.runner.browser:
+                from browser_use.browser.events import BrowserKillEvent
+                await self.runner.browser.event_bus.dispatch(BrowserKillEvent())
+                print("[DRIVER] Emitted BrowserKillEvent to shut down browser.", flush=True)
+            else:
+                print("[DRIVER] No browser instance found to emit kill event.", flush=True)
+        except Exception as e:
+            print(f"[DRIVER] Failed to emit BrowserKillEvent: {e}", flush=True)
 
     async def close_agent(self):
         """Close the agent.
 
         From browser_subprocess_runner.py line 223.
         """
-        agent = getattr(self.runner, '_Runner__agent', None)
+        agent = getattr(self.runner, 'agent', None)
 
         if agent is None:
-            print("[DRIVER] No agent to close.")
+            print("[DRIVER] No agent to close.", flush=True)
             return {"agent_closed": False, "reason": "no_agent"}
 
         try:
             await agent.close()
-            print("✅ Agent closed")
+            print("✅ Agent closed", flush=True)
             return {"agent_closed": True}
         except Exception as e:
-            print(f"[DRIVER] Failed to close agent: {e}")
+            print(f"[DRIVER] Failed to close agent: {e}", flush=True)
             return {"agent_closed": False, "error": str(e)}
 
     async def handle_keep_alive(self):
@@ -826,25 +876,26 @@ class TeardownDriver(Handler):
 
         From browser_subprocess_runner.py lines 240-261.
         """
-        config = self.runner.__config
-        monitor_queue = getattr(self.runner, '_Runner__monitor_queue', None)
+        config = self.runner.config
+        monitor_queue = getattr(self.runner, 'monitor_queue', None)
 
         if not config.keep_alive:
-            print("[DRIVER] keep_alive=False, no waiting needed.")
+            print("[DRIVER] keep_alive=False, no waiting needed.", flush=True)
             return {"keep_alive_wait": False}
 
         if monitor_queue is None:
-            print("[DRIVER] No monitor queue, can't wait for browser close.")
+            print("[DRIVER] No monitor queue, can't wait for browser close.", flush=True)
             return {"keep_alive_wait": False, "reason": "no_queue"}
 
-        print("[DRIVER] keep_alive=True, waiting for browser to close...")
+        print("[DRIVER] keep_alive=True, waiting for browser to close...", flush=True)
         try:
             # Wait up to 24 hours (effectively forever)
-            ok = monitor_queue.get(timeout=60 * 60 * 24)
-            print(f"[DRIVER] Browser closed (ok={ok})")
+            ok: bool = monitor_queue.get(timeout=60 * 60 * 24)
+            ok and await self.__emit_kill_browser_event()
+            print(f"[DRIVER] Browser closed (ok={ok})", flush=True)
             return {"keep_alive_wait": True, "browser_closed": ok}
         except Exception as e:
-            print(f"[DRIVER] Keep-alive wait failed: {e}")
+            print(f"[DRIVER] Keep-alive wait failed: {e}, traceback: {traceback.format_exc()}", flush=True)
             return {"keep_alive_wait": False, "error": str(e)}
 
     async def cleanup_resources(self):
