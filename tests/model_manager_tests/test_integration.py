@@ -11,10 +11,9 @@ from langchain_core.messages import BaseMessage, HumanMessage
 
 # Add paths for imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "utils"))
 
-from model_manager import ModelManager
-import config
+from src.utils.model_manager import ModelManager
+from src.config import settings
 
 
 class TestModelManagerIntegration(unittest.TestCase):
@@ -40,7 +39,7 @@ class TestModelManagerIntegration(unittest.TestCase):
         mock_response = MagicMock(spec=BaseMessage)
         mock_invoke.return_value = mock_response
 
-        manager = ModelManager(model=config.DEFAULT_MODEL)
+        manager = ModelManager(model=settings.DEFAULT_MODEL)
 
         # Test invoke call
         input_message = HumanMessage(content="Test message")
@@ -62,7 +61,7 @@ class TestModelManagerIntegration(unittest.TestCase):
         mock_response = MagicMock(spec=BaseMessage)
         mock_invoke.return_value = mock_response
 
-        manager = ModelManager(model=config.DEFAULT_MODEL)
+        manager = ModelManager(model=settings.DEFAULT_MODEL)
 
         # Test invoke with config and stop parameters
         input_message = HumanMessage(content="Test message")
@@ -93,14 +92,14 @@ class TestModelManagerIntegration(unittest.TestCase):
 
         # Test initialization with typical ChatOllama parameters
         manager = ModelManager(
-            model=config.DEFAULT_MODEL,
+            model=settings.DEFAULT_MODEL,
             temperature=0.8,
             top_p=0.9,
             base_url="http://localhost:11434",
         )
 
         self.assertIsInstance(manager, ModelManager)
-        self.assertEqual(ModelManager.current_model, config.DEFAULT_MODEL)
+        self.assertEqual(ModelManager.current_model, settings.DEFAULT_MODEL)
 
     @patch("subprocess.Popen")
     def test_multiple_instances_same_functionality(self, mock_popen):
@@ -109,8 +108,8 @@ class TestModelManagerIntegration(unittest.TestCase):
         mock_process.stdout.read.return_value.decode.return_value = ""
         mock_popen.return_value = mock_process
 
-        manager1 = ModelManager(model=config.DEFAULT_MODEL)
-        manager2 = ModelManager(model=config.CYPHER_MODEL)
+        manager1 = ModelManager(model=settings.DEFAULT_MODEL)
+        manager2 = ModelManager(model=settings.CYPHER_MODEL)
 
         # Both should be the same instance
         self.assertIs(manager1, manager2)
@@ -127,14 +126,14 @@ class TestModelManagerIntegration(unittest.TestCase):
         mock_popen.return_value = mock_process
 
         # Create first instance and set model
-        manager1 = ModelManager(model=config.DEFAULT_MODEL)
+        manager1 = ModelManager(model=settings.DEFAULT_MODEL)
         original_current_model = ModelManager.current_model
 
         # Create second instance
-        manager2 = ModelManager(model=config.CYPHER_MODEL)
+        manager2 = ModelManager(model=settings.CYPHER_MODEL)
 
         # Current model should be updated to the latest
-        self.assertEqual(ModelManager.current_model, config.CYPHER_MODEL)
+        self.assertEqual(ModelManager.current_model, settings.CYPHER_MODEL)
         self.assertNotEqual(ModelManager.current_model, original_current_model)
 
         # Both instances should see the same current model

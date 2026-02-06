@@ -4,11 +4,12 @@ Test runner for all ModelManager tests
 
 import os
 import sys
-import unittest
+from pathlib import Path
 
-# Add the parent directory to the path so we can import model_manager
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "utils"))
+# Ensure project root is on sys.path for src imports
+project_root = Path(__file__).resolve().parents[2]
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
 
 # Import all test modules
 from tests.model_manager_tests.test_singleton_behavior import TestModelManagerSingleton

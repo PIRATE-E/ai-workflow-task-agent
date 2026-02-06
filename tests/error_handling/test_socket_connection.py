@@ -12,8 +12,8 @@ import time
 # Add the project root to the Python path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
-from utils.error_transfer import SocketCon
-import config
+from src.utils.error_transfer import SocketCon
+from src.config import settings
 
 
 def test_socket_connection_basic():
@@ -25,8 +25,8 @@ def test_socket_connection_basic():
         test_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         test_socket.settimeout(5)  # 5 second timeout
 
-        print(f"Attempting to connect to {config.SOCKET_HOST}:{config.SOCKET_PORT}")
-        test_socket.connect((config.SOCKET_HOST, config.SOCKET_PORT))
+        print(f"Attempting to connect to {settings.SOCKET_HOST}:{settings.SOCKET_PORT}")
+        test_socket.connect((settings.SOCKET_HOST, settings.SOCKET_PORT))
 
         print("✅ Socket connection established")
 
@@ -67,7 +67,7 @@ def test_socket_error_scenarios():
     try:
         invalid_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         invalid_socket.settimeout(2)
-        invalid_socket.connect(("invalid-host-12345", config.SOCKET_PORT))
+        invalid_socket.connect(("invalid-host-12345", settings.SOCKET_PORT))
         invalid_socket.close()
         print("❌ Should have failed with invalid host")
     except Exception as e:
@@ -78,7 +78,7 @@ def test_socket_error_scenarios():
     try:
         invalid_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         invalid_socket.settimeout(2)
-        invalid_socket.connect((config.SOCKET_HOST, 99999))  # Invalid port
+        invalid_socket.connect((settings.SOCKET_HOST, 99999))  # Invalid port
         invalid_socket.close()
         print("❌ Should have failed with invalid port")
     except Exception as e:
@@ -89,7 +89,7 @@ def test_socket_error_scenarios():
     try:
         test_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         test_socket.settimeout(2)
-        test_socket.connect((config.SOCKET_HOST, config.SOCKET_PORT))
+        test_socket.connect((settings.SOCKET_HOST, settings.SOCKET_PORT))
         socket_con = SocketCon(test_socket)
 
         # Close the socket
@@ -114,7 +114,7 @@ def test_concurrent_connections():
         try:
             test_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             test_socket.settimeout(5)
-            test_socket.connect((config.SOCKET_HOST, config.SOCKET_PORT))
+            test_socket.connect((settings.SOCKET_HOST, settings.SOCKET_PORT))
 
             socket_con = SocketCon(test_socket)
             socket_con.send_error(f"🧪 Concurrent connection test #{connection_id}")
@@ -149,7 +149,7 @@ def test_message_formats():
     try:
         test_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         test_socket.settimeout(5)
-        test_socket.connect((config.SOCKET_HOST, config.SOCKET_PORT))
+        test_socket.connect((settings.SOCKET_HOST, settings.SOCKET_PORT))
 
         socket_con = SocketCon(test_socket)
 

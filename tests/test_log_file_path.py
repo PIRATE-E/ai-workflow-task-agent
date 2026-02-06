@@ -21,9 +21,11 @@ from src.system_logging.handlers.handler_base import TextHandler
 from src.system_logging.dispatcher import Dispatcher
 import json
 
-# Register handler
+# Register handler (idempotent)
 registry = OnTimeRegistry()
-registry.register(TextHandler())
+handler = TextHandler()
+if handler not in registry:
+    registry.register(handler)
 print("✓ Handler registered")
 
 # Create test message

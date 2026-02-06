@@ -12,10 +12,9 @@ from unittest.mock import patch, MagicMock
 
 # Add paths for imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "utils"))
 
-from model_manager import ModelManager
-import config
+from src.utils.model_manager import ModelManager
+from src.config import settings
 
 
 class TestModelManagerThreadSafety(unittest.TestCase):
@@ -41,7 +40,7 @@ class TestModelManagerThreadSafety(unittest.TestCase):
 
         def create_instance(thread_id):
             try:
-                instance = ModelManager(model=config.DEFAULT_MODEL)
+                instance = ModelManager(model=settings.DEFAULT_MODEL)
                 instances.append((thread_id, instance))
             except Exception as e:
                 exceptions.append((thread_id, e))
@@ -93,9 +92,9 @@ class TestModelManagerThreadSafety(unittest.TestCase):
 
         # Test concurrent loading of different models
         models_to_test = [
-            config.DEFAULT_MODEL,
-            config.CYPHER_MODEL,
-            config.CLASSIFIER_MODEL,
+            settings.DEFAULT_MODEL,
+            settings.CYPHER_MODEL,
+            settings.CLASSIFIER_MODEL,
         ]
 
         threads = []
@@ -130,7 +129,7 @@ class TestModelManagerThreadSafety(unittest.TestCase):
 
         def create_with_barrier():
             barrier.wait()  # Wait for all threads to be ready
-            instance = ModelManager(model=config.DEFAULT_MODEL)
+            instance = ModelManager(model=settings.DEFAULT_MODEL)
             instances.append(instance)
 
         threads = []
@@ -155,7 +154,7 @@ class TestModelManagerThreadSafety(unittest.TestCase):
         mock_popen.return_value = mock_process
 
         def get_manager_instance():
-            return ModelManager(model=config.DEFAULT_MODEL)
+            return ModelManager(model=settings.DEFAULT_MODEL)
 
         # Use ThreadPoolExecutor to create instances
         with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
@@ -174,16 +173,16 @@ class TestModelManagerThreadSafety(unittest.TestCase):
     def test_model_switching_thread_safety(self, mock_os_system, mock_popen):
         """Test thread safety during model switching"""
         mock_process = MagicMock()
-        mock_process.stdout.read.return_value.decode.return_value = config.DEFAULT_MODEL
+        mock_process.stdout.read.return_value.decode.return_value = settings.DEFAULT_MODEL
         mock_popen.return_value = mock_process
 
         switch_results = []
 
         def switch_model_repeatedly(thread_id):
             models = [
-                config.DEFAULT_MODEL,
-                config.CYPHER_MODEL,
-                config.CLASSIFIER_MODEL,
+                settings.DEFAULT_MODEL,
+                settings.CYPHER_MODEL,
+                settings.CLASSIFIER_MODEL,
             ]
             for i in range(5):
                 model = models[i % len(models)]
@@ -220,7 +219,7 @@ class TestModelManagerThreadSafety(unittest.TestCase):
         class_var_snapshots = []
 
         def capture_class_vars(thread_id):
-            manager = ModelManager(model=config.DEFAULT_MODEL)
+            manager = ModelManager(model=settings.DEFAULT_MODEL)
             snapshot = {
                 "thread_id": thread_id,
                 "instance_id": id(manager),

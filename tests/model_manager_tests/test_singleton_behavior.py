@@ -10,10 +10,9 @@ from unittest.mock import patch, MagicMock
 
 # Add paths for imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "utils"))
 
-from model_manager import ModelManager
-import config
+from src.utils.model_manager import ModelManager
+from src.config import settings
 
 
 class TestModelManagerSingleton(unittest.TestCase):
@@ -36,10 +35,10 @@ class TestModelManagerSingleton(unittest.TestCase):
         mock_popen.return_value = mock_process
 
         # Create first instance
-        manager1 = ModelManager(model=config.DEFAULT_MODEL)
+        manager1 = ModelManager(model=settings.DEFAULT_MODEL)
 
         # Create second instance
-        manager2 = ModelManager(model=config.DEFAULT_MODEL)
+        manager2 = ModelManager(model=settings.DEFAULT_MODEL)
 
         # Both should be the same instance
         self.assertIs(manager1, manager2)
@@ -52,8 +51,8 @@ class TestModelManagerSingleton(unittest.TestCase):
         mock_process.stdout.read.return_value.decode.return_value = ""
         mock_popen.return_value = mock_process
 
-        manager1 = ModelManager(model=config.DEFAULT_MODEL)
-        manager2 = ModelManager(model=config.CYPHER_MODEL)
+        manager1 = ModelManager(model=settings.DEFAULT_MODEL)
+        manager2 = ModelManager(model=settings.CYPHER_MODEL)
 
         self.assertIs(manager1, manager2)
 
@@ -67,7 +66,7 @@ class TestModelManagerSingleton(unittest.TestCase):
         instances = []
 
         def create_instance():
-            instance = ModelManager(model=config.DEFAULT_MODEL)
+            instance = ModelManager(model=settings.DEFAULT_MODEL)
             instances.append(instance)
 
         # Create multiple threads

@@ -235,7 +235,7 @@ def test_mcp_integration():
         return False
 
 
-async def test_agent_mode():
+def test_agent_mode():
     """Test agent mode functionality."""
     print("\n?? Testing Agent Mode...")
 

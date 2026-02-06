@@ -10,14 +10,12 @@ project_root = Path(__file__).resolve().parents[2]
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
-
 import os
-import sys
 import tempfile
 import time
 
 # Add the project root to Python path
-if project_root not in sys.path:
+# (Already added above; keep this as a no-op for historical reasons.)
 
 try:
     # Import hierarchical agent system

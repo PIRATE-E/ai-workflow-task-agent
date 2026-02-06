@@ -11,30 +11,29 @@ project_root = Path(__file__).resolve().parents[2]
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
-
-import sys
 import os
 import unittest
 from unittest.mock import Mock, patch, MagicMock
 from datetime import datetime
 
 # Add the project root to Python path
-if project_root not in sys.path:
+# (Already added above; keep this as a no-op for historical reasons.)
 
 try:
     # Import the modules we need to test
     from src.agents.agentic_orchestrator.AgentGraphCore import (
-        AgentGraphCore, 
-        TASK, 
-        REQUIRED_CONTEXT, 
-        EXECUTION_CONTEXT, 
-        FAILURE_CONTEXT, 
+        AgentGraphCore,
+        TASK,
+        REQUIRED_CONTEXT,
+        EXECUTION_CONTEXT,
+        FAILURE_CONTEXT,
         subAgent_CONTEXT,
         MAIN_STATE,
         AgentState,
-        Spawn_subAgent
+        Spawn_subAgent,
     )
     from src.models.state import State
+
     MODULES_AVAILABLE = True
 except ImportError as e:
     print(f"Import error: {e}")

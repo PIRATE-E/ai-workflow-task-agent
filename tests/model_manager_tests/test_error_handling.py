@@ -10,10 +10,9 @@ from unittest.mock import patch, MagicMock
 
 # Add paths for imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "utils"))
 
-from model_manager import ModelManager
-import config
+from src.utils.model_manager import ModelManager
+from src.config import settings
 
 
 class TestModelManagerErrorHandling(unittest.TestCase):
@@ -43,7 +42,7 @@ class TestModelManagerErrorHandling(unittest.TestCase):
         mock_popen.side_effect = subprocess.CalledProcessError(1, "ollama ps")
 
         with self.assertRaises(subprocess.CalledProcessError):
-            ModelManager.load_model(config.DEFAULT_MODEL)
+            ModelManager.load_model(settings.DEFAULT_MODEL)
 
     @patch("subprocess.Popen")
     def test_subprocess_timeout_handling(self, mock_popen):
@@ -52,7 +51,7 @@ class TestModelManagerErrorHandling(unittest.TestCase):
         mock_popen.side_effect = subprocess.TimeoutExpired("ollama ps", 30)
 
         with self.assertRaises(subprocess.TimeoutExpired):
-            ModelManager.load_model(config.DEFAULT_MODEL)
+            ModelManager.load_model(settings.DEFAULT_MODEL)
 
     @patch("subprocess.Popen")
     def test_malformed_ollama_ps_output(self, mock_popen):
@@ -66,8 +65,8 @@ class TestModelManagerErrorHandling(unittest.TestCase):
 
         # Should not crash, should handle gracefully
         try:
-            ModelManager.load_model(config.DEFAULT_MODEL)
-            self.assertEqual(ModelManager.current_model, config.DEFAULT_MODEL)
+            ModelManager.load_model(settings.DEFAULT_MODEL)
+            self.assertEqual(ModelManager.current_model, settings.DEFAULT_MODEL)
         except Exception as e:
             self.fail(f"Should handle malformed output gracefully, but raised: {e}")
 
@@ -78,8 +77,8 @@ class TestModelManagerErrorHandling(unittest.TestCase):
         mock_process.stdout.read.return_value.decode.return_value = ""
         mock_popen.return_value = mock_process
 
-        ModelManager.load_model(config.DEFAULT_MODEL)
-        self.assertEqual(ModelManager.current_model, config.DEFAULT_MODEL)
+        ModelManager.load_model(settings.DEFAULT_MODEL)
+        self.assertEqual(ModelManager.current_model, settings.DEFAULT_MODEL)
 
     @patch("os.system")
     def test_stop_model_system_error(self, mock_os_system):
@@ -87,7 +86,7 @@ class TestModelManagerErrorHandling(unittest.TestCase):
         # Simulate system command failure
         mock_os_system.return_value = 1  # Non-zero exit code
 
-        ModelManager.current_model = config.DEFAULT_MODEL
+        ModelManager.current_model = settings.DEFAULT_MODEL
 
         # Should not raise exception even if stop command fails
         try:
@@ -103,13 +102,13 @@ class TestModelManagerErrorHandling(unittest.TestCase):
         mock_process = MagicMock()
         # Include unicode characters
         mock_process.stdout.read.return_value.decode.return_value = (
-            f"模型 {config.DEFAULT_MODEL} 正在运行"
+            f"模型 {settings.DEFAULT_MODEL} 正在运行"
         )
         mock_popen.return_value = mock_process
 
         try:
-            ModelManager.load_model(config.DEFAULT_MODEL)
-            self.assertEqual(ModelManager.current_model, config.DEFAULT_MODEL)
+            ModelManager.load_model(settings.DEFAULT_MODEL)
+            self.assertEqual(ModelManager.current_model, settings.DEFAULT_MODEL)
         except UnicodeError as e:
             self.fail(f"Should handle unicode characters gracefully, but raised: {e}")
 
@@ -118,12 +117,12 @@ class TestModelManagerErrorHandling(unittest.TestCase):
         """Test handling of very large ollama ps output"""
         mock_process = MagicMock()
         # Simulate very large output
-        large_output = "x" * 10000 + config.DEFAULT_MODEL + "y" * 10000
+        large_output = "x" * 10000 + settings.DEFAULT_MODEL + "y" * 10000
         mock_process.stdout.read.return_value.decode.return_value = large_output
         mock_popen.return_value = mock_process
 
-        ModelManager.load_model(config.DEFAULT_MODEL)
-        self.assertEqual(ModelManager.current_model, config.DEFAULT_MODEL)
+        ModelManager.load_model(settings.DEFAULT_MODEL)
+        self.assertEqual(ModelManager.current_model, settings.DEFAULT_MODEL)
 
     @patch("subprocess.Popen")
     def test_model_list_modification_protection(self, mock_popen):
