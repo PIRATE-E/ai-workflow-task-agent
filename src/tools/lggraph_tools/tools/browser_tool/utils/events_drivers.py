@@ -538,11 +538,18 @@ class OnRunningDriver(Handler):
                 print("[DRIVER] Agent execution started", flush=True)
                 sys.stdout.flush()
 
-            elif not self.browser_pid and self.killer_flag['started'] and self.killer_flag['got_run']:
-                # Browser died AFTER running = critical
+            elif not self.browser_pid and self.killer_flag['started']:
+                # Browser died - emit kill event regardless of got_run state
                 self.killer_flag['should_kill'] = True
-                print("[DRIVER] ⚠️ Browser crashed during execution!", flush=True)
+                print("[DRIVER] Browser closed - emitting kill event", flush=True)
                 sys.stdout.flush()
+
+                # Ensure kill event gets queued
+                try:
+                    self.runner.monitor_queue.put_nowait(True)
+                    print("[DRIVER] Kill signal queued successfully", flush=True)
+                except queue.Full:
+                    print("[DRIVER] Queue full - kill signal may be delayed", flush=True)
 
             print(f"[DRIVER] Monitor state: {self.killer_flag}", flush=True)
             sys.stdout.flush()
@@ -662,9 +669,22 @@ class OnCompleteDriver(Handler):
         browser = self.runner.browser
         config = self.runner.config
 
+        # Check if browser connection is still valid
         if browser._cdp_client_root is None:
             print("[DRIVER] Browser CDP client not ready, skipping session save.")
             return {"session_saved": False, "reason": "cdp_not_ready"}
+
+        # Additional health check - try to create a session
+        try:
+            test_session = await browser.get_or_create_cdp_session()
+            # Quick health check
+            await test_session.cdp_client.send.Runtime.evaluate(
+                params={'expression': '1', 'returnByValue': True},
+                session_id=test_session.session_id
+            )
+        except Exception as e:
+            print(f"[DRIVER] Browser connection health check failed: {e}, skipping session save.")
+            return {"session_saved": False, "reason": "connection_unhealthy", "error": str(e)}
 
         try:
             current_url = await browser.get_current_page_url()

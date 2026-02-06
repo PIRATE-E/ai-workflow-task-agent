@@ -90,14 +90,17 @@ def main():
 
             # Cancel ALL pending tasks to prevent asyncio.run() from hanging
             print("[SUBPROCESS] Canceling all pending tasks...", flush=True)
-            tasks = [task for task in asyncio.all_tasks() if not task.done()]
-            print(f"[SUBPROCESS] Found {len(tasks)} pending tasks to cancel", flush=True)
-            for task in tasks:
-                task.cancel()
+            pending_tasks = [task for task in asyncio.all_tasks() if not task.done()]
+            print(f"[SUBPROCESS] Found {len(pending_tasks)} pending tasks to cancel", flush=True)
 
-            # Wait for all tasks to be cancelled
-            if tasks:
-                await asyncio.gather(*tasks, return_exceptions=True)
+            cancelled_tasks = []
+            for task in pending_tasks:
+                if not task.cancelled():  # Don't cancel already cancelled tasks
+                    task.cancel()
+                    cancelled_tasks.append(task)
+
+            # Don't await cancelled tasks - let asyncio.run() handle cleanup
+            print(f"[SUBPROCESS] Cancelled {len(cancelled_tasks)} tasks, letting asyncio clean up", flush=True)
 
             print("[SUBPROCESS] All tasks cancelled, returning result", flush=True)
 
