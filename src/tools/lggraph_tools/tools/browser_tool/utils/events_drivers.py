@@ -195,7 +195,8 @@ class SetupDriver(Handler):
             async def ainvoke(
                     self,
                     messages: List[BaseMessage],
-                    output_format: Optional[type[T]] = None
+                    output_format: Optional[type[T]] = None,
+                    **kwargs
             ) -> ChatInvokeCompletion[T] | ChatInvokeCompletion[str]:
                 """Convert browser_use messages to LangChain format and invoke the model"""
                 langchain_messages = []
@@ -872,25 +873,6 @@ class TeardownDriver(Handler):
         except Exception as e:
             print(f"[DRIVER] Failed to emit BrowserKillEvent: {e}", flush=True)
 
-    async def close_agent(self):
-        """Close the agent.
-
-        From browser_subprocess_runner.py line 223.
-        """
-        agent = getattr(self.runner, 'agent', None)
-
-        if agent is None:
-            print("[DRIVER] No agent to close.", flush=True)
-            return {"agent_closed": False, "reason": "no_agent"}
-
-        try:
-            await agent.close()
-            print("✅ Agent closed", flush=True)
-            return {"agent_closed": True}
-        except Exception as e:
-            print(f"[DRIVER] Failed to close agent: {e}", flush=True)
-            return {"agent_closed": False, "error": str(e)}
-
     async def handle_keep_alive(self):
         """Handle keep_alive mode - wait for browser to close.
 
@@ -900,6 +882,8 @@ class TeardownDriver(Handler):
         monitor_queue = getattr(self.runner, 'monitor_queue', None)
 
         if not config.keep_alive:
+            await self.__close_agent()
+            await self.__close_browser()
             print("[DRIVER] keep_alive=False, no waiting needed.", flush=True)
             return {"keep_alive_wait": False}
 
@@ -911,12 +895,69 @@ class TeardownDriver(Handler):
         try:
             # Wait up to 24 hours (effectively forever)
             ok: bool = monitor_queue.get(timeout=60 * 60 * 24)
-            ok and await self.__emit_kill_browser_event()
             print(f"[DRIVER] Browser closed (ok={ok})", flush=True)
+            if ok:
+                await self.__close_agent()
+                await self.__close_browser()
+                await self.__emit_kill_browser_event()
             return {"keep_alive_wait": True, "browser_closed": ok}
         except Exception as e:
             print(f"[DRIVER] Keep-alive wait failed: {e}, traceback: {traceback.format_exc()}", flush=True)
             return {"keep_alive_wait": False, "error": str(e)}
+
+    async def __close_agent(self):
+        """Close the agent.
+
+        From browser_subprocess_runner.py line 223.
+        """
+        agent = getattr(self.runner, 'agent', None)
+
+        if agent is None:
+            print("[DRIVER] No agent to close.", flush=True)
+
+        try:
+            await agent.close()
+            print("✅ Agent closed", flush=True)
+        except Exception as e:
+            print(f"[DRIVER] Failed to close agent: {e}", flush=True)
+
+
+    async def __close_browser(self):
+        """Force close browser bypassing monkey patch.
+
+        CRITICAL: The monkey patch at line 131-143 blocks browser.stop() when keep_alive=True!
+        We must use force=True to bypass it, otherwise CDP stays connected and tasks hang forever.
+        """
+        browser = getattr(self.runner, 'browser', None)
+        if browser is None:
+            print("[DRIVER] No browser to close.", flush=True)
+
+        try:
+            # CRITICAL: Use force=True to bypass monkey patch!
+            from browser_use.browser.events import BrowserStopEvent
+
+            print("[DRIVER] Force-closing browser (bypassing monkey patch)...", flush=True)
+
+            # Dispatch with force=True to bypass the monkey patch at line 131-143
+            await browser.event_bus.dispatch(BrowserStopEvent(force=True))
+
+            # Wait a bit for cleanup to complete
+            await asyncio.sleep(0.5)
+
+            print("✅ Browser force-stopped successfully", flush=True)
+        except Exception as e:
+            print(f"[DRIVER] Failed to force-stop browser: {e}", flush=True)
+
+            # Fallback: try direct CDP close
+            try:
+                print("[DRIVER] Attempting direct CDP connection close...", flush=True)
+                if hasattr(browser, '_browser_session'):
+                    session = browser._browser_session
+                    if hasattr(session, '_cdp_client_root') and session._cdp_client_root:
+                        await session._cdp_client_root.close()
+                        print("✅ CDP connection closed directly", flush=True)
+            except Exception as e2:
+                print(f"[DRIVER] CDP direct close also failed: {e2}", flush=True)
 
     async def cleanup_resources(self):
         """Final cleanup of any remaining resources."""

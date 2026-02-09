@@ -88,27 +88,12 @@ def main():
 
             print("[SUBPROCESS] got result from runner into the subprocess runner script", flush=True)
 
-            # Cancel ALL pending tasks to prevent asyncio.run() from hanging
-            print("[SUBPROCESS] Canceling all pending tasks...", flush=True)
-            pending_tasks = [task for task in asyncio.all_tasks() if not task.done()]
-            print(f"[SUBPROCESS] Found {len(pending_tasks)} pending tasks to cancel", flush=True)
-
-            cancelled_tasks = []
-            for task in pending_tasks:
-                if not task.cancelled():  # Don't cancel already cancelled tasks
-                    task.cancel()
-                    cancelled_tasks.append(task)
-
-            # Don't await cancelled tasks - let asyncio.run() handle cleanup
-            print(f"[SUBPROCESS] Cancelled {len(cancelled_tasks)} tasks, letting asyncio clean up", flush=True)
-
-            print("[SUBPROCESS] All tasks cancelled, returning result", flush=True)
-
             return result_dict
 
         # Execute the runner
         try:
-            main_result = asyncio.run(run_browser_agent())
+            runner = asyncio.Runner()
+            main_result = runner.run(run_browser_agent())
             print(f"[SUBPROCESS] Runner completed successfully, extracting results...", flush=True)
 
             # Safer extraction with explicit error handling
