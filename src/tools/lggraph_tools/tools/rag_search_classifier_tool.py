@@ -1,6 +1,10 @@
 import json
 
-import winsound
+try:
+    import winsound
+except ImportError:
+    winsound = None  # Not available on Linux/Mac
+
 from rich.prompt import Prompt
 
 import src.prompts.rag_search_classifier_prompts
@@ -222,7 +226,7 @@ def rag_search_classifier_tool(query: str) -> str:
     Determines the appropriate RAG (Retrieval-Augmented Generation) search type based on the query and file type,
     and performs the search if supported.
     """
-    if settings.ENABLE_SOUND_NOTIFICATIONS:
+    if settings.ENABLE_SOUND_NOTIFICATIONS and winsound:
         winsound.Beep(7200, 200)  # Play a sound to indicate the start of RAG search
     file_path = Prompt.ask(
         "Enter FILE PATH TO RAG SEARCH",
@@ -317,7 +321,7 @@ def rag_search_classifier_tool(query: str) -> str:
         return f"[ERROR] LLM did not specify a RAG type. Response: {response_json}"
 
     if selected_rag_type == "knowledge_graph":
-        if settings.ENABLE_SOUND_NOTIFICATIONS:
+        if settings.ENABLE_SOUND_NOTIFICATIONS and winsound:
             winsound.Beep(
                 7200, 200
             )  # Play a sound to indicate knowledge graph RAG search

@@ -1,4 +1,8 @@
-import winsound
+try:
+    import winsound
+except ImportError:
+    winsound = None  # Not available on Linux/Mac
+
 from rich.align import Align
 from rich.panel import Panel
 
@@ -34,5 +38,5 @@ def print_message(msg: str, sender="user"):
         padding=(1, 2),
     )
     console.print(panel)
-    if settings.ENABLE_SOUND_NOTIFICATIONS:
+    if settings.ENABLE_SOUND_NOTIFICATIONS and winsound:
         winsound.Beep(7200, 200)  # Play a sound for new message

@@ -6,7 +6,12 @@ import sys
 import threading
 from pathlib import Path
 
-import winsound
+# Windows-only import - conditional
+try:
+    import winsound
+except ImportError:
+    winsound = None  # Not available on Linux/Mac
+
 from anyio import sleep
 
 # Add project root to Python path

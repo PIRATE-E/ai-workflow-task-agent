@@ -1,5 +1,5 @@
 version = 1
-revision = 2
+revision = 3
 requires-python = ">=3.13"
 resolution-markers = [
     "python_full_version >= '3.14'",
@@ -125,16 +125,13 @@ dependencies = [
     { name = "pypdf" },
     { name = "pypika" },
     { name = "pyproject-hooks" },
-    { name = "pyreadline3" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
     { name = "python-dateutil" },
     { name = "python-dotenv" },
     { name = "python-multipart" },
     { name = "pytz" },
-    { name = "pywin32" },
     { name = "pyyaml" },
-    { name = "referencing" },
     { name = "requests" },
     { name = "requests-oauthlib" },
     { name = "requests-toolbelt" },
@@ -291,16 +288,13 @@ requires-dist = [
     { name = "pypdf", specifier = ">=6.0.0" },
     { name = "pypika", specifier = ">=0.48.9" },
     { name = "pyproject-hooks", specifier = ">=1.2.0" },
-    { name = "pyreadline3", specifier = ">=3.5.4" },
     { name = "pytest", specifier = ">=9.0.2" },
     { name = "pytest-asyncio", specifier = ">=0.25.0" },
     { name = "python-dateutil", specifier = ">=2.9.0.post0" },
     { name = "python-dotenv", specifier = ">=1.1.1" },
     { name = "python-multipart", specifier = ">=0.0.20" },
     { name = "pytz", specifier = ">=2025.2" },
-    { name = "pywin32", specifier = ">=311" },
     { name = "pyyaml", specifier = ">=6.0.2" },
-    { name = "referencing", specifier = ">=0.36.2" },
     { name = "requests", specifier = ">=2.32.5" },
     { name = "requests-oauthlib", specifier = ">=2.0.0" },
     { name = "requests-toolbelt", specifier = ">=1.0.0" },

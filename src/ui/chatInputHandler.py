@@ -10,6 +10,7 @@ Provides a beautiful, Cursor AI/Warp-style input experience with:
 """
 
 from typing import Iterable
+import sys
 
 from prompt_toolkit import PromptSession
 from prompt_toolkit.auto_suggest import AutoSuggestFromHistory
@@ -238,15 +239,26 @@ class InputHandler:
         """
         if prompt_text is None and style is None:
             prompt_text = [('class:prompt', 'you ➜ ')]
-        elif style is None:
+        elif prompt_text is not None and style is None:
             prompt_text = [('class:prompt', prompt_text)]
         elif prompt_text is None:
             prompt_text = [(style, 'you ➜ ')]
 
+        # If we're not in an interactive terminal, prompt_toolkit can't work reliably.
+        if not sys.stdin.isatty():
+            try:
+                # best-effort plain prompt
+                return input('you ➜ ')
+            except EOFError:
+                return '/exit'
+
         try:
             return InputHandler._session.prompt(prompt_text)
-        # except KeyboardInterrupt:
-        # we didnt have to handle this because outside we are handling it
-        #     return '/exit'
         except EOFError:
             return '/exit'
+        except Exception:
+            # prompt_toolkit can throw when terminal state is odd; fall back.
+            try:
+                return input('you ➜ ')
+            except EOFError:
+                return '/exit'
