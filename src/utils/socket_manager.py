@@ -15,12 +15,11 @@ except ImportError:
         from error_transfer import SocketCon
     except ImportError:
         # Last resort: add current directory to path and import
-        sys.path.append(pathlib.Path(pathlib.Path(__file__).resolve()).parent)
+        sys.path.append(pathlib.Path(__file__).resolve().parent)
         from error_transfer import SocketCon
 
 # Import settings - handle case where it might not be available
 from src.config import settings
-import pathlib
 
 # Structured debug protocol imports (lazy fallback if unavailable)
 try:
@@ -49,16 +48,11 @@ except ImportError:  # Minimal fallbacks so legacy still works
 
 
 class SocketManager:
-    instance = None
-    _socket_con = None
-    _log_server_process = None
-    _cleanup_in_progress = False  # Flag to prevent new connections during cleanup
-    # Exposed safe wrapper placeholder (assigned after class definition)
-
-    def __new__(cls):
-        if cls.instance is None:
-            cls.instance = super().__new__(cls)
-        return cls.instance
+    def __init__(self):
+        self._socket_connection = None
+        self._debug_sender = DebugMessageSender()  # Initialized without connection initially
+        self._log_server_process = None
+        self._terminal_process = None
 
     @staticmethod
     def get_socket_con():
@@ -69,14 +63,36 @@ class SocketManager:
             else None
         )
 
-    def _build_debug_sender(self):
-        """Internal helper to always return a DebugMessageSender bound to current connection"""
-        return DebugMessageSender(self._socket_con)
+    def get_socket_connection(self):
+        if self._socket_connection is None or not self._socket_connection.is_connected():
+            print("📡 No log server found, starting new one...")
+            if self.start_log_server():
+                # Wait for server to start
+                time.sleep(1)
+                
+                # Create client socket and connect
+                try:
+                    from src.config import settings
+                    client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    client_socket.settimeout(2)
+                    client_socket.connect((settings.SOCKET_HOST, settings.SOCKET_PORT))
+                    
+                    self._socket_connection = SocketCon(client_socket)  # Pass client socket to SocketCon
+                    
+                    # Update debug sender with the new connection
+                    self._debug_sender = DebugMessageSender(self._socket_connection)
+                    return self._socket_connection
+                except Exception as e:
+                    print(f"❌ Error establishing socket connection: {e}")
+                    self._socket_connection = None
+                    return None
+            else:
+                return None
+        return self._socket_connection
 
     def start_log_server(self):
-        """Start the log server as a subprocess"""
+        # Check if we already have a running process
         if self._log_server_process is not None:
-            # Check if process is still running
             if self._log_server_process.poll() is None:
                 print("Log server is already running")
                 return True
@@ -85,329 +101,142 @@ class SocketManager:
                 self._log_server_process = None
 
         try:
-            # Get the path to error_transfer.py
-            current_dir = pathlib.Path(pathlib.Path(__file__).resolve()).parent
+            # Get the path to error_transfer.py and project root
+            current_dir = pathlib.Path(__file__).resolve().parent
             error_transfer_path = current_dir / "error_transfer.py"
+            project_root = current_dir.parent.parent  # Navigate to project root
 
             if not pathlib.Path(error_transfer_path).exists():
-                print(
-                    f"Error: Could not find error_transfer.py at {error_transfer_path}"
-                )
+                print(f"❌ Error: error_transfer.py not found at {error_transfer_path}")
                 return False
 
             print(f"🚀 Starting log server subprocess: {error_transfer_path}")
 
-            # Start the subprocess - choose method based on settings
-            log_display_mode = settings.LOG_DISPLAY_MODE
-
-            if log_display_mode == "separate_window":
-                # Option 1: Separate console window (recommended)
-                if os.name == "nt":  # Windows
-                    self._log_server_process = subprocess.Popen(
-                        [sys.executable, error_transfer_path],
-                        creationflags=subprocess.CREATE_NEW_CONSOLE,
-                    )
-                else:  # Linux/Mac
-                    self._log_server_process = subprocess.Popen(
-                        ["gnome-terminal", "--", sys.executable, error_transfer_path]
-                    )
-            elif log_display_mode == "background":
-                # Option 2: Background process (logs not visible)
+            if os.name == 'nt':  # Windows
+                # Windows implementation
                 self._log_server_process = subprocess.Popen(
-                    [sys.executable, error_transfer_path],
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
+                    [sys.executable, str(error_transfer_path)],
+                    cwd=str(project_root),
+                    creationflags=subprocess.CREATE_NEW_CONSOLE,
                 )
-            elif log_display_mode == "file":
-                # Option 3: Log to file
-                log_file = (
-                    settings.BASE_DIR / "basic_logs" / "error_log.txt"
-                )  # Fixed: should be src/basic_logs, not project_root/basic_logs
-                print(f"Log file exists: {log_file.exists()}, path: {log_file}")
-                with log_file.open("w") as f:
-                    self._log_server_process = subprocess.Popen(
-                        [sys.executable, error_transfer_path], stdout=f, stderr=f
-                    )
-                print(f"📝 Log server output will be written to: {log_file}")
-            else:
-                # Default: Separate window
-                if os.name == "nt":  # Windows
-                    self._log_server_process = subprocess.Popen(
-                        [sys.executable, error_transfer_path],
-                        creationflags=subprocess.CREATE_NEW_CONSOLE,
-                    )
-                else:  # Linux/Mac
-                    self._log_server_process = subprocess.Popen(
-                        ["gnome-terminal", "--", sys.executable, error_transfer_path]
-                    )
+            else:  # Linux/Mac  
+                # Enhanced terminal commands with proper working directory and UV
+                terminals = [
+                    # qterminal with bash wrapper for persistence
+                    ["qterminal", "-e", "bash", "-c", f"cd '{project_root}' && uv run python '{error_transfer_path}'; echo 'Log server ended. Press Enter to close...'; read"],
+                    # gnome-terminal with bash wrapper for persistence
+                    ["gnome-terminal", "--", "bash", "-c", f"cd '{project_root}' && uv run python '{error_transfer_path}'; echo 'Log server ended. Press Enter to close...'; read"],
+                    # xterm with hold flag
+                    ["xterm", "-hold", "-e", "bash", "-c", f"cd '{project_root}' && uv run python '{error_transfer_path}'"],
+                    # konsole with hold flag
+                    ["konsole", "--hold", "-e", "bash", "-c", f"cd '{project_root}' && uv run python '{error_transfer_path}'"],
+                    # tmux as persistent fallback
+                    ["tmux", "new-session", "-d", "-s", "ai_logs", f"cd '{project_root}' && uv run python '{error_transfer_path}'"]
+                ]
+                
+                started = False
+                terminal_type = None
+                
+                for terminal_cmd in terminals:
+                    try:
+                        # Check if terminal exists
+                        if subprocess.run(["which", terminal_cmd[0]], capture_output=True).returncode == 0:
+                            self._terminal_process = subprocess.Popen(terminal_cmd, cwd=str(project_root))
+                            self._log_server_process = self._terminal_process
+                            terminal_type = terminal_cmd[0]
+                            started = True
+                            print(f"🔍 Started terminal monitor for {terminal_type}")
+                            break
+                    except (subprocess.CalledProcessError, FileNotFoundError) as e:
+                        print(f"⚠️ Failed to start {terminal_cmd[0]}: {e}")
+                        continue
 
-            print(f"✅ Log server started with PID: {self._log_server_process.pid}")
+                if not started:
+                    print("❌ No compatible terminal found for log server")
+                    return False
 
-            # Give the server a moment to start up
+            # Give the process time to start
             time.sleep(2)
 
-            # Check if the process is still running
-            if self._log_server_process.poll() is None:
-                print("✅ Log server is running successfully")
-                return True
+            if self._log_server_process and self._log_server_process.poll() is None:
+                print(f"✅ Log server started with {terminal_type if os.name != 'nt' else 'new console'}")
+                print(f"✅ Log server started with PID: {self._log_server_process.pid}")
+                
+                # Validate server is running after brief startup delay
+                time.sleep(1)
+                if self.is_server_running():
+                    print("✅ Log server is running successfully")
+                    return True
+                else:
+                    print("⚠️ Log server started but may not be responsive")
+                    return False
             else:
-                print("❌ Log server failed to start")
-                self._log_server_process = None
+                print("❌ Failed to start log server process")
                 return False
 
         except Exception as e:
-            print(f"❌ Failed to start log server: {e}")
-            self._log_server_process = None
+            print(f"❌ Error starting log server: {e}")
             return False
 
-    def stop_log_server(self):
-        """Stop the log server subprocess with enhanced cleanup"""
-        if self._log_server_process is not None:
-            try:
-                print("🛑 Stopping log server...")
-
-                # Check if process is still alive before terminating
-                if self._log_server_process.poll() is None:
-                    print(
-                        f"Terminating log server process (PID: {self._log_server_process.pid})"
-                    )
-
-                    # First try graceful termination
-                    self._log_server_process.terminate()
-
-                    # Wait for process to terminate gracefully
-                    try:
-                        self._log_server_process.wait(timeout=5)  # Increased timeout
-                        print("✅ Log server stopped gracefully")
-                    except subprocess.TimeoutExpired:
-                        print(
-                            "⚠️ Log server didn't stop gracefully, forcing termination..."
-                        )
-                        self._log_server_process.kill()
-                        try:
-                            self._log_server_process.wait(
-                                timeout=3
-                            )  # Increased timeout
-                            print("✅ Log server forcefully terminated")
-                        except subprocess.TimeoutExpired:
-                            print("❌ Could not terminate log server process")
-                            # Try to clean up any remaining processes
-                            try:
-                                import psutil
-
-                                parent = psutil.Process(self._log_server_process.pid)
-                                for child in parent.children(recursive=True):
-                                    child.kill()
-                                parent.kill()
-                                print("✅ Forcefully killed process tree")
-                            except ImportError:
-                                print("⚠️ psutil not available for process tree cleanup")
-                            except Exception as cleanup_error:
-                                print(
-                                    f"⚠️ Error during process tree cleanup: {cleanup_error}"
-                                )
-                else:
-                    print("✅ Log server process already terminated")
-
-            except Exception as e:
-                print(f"❌ Error stopping log server: {e}")
-            finally:
-                self._log_server_process = None
-
-                # Also clean up any stale lock files
-                try:
-                    lock_file = (
-                        pathlib.Path(__file__).parent / ".." / ".." / "basic_logs" / "server.lock"
-                    )
-                    if lock_file.exists():
-                        lock_file.unlink()
-                        print("🧹 Cleaned up server lock file")
-                except Exception as lock_cleanup_error:
-                    print(f"⚠️ Error cleaning up lock file: {lock_cleanup_error}")
-
-    def is_log_server_running(self):
-        """Check if the log server subprocess is running"""
-        if self._log_server_process is None:
+    def is_server_running(self):
+        """Check if the log server is running by testing socket connection"""
+        try:
+            # Test socket connection without creating persistent connection
+            test_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            test_socket.settimeout(1)
+            result = test_socket.connect_ex(('localhost', 5390))
+            test_socket.close()
+            return result == 0
+        except Exception:
             return False
-        return self._log_server_process.poll() is None
 
-    def get_socket_connection(self):
-        """Get or create the socket connection with adaptive timeout and health checking"""
-        if self._cleanup_in_progress:  # Prevent new connections during cleanup
-            return None
-
-        # === STEP 1: HEALTH CHECK EXISTING CONNECTION ===
-        if self._socket_con is not None:
-            if (
-                hasattr(self._socket_con, "_is_connected")
-                and self._socket_con._is_connected()
-            ):
-                return self._socket_con
-            else:
-                print("🔄 Detected dead connection, clearing for reconnection...")
-                try:
-                    if hasattr(self._socket_con, "client_socket"):
-                        self._socket_con.client_socket.close()
-                except Exception as e:
-                    print(f"❌ Error closing dead socket: {e}")
-                self._socket_con = None
-
-        if self._socket_con is None:
+    def restart_log_server(self):
+        """Restart the log server if it has stopped"""
+        print("⚠️ Log terminal closed, attempting restart...")
+        
+        # Clean up existing connections
+        if self._socket_connection:
             try:
-                if not getattr(settings, "ENABLE_SOCKET_LOGGING", False):
-                    print("Socket system_logging is disabled in settings")
-                    return None
-
-                # First, try to connect to existing server
-                socket_req = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                socket_req.settimeout(0.5)
-                try:
-                    socket_req.connect((settings.SOCKET_HOST, settings.SOCKET_PORT))
-                    self._socket_con = SocketCon(socket_req)
-                    print("✅ Connected to existing log server")
-                    settings.socket_con = self._socket_con  # expose raw connection
-                    return self._socket_con
-                except (ConnectionRefusedError, socket.timeout):
-                    print("📡 No log server found, starting new one...")
-                    socket_req.close()
-                    if self.start_log_server():
-                        time.sleep(1)
-                        socket_req = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                        socket_req.settimeout(2)
-                        socket_req.connect((settings.SOCKET_HOST, settings.SOCKET_PORT))
-                        self._socket_con = SocketCon(socket_req)
-                        settings.socket_con = self._socket_con
-                        print("✅ Connected to newly started log server")
-                        return self._socket_con
-                    else:
-                        print("❌ Failed to start log server")
-                        return None
-            except Exception as e:
-                print(f"❌ Error establishing socket connection: {e}")
-                self._socket_con = None
-        return self._socket_con
-
-    def send_error(self, message: str):
-        """LEGACY: Send error (now bridged to structured protocol)."""
-        socket_con = self.get_socket_connection()
-        sender = self._build_debug_sender() if socket_con else None
-        if sender:
-            try:
-                # Heuristic parsing for legacy level prefix like [ERROR]
-                level = LogLevel.INFO
-                heading = "LEGACY • MESSAGE"
-                body = message.strip()
-                if body.startswith("[") and "]" in body.split("\n", 1)[0]:
-                    prefix = body[1 : body.find("]")].upper()
-                    body_no_prefix = body[body.find("]") + 1 :].strip()
-                    heading = f"LEGACY • {prefix}"
-                    body = body_no_prefix or body
-                    level_map = {
-                        "DEBUG": LogLevel.DEBUG
-                        if hasattr(LogLevel, "DEBUG")
-                        else LogLevel.INFO,
-                        "INFO": LogLevel.INFO,
-                        "WARNING": LogLevel.WARNING,
-                        "WARN": LogLevel.WARNING,
-                        "ERROR": LogLevel.ERROR,
-                        "CRITICAL": LogLevel.CRITICAL,
-                    }
-                    level = level_map.get(prefix, LogLevel.INFO)
-                sender.send_debug_message(
-                    heading=heading,
-                    body=body,
-                    level=level,
-                    metadata={"origin": "legacy_send_error"},
-                )
-            except Exception as e:
-                print(f"Failed structured send, falling back. Error: {e}")
-                if socket_con and hasattr(socket_con, "send_error"):
-                    try:
-                        socket_con.send_error(message + "\n")
-                    except Exception as inner:
-                        print(f"Legacy fallback failed: {inner}\nOriginal: {message}")
-        else:
-            print(f"Socket not available - {message}")
-
-    def is_connected(self):
-        """Check if socket connection is active"""
-        if self._socket_con and hasattr(self._socket_con, "_is_connected"):
-            return self._socket_con._is_connected()
+                self._socket_connection.disconnect()
+            except Exception:
+                pass
+            self._socket_connection = None
+        
+        # Start new server
+        if self.start_log_server():
+            # Re-establish connection
+            return self.get_socket_connection() is not None
         return False
 
-    def close_connection(self):
-        """Close the socket connection and optionally stop the log server"""
-        if self._socket_con and hasattr(self._socket_con, "client_socket"):
+    def monitor_terminal_process(self):
+        """Monitor terminal process and restart if needed (Linux only)"""
+        if os.name != 'nt' and self._terminal_process:
+            if self._terminal_process.poll() is not None:
+                # Terminal has closed, attempt restart
+                self.restart_log_server()
+
+    def cleanup(self):
+        """Clean up processes and connections"""
+        if self._socket_connection:
             try:
-                self._socket_con.client_socket.close()
-                print("Socket connection closed")
-            except Exception as e:
-                print(f"Error closing socket: {e}")
-        self._socket_con = None
-        if self.is_log_server_running():
-            print("🔄 Stopping log server subprocess...")
-            self.stop_log_server()
+                self._socket_connection.disconnect()
+            except Exception:
+                pass
+            self._socket_connection = None
+            
+        if self._log_server_process:
+            try:
+                self._log_server_process.terminate()
+                self._log_server_process.wait(timeout=5)
+            except Exception:
+                try:
+                    self._log_server_process.kill()
+                except Exception:
+                    pass
+            self._log_server_process = None
+            self._terminal_process = None
 
     @classmethod
     def cleanup(cls):
-        """Simple cleanup - just kill the subprocess"""
-        print("🧹 Cleaning up SocketManager...")
-        if hasattr(cls, "instance") and cls.instance is not None:
-            cls.instance._cleanup_in_progress = True
-            instance = cls.instance
-            if instance._socket_con:
-                try:
-                    if hasattr(instance._socket_con, "client_socket"):
-                        instance._socket_con.client_socket.close()
-                        print("🔌 Socket closed")
-                except Exception:
-                    pass
-                instance._socket_con = None
-            if instance._log_server_process is not None:
-                try:
-                    print("🛑 Killing log server subprocess...")
-                    instance._log_server_process.kill()
-                    print("✅ Log server killed")
-                except Exception as e:
-                    print(e)
-                finally:
-                    instance._log_server_process = None
-        print("✅ SocketManager cleanup completed")
-
-
-# --- Safe Socket Wrapper (merged & enhanced) ---
-class SafeSocketWrapper:
-    """Safe wrapper for socket connections that prevents NoneType errors and bridges legacy calls."""
-
-    def __init__(self, manager: SocketManager):
-        self._manager = manager
-
-    def send_error(self, message: str):  # Legacy external API
-        return self._manager.send_error(message)
-
-    def _is_connected(self):
-        return self._manager.is_connected()
-
-    # Structured helpers for external callers wanting protocol level access
-    def send_debug(self, heading: str, body: str, level: str = "INFO", metadata=None):
-        sender = self._manager._build_debug_sender()
-        try:
-            sender.send_debug_message(heading, body, level, metadata or {})
-            return True
-        except Exception as e:
-            print(f"[SAFE_SOCKET_FALLBACK] {heading}: {body} ({e})")
-            return False
-
-
-# Global instances
-socket_manager = SocketManager()
-safe_socket = SafeSocketWrapper(socket_manager)
-
-# Ensure settings.socket_con always has something usable for legacy code
-try:
-    if not hasattr(settings, "socket_con") or settings.socket_con is None:
-        settings.socket_con = (
-            safe_socket  # Provide wrapper that emulates expected interface
-        )
-except Exception:
-    pass
+        """Legacy class method for cleanup"""
+        pass  # No global state to clean up in new implementation
