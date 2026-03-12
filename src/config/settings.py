@@ -1,9 +1,11 @@
 """
 Configuration settings for AI LLM project.
 """
+
 from __future__ import annotations
 
 import os
+
 # Load environment variables from .env file
 from pathlib import Path
 from typing import TypedDict, TYPE_CHECKING
@@ -43,14 +45,16 @@ TRANSLATION_API_URL = os.getenv(
 # Default paths
 DEFAULT_RAG_EXAMPLE_FILE_PATH = BASE_DIR / "RAG" / "RAG_FILES" / "kafka.pdf"
 DEFAULT_RAG_FILES_HASH_TXT_PATH = (
-        BASE_DIR / "RAG" / "RAG_FILES" / "processed_hash_chunks.txt"
+    BASE_DIR / "RAG" / "RAG_FILES" / "processed_hash_chunks.txt"
 )
 DEFAULT_RAG_FILES_PROCESSED_TRIPLES_PATH = (
-        BASE_DIR / "RAG" / "RAG_FILES" / "processed_triple.json"
+    BASE_DIR / "RAG" / "RAG_FILES" / "processed_triple.json"
 )
 
 # Task management configuration
-SKIP_THRESHOLD = int(os.getenv("SKIP_THRESHOLD", 70))  # Skip tasks with skip_probability >= this value
+SKIP_THRESHOLD = int(
+    os.getenv("SKIP_THRESHOLD", 70)
+)  # Skip tasks with skip_probability >= this value
 
 # Logging configuration
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
@@ -58,7 +62,7 @@ LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 # Feature flags
 ENABLE_SOCKET_LOGGING = os.getenv("ENABLE_SOCKET_LOGGING", "true").lower() == "true"
 ENABLE_SOUND_NOTIFICATIONS = (
-        os.getenv("ENABLE_SOUND_NOTIFICATIONS", "true").lower() == "true"
+    os.getenv("ENABLE_SOUND_NOTIFICATIONS", "true").lower() == "true"
 )
 
 # Log display mode options:
@@ -73,7 +77,9 @@ LOG_TEXT_HANDLER_ROTATION_SIZE_LIMIT_MB = int(
 LOG_TEXT_HANDLER_ROTATION_TIME_LIMIT_HOURS = int(
     os.getenv("LOG_TEXT_HANDLER_ROTATION_TIME_LIMIT_HOURS", 24 * 60 * 60)
 )  # 24 hours
-LOG_ROTATION_ALWAYS_ON = os.getenv("LOG_ROTATION_ALWAYS_ON", "true").lower() == "true" ##### set to true for debugging only
+LOG_ROTATION_ALWAYS_ON = (
+    os.getenv("LOG_ROTATION_ALWAYS_ON", "true").lower() == "true"
+)  ##### set to true for debugging only
 
 # Development/Production mode
 DEBUG = os.getenv("DEBUG", "false").lower() == "true"
@@ -117,26 +123,32 @@ socket_con = (
 
 # listeners
 
+
 class ListenersDict(TypedDict):
-    eval: 'RichStatusListener | None'
-    exit: 'ExitListener | None'
+    eval: "RichStatusListener | None"
+    exit: "ExitListener | None"
 
-listeners: ListenersDict = {
-    "eval": None,
-    "exit": None
-}
 
-#exit flag to close the application smoothly
+listeners: ListenersDict = {"eval": None, "exit": None}
+
+# exit flag to close the application smoothly
 exit_flag = False
 
 # recursion limits
-recursion_limit = int(os.getenv("RECURSION_LIMIT", 500))  ## recursion limit for the agent graph core
+recursion_limit = int(
+    os.getenv("RECURSION_LIMIT", 500)
+)  ## recursion limit for the agent graph core
 
 # browser use
 BROWSER_USE_ENABLED = os.getenv("BROWSER_USE_ENABLED", "true").lower() == "true"
-BROWSER_USE_TIMEOUT = int(os.getenv("BROWSER_USE_TIMEOUT", 1300))  # Timeout in seconds (default 1300s = 20min)
+BROWSER_USE_TIMEOUT = int(
+    os.getenv("BROWSER_USE_TIMEOUT", 1300)
+)  # Timeout in seconds (default 1300s = 20min)
 BROWSER_USE_LOG_FILE = "browser.txt"
-BROWSER_USE_USER_PROFILE_PATH = os.getenv("BROWSER_USE_USER_PROFILE_PATH", str(BASE_DIR.parent.parent / "./profiles/main_profile"))
+BROWSER_USE_USER_PROFILE_PATH = os.getenv(
+    "BROWSER_USE_USER_PROFILE_PATH",
+    str(BASE_DIR.parent.parent / "./profiles/main_profile"),
+)
 
 
 # mcp.md configs
@@ -146,7 +158,10 @@ MCP_CONFIG = {
     "MCP_PORT": int(os.getenv("MCP_PORT", 5000)),
     "MCP_API_KEY": os.getenv("MCP_API_KEY", "your_api_key_here"),
     "MCP_TIMEOUT": int(os.getenv("MCP_TIMEOUT", 30)),  # Timeout in seconds
-    "MCP_CONFIG_PATH": BASE_DIR.parent / ".mcp.json",  # Path to MCP configuration file
+    "MCP_CONFIG_PATH": BASE_DIR.parent / ".mcp.json",  # Path to MCP configuration file,
+    "MCP_START_TIME_OUT": int(
+        os.getenv("MCP_SERVER_START_TIMEOUT", 30)
+    ),  # Time to wait for MCP server to start in seconds
 }
 
 if __name__ == "__main__":
