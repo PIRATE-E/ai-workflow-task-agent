@@ -1,3 +1,48 @@
+"""chat_initializer.py
+
+Chat session initialization and lifecycle management for AI Agent Workflow.
+
+This module provides the ChatInitializer class which orchestrates the complete
+setup of the chat application, including LangGraph compilation, tool registration,
+MCP server management, socket initialization, and Neo4j database connections.
+
+Features:
+    - Complete chat session bootstrap and initialization
+    - LangGraph graph compilation with State schema
+    - Tool registration (18 core tools + MCP dynamic tools)
+    - MCP server management with async startup
+    - Socket server for external integrations
+    - Neo4j database connection management
+    - Exit listener for graceful shutdown
+    - Rich CLI presentation with modern input handling
+
+Classes:
+    ChatInitializer: Main orchestrator for chat session initialization
+
+Dependencies:
+    - langgraph: Graph-based agent orchestration
+    - rich: Terminal UI and error formatting
+    - asyncio: Async MCP server management
+    - src.mcp.manager: MCP server lifecycle
+    - src.tools: Core tool implementations
+    - src.models.state: State management
+    - src.ui.chatInputHandler: Modern CLI input
+
+Notes:
+    This class handles the complete initialization sequence:
+    1. Core class setup
+    2. Tool registration (LangChain tools)
+    3. LangGraph compilation
+    4. MCP server startup (async)
+    5. Neo4j connection
+    6. Socket server (if enabled)
+    7. Exit listener registration
+
+Warning:
+    - Initialization can take 30-60 seconds due to MCP server startup
+    - Network-dependent operations may fail silently
+    - Some initialization errors are non-fatal (logged but don't stop startup)
+"""
 import asyncio
 import gc
 import json
@@ -27,6 +72,7 @@ from src.ui.print_message_style import print_message
 from src.utils.socket_manager import SocketManager
 
 from src.utils.listeners.exit_listener import ExitListener
+
 # mcp.md servers integration
 
 # Modern CLI input handler
@@ -34,6 +80,56 @@ from src.ui.chatInputHandler import InputHandler
 
 
 class ChatInitializer:
+    """Orchestrate complete initialization of the AI chat application.
+
+    This class manages the full lifecycle setup of the chat session, including
+    tool registration, graph compilation, MCP server startup, database connections,
+    and UI initialization. It ensures all components are properly initialized before
+    the chat loop begins.
+
+    Attributes:
+        break_loop (bool|None): Flag to signal chat loop termination. Set by
+            exit commands or listeners.
+        _exit_function (Callable|None): Callback function for graceful shutdown.
+            Registered with ExitListener.
+        os (str): Operating system name (Linux, Windows, Darwin). Used for
+            platform-specific behavior.
+        console (rich.console.Console): Rich console for formatted terminal output.
+        _state (State): TypedDict containing messages list and message_type.
+            Initial state with empty messages.
+        state_accessor (StateAccessor): Singleton accessor for state management.
+            Provides thread-safe state access.
+        graph (CompiledStateGraph|None): Compiled LangGraph graph. None until
+            compiled via node_assign.
+        tools (list|None): List of registered LangChain tools. Includes core
+            tools and dynamically discovered MCP tools.
+
+    Methods:
+        tools_register: Register all LangChain tools (core + MCP)
+        initialize_mcp: Start and configure all MCP servers
+        initialize_neo4j: Connect to Neo4j vector database
+        initialize_socket: Start socket server for external communication
+
+    Notes:
+        - Initialization order matters - tools before graph, MCP after tools
+        - MCP server startup is async and can take 30-60 seconds
+        - Non-fatal errors are logged but don't prevent startup
+        - Rich traceback handler wraps initialization for beautiful error reporting
+        - State is initialized empty and populated during first user interaction
+
+    Warning:
+        - Initialization failures in non-critical components don't stop startup
+        - MCP server failures are logged but application continues
+        - Socket and Neo4j failures are non-blocking
+        - Graph must be compiled before chat loop starts
+
+    Examples:
+        >>> initializer = ChatInitializer()
+        >>> await initializer.initialize_mcp()
+        >>> initializer.tools_register()
+        >>> # Graph compilation happens in main_orchestrator
+    """
+
     @rich_exception_handler("ChatInitializer Initialization")
     def __init__(self):
         self.break_loop = None  # This will be used to break the chat loop
@@ -48,8 +144,15 @@ class ChatInitializer:
         self.graph = None  # graph.compile() will be called later
         self.tools = None
 
-        # mcp.md servers integration
-        self._initialize_mcp_servers_sync()
+        # mcp.md servers integration - only if enabled
+        if settings.MCP_CONFIG.get("MCP_ENABLED", False):
+            self._initialize_mcp_servers_sync()
+        else:
+            debug_info(
+                heading="MCP • SKIPPED",
+                body="MCP server initialization skipped (MCP_ENABLED=false)",
+                metadata={"enabled": False},
+            )
         self.initialize_neo4j()
         self._register_slash_commands()
 
@@ -90,8 +193,8 @@ class ChatInitializer:
             settings.socket_con = SocketManager.get_socket_con()
 
             # register the exit listener
-            settings.listeners['exit'] = ExitListener()
-            settings.listeners['exit'].register()
+            settings.listeners["exit"] = ExitListener()
+            settings.listeners["exit"].register()
 
         except Exception as e:
             RichTracebackManager.handle_exception(
@@ -166,12 +269,48 @@ class ChatInitializer:
 
     @rich_exception_handler("MCP Server Initialization")
     async def initialize_mcp_servers(self):
-        """
-        Initialize MCP servers if they are not already running.
-        This method can be extended to initialize any required MCP servers.
+        """Initialize and start all configured MCP servers asynchronously with timeout.
+
+        This method loads MCP server configurations from .mcp.json, registers each
+        server with MCP_Manager, and starts them concurrently using asyncio.gather.
+        Each server startup is wrapped with timeout protection to prevent indefinite
+        hangs.
+
+        Args:
+            None
+
+        Returns:
+            None
+
+        Raises:
+            Exception: Non-fatal exceptions are caught and logged via RichTracebackManager.
+                Server startup failures don't prevent application from continuing.
+
+        Notes:
+            - Loads server configs from McpConfigFile.retrieve_config()
+            - Each server config contains: name, command, args, wrapper function
+            - Servers are added to MCP_Manager registry before starting
+            - All servers start concurrently via asyncio.create_task
+            - Individual server timeouts configurable via MCP_SERVER_START_TIMEOUT
+            - Default timeout is 30 seconds per server
+            - Uses Utils.start_server_async_with_timeout for timeout enforcement
+            - Failed servers are logged but don't block other servers
+
+        Warning:
+            - Uses asyncio.gather() which FAILS FAST by default
+            - If any server times out, ALL pending servers may be cancelled
+            - Should use asyncio.gather(*tasks, return_exceptions=True) for fault tolerance
+            - NPX servers take 15-30s to start (may timeout)
+            - UVX servers take 5-10s to start
+            - Git server often returns errors but this is expected
+
+        Examples:
+            >>> await initializer.initialize_mcp_servers()
+            # All servers start concurrently with 30s timeout each
         """
         try:
             from src.mcp.manager import MCP_Manager
+
             # Add and start MCP servers if needed with allowed path of AI_llm folder
             # to add server we required [server_name, runner, package, server_args, server_wrapper]
             # list form of that is: (that's working)
@@ -205,26 +344,38 @@ class ChatInitializer:
             # LEGACY: Uncomment if you want to use the legacy filesystem server
             # MCP_Manager.add_server("filesystem", "npx", "@modelcontextprotocol/server-filesystem", [f"{settings.BASE_DIR.parent}"], FileSystemWrapper)
             # start the MCP servers in asynchronously (that's working)
-            async def start_mcp_server(server_name: str):
-                loop = asyncio.get_running_loop()
-                got_start = await loop.run_in_executor(
-                    None, MCP_Manager.start_server, server_name
-                )
-                if not got_start:
-                    debug_warning(
-                        heading="MCP Server Startup Failed",
-                        body=f"Failed to start MCP server: {server_name}",
-                        metadata={"server_name": server_name},
-                    )
-                else:
-                    debug_info(
-                        heading="MCP Server Started",
-                        body=f"MCP server '{server_name}' started successfully.",
-                        metadata={"server_name": server_name},
-                    )
+            # todo tesinng for applying time out for starintg up the servers
+            # async def start_mcp_server(server_name: str):
+            #     loop = asyncio.get_running_loop()
+            #     got_start = await loop.run_in_executor(
+            #         None, MCP_Manager.start_server, server_name
+            #     )
+            #     if not got_start:
+            #         debug_warning(
+            #             heading="MCP Server Startup Failed",
+            #             body=f"Failed to start MCP server: {server_name}",
+            #             metadata={"server_name": server_name},
+            #         )
+            #     else:
+            #         debug_info(
+            #             heading="MCP Server Started",
+            #             body=f"MCP server '{server_name}' started successfully.",
+            #             metadata={"server_name": server_name},
+            #         )
+            #
+            from ..mcp.mcp_manager_util import Utils
 
+            utils = Utils()  # Create an instance of the utility class
+
+            start_mcp_server = (
+                utils.start_server_async_with_timeout
+            )  # Use the utility function with timeout (monkey patch for better recovery to the legacy code if any issues or change of mind)
             task: list[Awaitable] = [
-                asyncio.create_task(start_mcp_server(server))
+                asyncio.create_task(
+                    start_mcp_server(
+                        server, settings.MCP_CONFIG.get("MCP_SERVER_START_TIMEOUT", 30)
+                    )
+                )
                 for server in MCP_Manager.mcp_servers
             ]
             await asyncio.gather(*task)
@@ -362,10 +513,9 @@ class ChatInitializer:
                 (
                     "browser_agent",
                     BrowserUseWrapper,
-                    "An autonomous AI agent that can control a web browser to perform complex tasks. Provide a high-level objective (e.g., 'Open Spotify and play a sad song') and the agent will handle the step-by-step execution. This is a powerful, autonomous tool; do not decompose its tasks."
-                    ,
+                    "An autonomous AI agent that can control a web browser to perform complex tasks. Provide a high-level objective (e.g., 'Open Spotify and play a sad song') and the agent will handle the step-by-step execution. This is a powerful, autonomous tool; do not decompose its tasks.",
                     browser_agent,
-                )
+                ),
             ]
 
             for name, func, description, schema in tool_configs:
@@ -438,7 +588,6 @@ class ChatInitializer:
 
             user_input = InputHandler().get_user_input()
 
-
             if user_input.lower() == "exit" or settings.exit_flag:
                 self.console.print("[bold red]Exiting the chat...[/bold red]")
                 try:
@@ -460,17 +609,22 @@ class ChatInitializer:
 
                     # ✅ FIXED: Only set exit_flag when user actually wants to exit
                     # Check if this was an exit-related workflow
-                    if (user_input.lower() == "exit" or
-                        user_input.startswith("/exit") or
-                        any(msg.content.lower() == "exit" or msg.content.startswith("/exit")
-                            for msg in self._state.get("messages", [])[-2:])):  # Check last 2 messages
+                    if (
+                        user_input.lower() == "exit"
+                        or user_input.startswith("/exit")
+                        or any(
+                            msg.content.lower() == "exit"
+                            or msg.content.startswith("/exit")
+                            for msg in self._state.get("messages", [])[-2:]
+                        )
+                    ):  # Check last 2 messages
 
                         # Only NOW set the flag to True (first time)
                         settings.exit_flag = True
 
-                        settings.listeners['exit'].emit_exit_ticket(
+                        settings.listeners["exit"].emit_exit_ticket(
                             source_class=ChatInitializer,
-                            source_name="workflow_completion"
+                            source_name="workflow_completion",
                         )
                     else:
                         # ✅ CRITICAL FIX: Reset flag to False for non-exit messages
@@ -542,11 +696,15 @@ class ChatInitializer:
         from src.slash_commands.commands.clear import register_clear_command
         from src.slash_commands.commands.help import register_help_command
         from src.slash_commands.commands.exit import register_exit_command
+
         # core/routing slash commands
         from src.slash_commands.commands.core_slashs.agent import register_agent_command
-        from src.slash_commands.commands.core_slashs.chat_llm import register_chat_llm_command
-        from src.slash_commands.commands.core_slashs.use_tool import register_slash_command_use_tool
-
+        from src.slash_commands.commands.core_slashs.chat_llm import (
+            register_chat_llm_command,
+        )
+        from src.slash_commands.commands.core_slashs.use_tool import (
+            register_slash_command_use_tool,
+        )
 
         async def register_commands():
             ##### this is the place which register the all slash commands #####
@@ -578,7 +736,6 @@ class ChatInitializer:
             metadata={},
         )
 
-
     def _register_logging_handlers(self):
         """Register logging handlers for the chat application."""
         pass  # Implement logging handler registration as needed
@@ -609,4 +766,3 @@ class ChatInitializer:
             body="Core logging handlers registered successfully.",
             metadata={},
         )
-
