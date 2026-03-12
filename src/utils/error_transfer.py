@@ -1,3 +1,4 @@
+from rich.console import Console
 import atexit
 import os
 import signal
@@ -6,6 +7,14 @@ import sys
 import threading
 from pathlib import Path
 
+# Add project root to Python path BEFORE other imports
+project_root = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(project_root))
+
+# Now import from src after path is set
+from src.ui.rich_error_print import RichErrorPrint
+from src.config import settings
+
 # Windows-only import - conditional
 try:
     import winsound
@@ -13,14 +22,6 @@ except ImportError:
     winsound = None  # Not available on Linux/Mac
 
 from anyio import sleep
-
-# Add project root to Python path
-project_root = Path(__file__).parent.parent.parent
-sys.path.insert(0, str(project_root))
-
-from src.config import settings
-from src.ui.rich_error_print import RichErrorPrint
-from rich.console import Console
 
 
 class SocketCon:
@@ -32,8 +33,8 @@ class SocketCon:
             self.client_socket = _client_socket
 
     def send_error(self, error_message: str, close_socket: bool = False):
-        if "\n" not in  error_message:
-            error_message += "\n" # Ensure message ends with newline easy to parse in the receiver
+        if "\n" not in error_message:
+            error_message += "\n"  # Ensure message ends with newline easy to parse in the receiver
         with self._lock:
             try:
                 #     check whether the socket is connected
@@ -57,7 +58,8 @@ class SocketCon:
 
     def receive_error(self) -> str:
         try:
-            data = self.client_socket.recv(1024 * 1024)  # Receive up to 1 MB of data
+            # Receive up to 1 MB of data
+            data = self.client_socket.recv(1024 * 1024)
             return data.decode("utf-8")
         except socket.error as e:
             print(f"Error receiving message: {e}")
@@ -67,7 +69,8 @@ class SocketCon:
         try:
             # Use getsockopt to check socket state without sending data
             # This works for both unidirectional and bidirectional connections
-            error = self.client_socket.getsockopt(socket.SOL_SOCKET, socket.SO_ERROR)
+            error = self.client_socket.getsockopt(
+                socket.SOL_SOCKET, socket.SO_ERROR)
             if error:
                 return False
 
@@ -120,8 +123,10 @@ def create_lock_file():
 
             # Check if the process is still running
             try:
-                os.kill(pid, 0)  # This doesn't kill, just checks if process exists
-                print(f"Another server instance is already running (PID: {pid})")
+                # This doesn't kill, just checks if process exists
+                os.kill(pid, 0)
+                print(
+                    f"Another server instance is already running (PID: {pid})")
                 return False
             except OSError:
                 # Process doesn't exist, remove stale lock file
@@ -182,7 +187,8 @@ def new_logger_write(text: str):
 
     except ImportError as e:
         # If system_logging not available, fall back to file write
-        print(f"[IMPORT_ERROR] Logging system not available: {e}", file=sys.stderr)
+        print(f"[IMPORT_ERROR] Logging system not available: {
+              e}", file=sys.stderr)
         write_to_file(text)
     except Exception as e:
         # Catch-all for unexpected errors
@@ -290,8 +296,12 @@ if __name__ == "__main__":
                                 new_logger_write(single_message)
                         else:
                             print_error.print_rich(received_error)
-                        if settings.ENABLE_SOUND_NOTIFICATIONS:
-                            winsound.Beep(7933, 500)  # Beep sound for error notification
+                        # Sound notification - properly protected
+                        if settings.ENABLE_SOUND_NOTIFICATIONS and winsound is not None:
+                            try:
+                                winsound.Beep(7933, 500)
+                            except AttributeError as beep_error:
+                                print(f"🔍 BEEP ERROR: {beep_error}", file=sys.stderr)
                     # Don't exit the loop - continue listening for new connections
                     print_error.print_rich(
                         "Client disconnected, waiting for new connections..."
@@ -302,7 +312,8 @@ if __name__ == "__main__":
             except socket.timeout:
                 # Check got_killed flag on timeout and continue if not killed
                 if SocketCon.got_killed:
-                    print_error.print_rich("Server shutdown requested, exiting...")
+                    print_error.print_rich(
+                        "Server shutdown requested, exiting...")
                     break
                 continue  # Continue listening if not killed
             except Exception as e:

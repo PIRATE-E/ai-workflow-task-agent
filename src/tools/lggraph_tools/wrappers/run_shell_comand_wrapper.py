@@ -15,7 +15,7 @@ class ShellCommandWrapper:
 
     def run_command(self):
         """
-        Executes the shell command stored in \`self.command\` and appends the result to the ToolResponseManager.
+        Executes the shell command stored in `self.command` and appends the result to the ToolResponseManager.
 
         If the command executes successfully, the output is appended as a response.
         If the command fails, an error message is appended to help diagnose the issue.
