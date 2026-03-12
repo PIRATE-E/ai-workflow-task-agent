@@ -40,150 +40,34 @@ def universal_tool(**kwargs):
 
     arguments = kwargs
 
-    # 🔧 FIX: Enhanced tool-to-server mapping
-    tool_server_mapping = {
-        # Memory server tools (knowledge graph operations)
-        "read_graph": "memory",
-        "search_nodes": "memory",
-        "open_nodes": "memory",
-        "create_entities": "memory",
-        "create_relations": "memory",
-        "add_observations": "memory",
-        "delete_entities": "memory",
-        "delete_observations": "memory",
-        "delete_relations": "memory",
-        # GitHub server tools
-        "create_or_update_file": "github",
-        "search_repositories": "github",
-        "create_repository": "github",
-        "get_file_contents": "github",
-        "push_files": "github",
-        "create_issue": "github",
-        "create_pull_request": "github",
-        "fork_repository": "github",
-        "create_branch": "github",
-        "list_commits": "github",
-        "list_issues": "github",
-        "update_issue": "github",
-        "add_issue_comment": "github",
-        "search_code": "github",
-        "search_issues": "github",
-        "search_users": "github",
-        "get_issue": "github",
-        "get_pull_request": "github",
-        "list_pull_requests": "github",
-        "create_pull_request_review": "github",
-        "merge_pull_request": "github",
-        "get_pull_request_files": "github",
-        "get_pull_request_status": "github",
-        "update_pull_request_branch": "github",
-        "get_pull_request_comments": "github",
-        "get_pull_request_reviews": "github",
-        # Filesystem server tools
-        "read_file": "filesystem",
-        "read_text_file": "filesystem",
-        "read_media_file": "filesystem",
-        "read_multiple_files": "filesystem",
-        "write_file": "filesystem",
-        "edit_file": "filesystem",
-        "create_directory": "filesystem",
-        "list_directory": "filesystem",
-        "list_directory_with_sizes": "filesystem",
-        "directory_tree": "filesystem",
-        "move_file": "filesystem",
-        "search_files": "filesystem",
-        "get_file_info": "filesystem",
-        "list_allowed_directories": "filesystem",
-        # Puppeteer server tools
-        "puppeteer_navigate": "puppeteer",
-        "puppeteer_screenshot": "puppeteer",
-        "puppeteer_click": "puppeteer",
-        "puppeteer_fill": "puppeteer",
-        "puppeteer_select": "puppeteer",
-        "puppeteer_hover": "puppeteer",
-        "puppeteer_evaluate": "puppeteer",
-        # Sequential thinking server tools
-        "sequentialthinking": "sequential-thinking",
-    }
-
-    # 🔧 FIX: Use both static and dynamic mapping for server resolution
-    server_name = tool_server_mapping.get(tool_name) or MPC_TOOL_SERVER_MAPPING.get(
-        tool_name
-    )
-
-    # Enhanced debugging with detailed mapping info
-    debug_critical(
-        heading="MCP_UNIVERSAL • DEBUG",
-        body="Current tool-server mapping and running servers",
-        metadata={
-            "tool_server_mapping": tool_server_mapping,
-            "dynamic_tool_server_mapping": MPC_TOOL_SERVER_MAPPING,
-            "running_servers": list(MCP_Manager.running_servers.keys()),
-            "requested_tool": tool_name,
-            "server_name": server_name,
-        },
-    )
+    # Use dynamic tool-to-server mapping (populated by tool_discovery during startup)
+    server_name = MPC_TOOL_SERVER_MAPPING.get(tool_name)
 
     if not server_name:
+        # Tool not found in any discovered server
+        available_tools = list(MPC_TOOL_SERVER_MAPPING.keys())[:20]  # Show first 20
         debug_warning(
-            heading="MCP_UNIVERSAL • UNKNOWN_TOOL",
-            body=f"Tool '{tool_name}' not found in server mapping, attempting to find server",
+            heading="MCP_UNIVERSAL • TOOL_NOT_FOUND",
+            body=f"Tool '{tool_name}' not found in any running server",
             metadata={
                 "tool_name": tool_name,
-                "available_mappings": list(tool_server_mapping.keys()),
+                "running_servers": list(MCP_Manager.running_servers.keys()),
+                "available_tools_count": len(MPC_TOOL_SERVER_MAPPING),
             },
         )
-
-        # 🔧 FIX: Systematic fallback server detection
-        fallback_servers = [
-            "filesystem",
-            "memory",
-            "github",
-            "puppeteer",
-            "sequential-thinking",
-        ]
-        for server in fallback_servers:
-            if server in MCP_Manager.running_servers:
-                debug_info(
-                    heading="MCP_UNIVERSAL • FALLBACK_ATTEMPT",
-                    body=f"Trying server '{server}' as fallback for tool '{tool_name}'",
-                    metadata={"tool_name": tool_name, "fallback_server": server},
-                )
-
-                # Test if server can handle this tool
-                test_response = MCP_Manager.call_mcp_server(
-                    server, tool_name, arguments
-                )
-                if test_response and test_response.get("success"):
-                    server_name = server
-                    debug_info(
-                        heading="MCP_UNIVERSAL • FALLBACK_SUCCESS",
-                        body=f"Server '{server}' accepted tool '{tool_name}'",
-                        metadata={"tool_name": tool_name, "successful_server": server},
-                    )
-                    break
-
-        if not server_name:
-            error_msg = f"No server found for tool '{tool_name}'. Available servers: {list(MCP_Manager.running_servers.keys())}"
-            debug_critical(
-                heading="MCP_UNIVERSAL • NO_SERVER_FOUND",
-                body=error_msg,
-                metadata={
-                    "tool_name": tool_name,
-                    "running_servers": list(MCP_Manager.running_servers.keys()),
-                    "static_mapping_keys": list(tool_server_mapping.keys())[:10],
-                    "dynamic_mapping_keys": list(MPC_TOOL_SERVER_MAPPING.keys())[:10],
-                },
-            )
-            return {"success": False, "error": error_msg}
+        return {
+            "success": False,
+            "error": f"Tool '{tool_name}' not found. Server may have failed to start or tool discovery failed.",
+            "available_tools": available_tools,
+            "running_servers": list(MCP_Manager.running_servers.keys()),
+        }
 
     debug_info(
-        heading="MCP_UNIVERSAL • TOOL_MAPPING",
-        body=f"Calling tool '{tool_name}' on server '{server_name}'",
+        heading="MCP_UNIVERSAL • TOOL_ROUTING",
+        body=f"Routing tool '{tool_name}' to server '{server_name}'",
         metadata={
             "tool_name": tool_name,
             "server_name": server_name,
-            "arguments": arguments,
         },
     )
 
@@ -228,7 +112,7 @@ def universal_tool(**kwargs):
             uri = data.get('params', {}).get('uri')
             if uri:
                 # now it is confirmed that it is uri ##
-                debug_critical(
+                debug_info(
                     heading="MCP_UNIVERSAL • URI_DETECTED",
                     body=f"URI detected in MCP response: {uri}",
                     metadata={
