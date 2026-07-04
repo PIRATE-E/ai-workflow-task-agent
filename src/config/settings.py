@@ -29,12 +29,12 @@ SOCKET_HOST = os.getenv("SOCKET_HOST", "localhost")
 SOCKET_PORT = int(os.getenv("SOCKET_PORT", 5390))
 
 # Model configuration
-DEFAULT_MODEL = os.getenv("DEFAULT_MODEL", "llava-llama3:latest")
+DEFAULT_MODEL = os.getenv("DEFAULT_MODEL", "nvidia/llama-3.3-nemotron-super-49b-v1")
 CYPHER_MODEL = os.getenv("CYPHER_MODEL", "deepseek-r1:8b")
 CLASSIFIER_MODEL = os.getenv("CLASSIFIER_MODEL", "llama3.1:8b")
 GPT_MODEL = os.getenv("GPT_MODEL", "openai/gpt-oss-120b")
-KIMI_MODEL = os.getenv("KIMI_MODEL", "moonshotai/kimi-k2-instruct-0905")
-API_DEFAULT_API_MODEL = KIMI_MODEL
+KIMI_MODEL = os.getenv("KIMI_MODEL", "moonshotai/kimi-k2.6")
+API_DEFAULT_API_MODEL = KIMI_MODEL  # reads from GPT_MODEL env var — routing check in model_manager.py uses api_model_list which contains GPT_MODEL
 OPEN_AI_API_KEY = os.getenv("OPENAI_API_KEY", "your_openai_api_key_here")
 
 # API endpoints

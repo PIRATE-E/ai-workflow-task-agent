@@ -20,7 +20,7 @@ import sys
 import unicodedata
 
 # 🔄 HIERARCHICAL AGENT INTEGRATION: Import AgentGraphCore for complex workflows
-from src.agents.agentic_orchestrator.AgentGraphCore import (
+from src.agents.agentic_orchestrator import (
     AgentGraphCore,
 )
 from src.config import settings

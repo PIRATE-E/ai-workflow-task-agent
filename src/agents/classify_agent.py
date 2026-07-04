@@ -110,7 +110,7 @@ def classify_message_type(state) -> dict:
 OR
 {"message_type": "tool", "reasoning": "Your reasoning here"}
 OR
-{""message_type": "agent", "reasoning": "your reasoning here"}
+{"message_type": "agent", "reasoning": "your reasoning here"}
 
 Classify thoughtfully based on true user intent, not just keywords."""
     # modify the content and provide the history and tool context

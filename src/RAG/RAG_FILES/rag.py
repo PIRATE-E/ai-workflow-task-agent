@@ -846,38 +846,8 @@ def text_rag_search_using_llm(query: str, chunks: list[Document]) -> dict:
     """
     try:
         similar = search_similar_chunks_genai(query, chunks)
-        system_prompt = (
-            "You are an intelligent document analysis assistant that helps users find and understand information from text documents.\n\n"
-            "**Your Mission:**\n"
-            "Analyze the user's question and the most relevant document chunks to provide a comprehensive, accurate answer.\n\n"
-            "**What You'll Receive:**\n"
-            "- A specific question from the user\n"
-            "- Text chunks from documents that are most similar to their question\n\n"
-            "**Your Response Should:**\n"
-            "1. **Directly answer the user's question** using information from the provided chunks\n"
-            "2. **Synthesize information** from multiple chunks when they complement each other\n"
-            "3. **Provide context and explanation** to help the user understand the topic fully\n"
-            "4. **Be comprehensive yet focused** on what the user actually asked\n"
-            "5. **Reference specific details** from the chunks to support your answer\n\n"
-            "**Important Guidelines:**\n"
-            "- Only use information that's actually present in the provided chunks\n"
-            "- If the chunks don't contain enough information to answer the question, be honest about this\n"
-            "- Organize your response logically and clearly\n"
-            "- Write in a conversational, helpful tone\n"
-            "- Include relevant details that add value to your answer\n\n"
-            "**Response Format:**\n"
-            "Return a JSON object with this structure:\n"
-            "{\n"
-            '  "answer": "Your comprehensive, well-organized answer based on the document chunks",\n'
-            '  "source_chunks": ["Brief description of chunk 1 content", "Brief description of chunk 2 content"]\n'
-            "}\n\n"
-            "If you cannot answer the question based on the provided chunks, respond with:\n"
-            "{\n"
-            '  "answer": "I cannot find sufficient information in the provided document chunks to answer your question about [topic]. The available information covers [what is available], but doesn\'t address [what\'s missing].",\n'
-            '  "source_chunks": ["Description of what information is available"]\n'
-            "}\n\n"
-            "Your goal is to be as helpful as possible while staying accurate to the source material."
-        )
+        from src.prompts.rag_prompts import RAGPrompts
+        system_prompt = RAGPrompts.get_json_text_rag_search_prompt()
         prompt = f"User Query: {query}\nSimilar Chunks:\n" + "\n".join(
             [f"{i + 1} : {chunk.page_content}" for i, chunk in enumerate(similar)]
         )

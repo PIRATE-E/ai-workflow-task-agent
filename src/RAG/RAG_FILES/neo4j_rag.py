@@ -44,69 +44,7 @@ except Exception:  # Fallback minimal Prompt implementation
             )
 
 
-SYSTEM_PROMPT_GENERATE_TRIPLE_ENHANCED = """
-You are an intelligent knowledge graph extraction system that identifies meaningful relationships between entities in text.
 
-**CRITICAL: Respond with JSON array only. No reasoning, explanation, or additional text.**
-
-**Your Mission:**
-Extract clear, factual relationships from the provided text to build a comprehensive knowledge graph that captures how different entities connect to each other.
-
-**What You're Looking For:**
-- **Entities**: People, organizations, products, concepts, locations, technologies
-- **Relationships**: How these entities connect, interact, or relate to each other
-- **Facts**: Concrete, verifiable information about these connections
-
-**Extraction Guidelines:**
-
-1. **Entity Identification:**
-   - Focus on concrete nouns: companies, people, products, technologies, locations
-   - Use the most specific name available (e.g., "Microsoft Azure" not just "Azure")
-   - Keep entity names consistent throughout
-
-2. **Relationship Types:**
-   - Use clear, descriptive verbs: "owns", "provides", "develops", "partners with", "located in"
-   - Capture different relationship types: ownership, creation, usage, location, collaboration
-   - Make relationships specific and meaningful
-
-3. **Quality Standards:**
-   - Extract only factual, verifiable relationships
-   - Avoid vague or unclear connections
-   - Focus on the most important relationships in the text
-   - Ensure each triple adds meaningful information
-
-**Output Format:**
-Return ONLY a JSON array where each triple has exactly these keys:
-- "subject": the main entity (string)
-- "predicate": the relationship type (string)
-- "object": the connected entity (string)
-
-**CRITICAL REQUIREMENTS:**
-- Return ONLY the JSON OBJECT, no additional text
-- No reasoning or explanation text
-- No "thinking" or "let me think" phrases
-- Format: [{"subject": "entity1", "predicate": "relationship", "object": "entity2"}]
-
-**Examples:**
-
-Input: "Microsoft developed Azure to provide cloud computing services. Many enterprises use Azure for their digital transformation initiatives."
-
-Output as JSON array:
-[
-  {"subject": "Microsoft", "predicate": "developed", "object": "Azure"},
-  {"subject": "Azure", "predicate": "provides", "object": "cloud computing services"},
-  {"subject": "enterprises", "predicate": "use", "object": "Azure"},
-  {"subject": "enterprises", "predicate": "use Azure for", "object": "digital transformation"}
-]
-
-**Important Notes:**
-- Return [] if no clear relationships exist
-- Focus on quality over quantity
-- Each triple should be independently meaningful
-- Use consistent entity naming
-
-**Text to analyze:**
-"""
 
 # --- Neo4j driver setup (optional) ---
 # if _neo4j_available:
@@ -157,7 +95,7 @@ async def prompt_gemini_for_triples_cli(chunk: Document) -> dict[str, Any]:
         combined_prompt = f"{system_part}\n{user_part}".strip()
     else:
         combined_prompt = (
-            SYSTEM_PROMPT_GENERATE_TRIPLE_ENHANCED + f"\nText:\n{chunk.page_content}\n"
+            Prompt.get_unstructured_triple_prompt() + f"\nText:\n{chunk.page_content}\n"
         )
 
     if not pathlib.Path(GEMINI_CLI_PATH).exists():
@@ -275,7 +213,7 @@ async def prompt_gemini_for_triples_api(
     else:
         # Use original unstructured text prompt
         prompt = (
-            SYSTEM_PROMPT_GENERATE_TRIPLE_ENHANCED
+            Prompt.get_unstructured_triple_prompt()
             + f"""\n
         Text:\n
         {chunk.page_content}
@@ -339,7 +277,7 @@ async def prompt_openai_for_triples(
     """
     from src.utils.model_manager import ModelManager
 
-    system_prompt = SYSTEM_PROMPT_GENERATE_TRIPLE_ENHANCED
+    system_prompt = Prompt.get_unstructured_triple_prompt()
     user_prompt = ""
 
     is_structured = (
@@ -434,7 +372,7 @@ def prompt_local_llm_for_triples(chunk: Document) -> list:
     """Existing function - unchanged."""
     llm = ChatOllama(model="llama3.1:8b", temperature=0.1, format="json")
     triples = []
-    llm.invoke(SYSTEM_PROMPT_GENERATE_TRIPLE_ENHANCED)
+    llm.invoke(Prompt.get_unstructured_triple_prompt())
     prompt = f"""
         You are analyzing text to extract meaningful relationships for a knowledge graph.
         \n        **Your Task:**\n        Extract clear, factual relationships between entities in the text below.\n        Focus on concrete entities (people, companies, products, technologies) and their connections.\n        \n        **Text to Analyze:**\n        \"\"\"{chunk.page_content}\"\"\"\n        \n        **Output Format:**\n        Return a JSON array where each relationship is represented as:\n        {{"subject": "entity1", "predicate": "relationship", "object": "entity2"}}\n        \n        Focus on quality over quantity - extract only meaningful, verifiable relationships.\n        """

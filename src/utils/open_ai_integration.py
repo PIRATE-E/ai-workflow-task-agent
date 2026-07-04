@@ -12,7 +12,7 @@ except ImportError:
 
 from openai import OpenAI, AsyncOpenAI
 
-from src.config.settings import OPEN_AI_API_KEY, OPENAI_TIMEOUT
+from src.config.settings import OPEN_AI_API_KEY, OPENAI_TIMEOUT, API_DEFAULT_API_MODEL
 from src.utils.listeners.rich_status_listen import RichStatusListener
 
 
@@ -65,7 +65,7 @@ class OpenAIIntegration:
 
         self._initialized = True
         key = api_key or OPEN_AI_API_KEY
-        self.model = model or "openai/gpt-oss-120b"
+        self.model = model or settings.API_DEFAULT_API_MODEL
         self.base_url = "https://integrate.api.nvidia.com/v1"
 
         if not key:
