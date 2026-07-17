@@ -12,7 +12,7 @@ if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
 # Initialize Rich Traceback Manager
-from src.ui.diagnostics.rich_traceback_manager import RichTracebackManager
+from coldwind.desktop.ui.diagnostics.rich_traceback_manager import RichTracebackManager
 
 RichTracebackManager.initialize(
     show_locals=False,
@@ -29,9 +29,9 @@ RichTracebackManager.initialize(
 )
 
 # Import required modules
-from src.config import settings
-from src.utils.socket_manager import SocketManager
-from src.tools.lggraph_tools.tools.run_shell_command_tool import run_shell_command
+from coldwind.core.config import settings
+from coldwind.core.utils.socket_manager import SocketManager
+from coldwind.core.tools.lggraph_tools.tools.run_shell_command_tool import run_shell_command
 
 
 def test_shell_command_fixes():
@@ -90,10 +90,10 @@ def test_shell_command_fixes():
     # Test 5: Test the wrapper class
     print("\n5. Testing ShellCommandWrapper:")
     try:
-        from src.tools.lggraph_tools.wrappers.run_shell_comand_wrapper import (
+        from coldwind.core.tools.lggraph_tools.wrappers.run_shell_comand_wrapper import (
             ShellCommandWrapper,
         )
-        from src.tools.lggraph_tools.tool_response_manager import ToolResponseManager
+        from coldwind.core.tools.lggraph_tools.tool_response_manager import ToolResponseManager
 
         # Initialize ToolResponseManager
         tool_manager = ToolResponseManager()

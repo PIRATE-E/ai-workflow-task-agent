@@ -16,8 +16,8 @@ class TestModelManagerSingleton:
 
     def test_singleton_instance_creation(self, model_manager):
         """ModelManager should return singleton instance."""
-        from src.utils.model_manager import ModelManager
-        from src.config import settings
+        from coldwind.core.utils.model_manager import ModelManager
+        from coldwind.core.config import settings
 
         mm1 = ModelManager(model=settings.DEFAULT_MODEL)
         mm2 = ModelManager(model=settings.DEFAULT_MODEL)

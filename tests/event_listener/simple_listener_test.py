@@ -32,7 +32,7 @@ def test_event_listener_system():
 
     try:
         # Import your event listener (with error handling)
-        from src.utils.listeners.rich_status_listen import RichStatusListener
+        from coldwind.core.utils.listeners.rich_status_listen import RichStatusListener
 
         console.print("✅ Successfully imported RichStatusListener")
 

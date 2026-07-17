@@ -17,7 +17,7 @@ from pathlib import Path
 
 # Add project root to Python path
 
-from src.ui.rich_error_print import RichErrorPrint
+from coldwind.desktop.ui.rich_error_print import RichErrorPrint
 from rich.console import Console
 
 

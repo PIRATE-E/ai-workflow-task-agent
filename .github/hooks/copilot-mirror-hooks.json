@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "hooks": {
+    "sessionStart": [
+      {
+        "type": "command",
+        "bash": "mkdir -p \"$HOME/.copilot/logs\" && printf '%s\\n' \"[$(date +'%Y-%m-%d %H:%M')] SESSION_START - Copilot mirror hooks loaded\" >> \"$HOME/.copilot/logs/copilot-mirror.log\" && printf '{\"ok\":true,\"message\":\"session start logged\"}'",
+        "timeoutSec": 10
+      }
+    ],
+    "sessionEnd": [
+      {
+        "type": "command",
+        "bash": "mkdir -p \"$HOME/.copilot/logs\" && printf '%s\\n' \"[$(date +'%Y-%m-%d %H:%M')] SESSION_END - Copilot session closed\" >> \"$HOME/.copilot/logs/copilot-mirror.log\" && printf '{\"ok\":true,\"message\":\"session end logged\"}'",
+        "timeoutSec": 10
+      }
+    ],
+    "agentStop": [
+      {
+        "type": "command",
+        "bash": "printf '{\"ok\":true,\"message\":\"agent stopped\"}'",
+        "timeoutSec": 5
+      }
+    ],
+    "postToolUse": [
+      {
+        "type": "command",
+        "matcher": "mcp__memory__.*",
+        "bash": "printf '{\"ok\":true,\"message\":\"memory tool used: keep entity names specific and relations active-voice\"}'",
+        "timeoutSec": 5
+      }
+    ],
+    "preCompact": [
+      {
+        "type": "command",
+        "bash": "printf '{\"ok\":true,\"message\":\"save critical context before compaction\"}'",
+        "timeoutSec": 5
+      }
+    ]
+  }
+}

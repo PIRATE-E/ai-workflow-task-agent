@@ -8,7 +8,7 @@ if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
 
-from src.utils.open_ai_integration import OpenAIIntegration
+from coldwind.core.utils.open_ai_integration import OpenAIIntegration
 
 # Reset state
 OpenAIIntegration._failure_count = 0

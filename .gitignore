@@ -174,7 +174,7 @@ QWEN.md
 GEMINI.md
 # custom memory file
 memory.json
-.github
+# .github for testing purposes because instructions are now got updated 
 # Node.js/MCP config (if not needed in root)
 package.json
 

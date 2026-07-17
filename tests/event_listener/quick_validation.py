@@ -24,8 +24,8 @@ from rich.console import Console
 console = Console()
 
 try:
-    from src.utils.listeners.rich_status_listen import RichStatusListener
-    from src.utils.listeners.event_listener import EventListener
+    from coldwind.core.utils.listeners.rich_status_listen import RichStatusListener
+    from coldwind.core.utils.listeners.event_listener import EventListener
 
     console.print("🔍 [bold blue]QUICK VALIDATION[/bold blue]")
 

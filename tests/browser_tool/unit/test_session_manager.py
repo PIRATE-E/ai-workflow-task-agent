@@ -9,7 +9,7 @@ class TestSessionManager:
 
     def test_session_manager_creation(self, tmp_path):
         """SessionManager should be creatable with profile_dir."""
-        from src.tools.lggraph_tools.tools.browser_tool.utils.session_manager import SessionManager
+        from coldwind.core.tools.lggraph_tools.tools.browser_tool.utils.session_manager import SessionManager
 
         manager = SessionManager(profile_dir=tmp_path)
         assert manager is not None
@@ -17,7 +17,7 @@ class TestSessionManager:
 
     def test_session_manager_default_path(self):
         """SessionManager should have default profile path."""
-        from src.tools.lggraph_tools.tools.browser_tool.utils.session_manager import SessionManager
+        from coldwind.core.tools.lggraph_tools.tools.browser_tool.utils.session_manager import SessionManager
 
         manager = SessionManager()
         assert manager._profile_dir is not None

@@ -15,7 +15,7 @@ class TestDispatcher:
 
     def test_dispatcher_importable(self):
         """Dispatcher should be importable."""
-        from src.system_logging.dispatcher import Dispatcher
+        from coldwind.core.system_logging.dispatcher import Dispatcher
         assert Dispatcher is not None
 
     def test_dispatcher_creation(self, dispatcher):
@@ -38,7 +38,7 @@ class TestDispatcher:
 
     def test_dispatch_invalid_json(self, dispatcher):
         """Dispatcher should handle invalid JSON by raising DispatchError."""
-        from src.system_logging.dispatcher import Dispatcher
+        from coldwind.core.system_logging.dispatcher import Dispatcher
 
         invalid_json = "not valid json {"
 
@@ -52,7 +52,7 @@ class TestDispatcherWithHandlers:
 
     def test_dispatch_invokes_handlers(self, dispatcher, registry, sample_log_message):
         """Dispatch should invoke registered handlers."""
-        from src.system_logging.handlers.handler_base import TextHandler
+        from coldwind.core.system_logging.handlers.handler_base import TextHandler
 
         try:
             # Register a handler

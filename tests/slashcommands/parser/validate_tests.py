@@ -13,7 +13,7 @@ if str(project_root) not in sys.path:
 
 
 import pytest
-from src.slash_commands.parser import ParseCommand
+from coldwind.desktop.slash_commands.parser import ParseCommand
 
 
 def test_parse_simple_command():

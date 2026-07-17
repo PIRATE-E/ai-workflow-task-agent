@@ -14,7 +14,7 @@ class TestOnTimeRegistry:
 
     def test_registry_importable(self):
         """OnTimeRegistry should be importable."""
-        from src.system_logging.on_time_registry import OnTimeRegistry
+        from coldwind.core.system_logging.on_time_registry import OnTimeRegistry
         assert OnTimeRegistry is not None
 
     def test_registry_creation(self, registry):
@@ -27,9 +27,9 @@ class TestOnTimeRegistry:
 
     def test_register_handler(self):
         """Should be able to register a handler or get registry error if already registered."""
-        from src.system_logging.on_time_registry import OnTimeRegistry
-        from src.system_logging.handlers.handler_base import TextHandler
-        from src.system_logging.registry import Registry
+        from coldwind.core.system_logging.on_time_registry import OnTimeRegistry
+        from coldwind.core.system_logging.handlers.handler_base import TextHandler
+        from coldwind.core.system_logging.registry import Registry
 
         registry = OnTimeRegistry()
         handler = TextHandler()
@@ -44,7 +44,7 @@ class TestOnTimeRegistry:
 
     def test_get_all_handlers(self):
         """Should be able to get all handlers."""
-        from src.system_logging.on_time_registry import OnTimeRegistry
+        from coldwind.core.system_logging.on_time_registry import OnTimeRegistry
 
         registry = OnTimeRegistry()
         handlers = registry.get_all_handlers()
@@ -58,24 +58,24 @@ class TestTextHandler:
 
     def test_handler_importable(self):
         """TextHandler should be importable."""
-        from src.system_logging.handlers.handler_base import TextHandler
+        from coldwind.core.system_logging.handlers.handler_base import TextHandler
         assert TextHandler is not None
 
     def test_handler_creation(self):
         """TextHandler should be instantiable."""
-        from src.system_logging.handlers.handler_base import TextHandler
+        from coldwind.core.system_logging.handlers.handler_base import TextHandler
         handler = TextHandler()
         assert handler is not None
 
     def test_handler_has_name(self):
         """Handler should have name attribute."""
-        from src.system_logging.handlers.handler_base import TextHandler
+        from coldwind.core.system_logging.handlers.handler_base import TextHandler
         handler = TextHandler()
         assert hasattr(handler, 'name')
 
     def test_handler_has_handle_method(self):
         """Handler should have handle method."""
-        from src.system_logging.handlers.handler_base import TextHandler
+        from coldwind.core.system_logging.handlers.handler_base import TextHandler
         handler = TextHandler()
         assert hasattr(handler, 'handle') or hasattr(handler, '__call__')
 

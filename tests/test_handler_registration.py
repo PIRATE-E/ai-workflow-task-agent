@@ -17,8 +17,8 @@ from pathlib import Path
 print("Checking handler registration...")
 
 # Register handlers like error_transfer.py does
-from src.system_logging.on_time_registry import OnTimeRegistry
-from src.system_logging.handlers.handler_base import TextHandler
+from coldwind.core.system_logging.on_time_registry import OnTimeRegistry
+from coldwind.core.system_logging.handlers.handler_base import TextHandler
 
 registry = OnTimeRegistry()
 print(f"Registry before registration: {len(registry._handlers)} handlers")
@@ -43,7 +43,7 @@ except Exception as e:
     print(f"❌ Failed to get handlers: {e}")
 
 # Now test dispatch
-from src.system_logging.dispatcher import Dispatcher
+from coldwind.core.system_logging.dispatcher import Dispatcher
 import json
 
 test_json = json.dumps({

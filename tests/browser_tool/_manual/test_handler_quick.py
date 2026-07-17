@@ -12,10 +12,10 @@ print("=" * 70)
 
 # Import drivers to trigger registration
 print("\n1️⃣ Importing drivers...")
-from src.tools.lggraph_tools.tools.browser_tool.utils import events_drivers
-from src.tools.lggraph_tools.tools.browser_tool.Handler import Handler, HandlerEnums
-from src.tools.lggraph_tools.tools.browser_tool.config import BrowserRequiredConfig
-from src.tools.lggraph_tools.tools.browser_tool.runner import Runner
+from coldwind.core.tools.lggraph_tools.tools.browser_tool.utils import events_drivers
+from coldwind.core.tools.lggraph_tools.tools.browser_tool.Handler import Handler, HandlerEnums
+from coldwind.core.tools.lggraph_tools.tools.browser_tool.config import BrowserRequiredConfig
+from coldwind.core.tools.lggraph_tools.tools.browser_tool.runner import Runner
 
 print("   ✅ Imports successful")
 

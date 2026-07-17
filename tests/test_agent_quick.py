@@ -26,11 +26,11 @@ async def test_agent_workflow():
 
     try:
         # Setup MCP servers first
-        from src.mcp.manager import MCP_Manager
-        from src.tools.lggraph_tools.wrappers.mcp_wrapper.uni_mcp_wrappers import (
+        from coldwind.core.mcp.manager import MCP_Manager
+        from coldwind.core.tools.lggraph_tools.wrappers.mcp_wrapper.uni_mcp_wrappers import (
             UniversalMCPWrapper,
         )
-        from src.mcp.mcp_register_structure import Command
+        from coldwind.core.mcp.mcp_register_structure import Command
 
         # Initialize and configure servers
         mcp_manager = MCP_Manager()
@@ -53,7 +53,7 @@ async def test_agent_workflow():
             await asyncio.sleep(2)  # Wait for initialization
 
             # Test the exact tools that were failing
-            from src.tools.lggraph_tools.tools.mcp_integrated_tools.universal import (
+            from coldwind.core.tools.lggraph_tools.tools.mcp_integrated_tools.universal import (
                 universal_tool,
             )
 

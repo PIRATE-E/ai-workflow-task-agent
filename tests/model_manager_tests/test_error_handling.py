@@ -11,8 +11,8 @@ from unittest.mock import patch, MagicMock
 # Add paths for imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
-from src.utils.model_manager import ModelManager
-from src.config import settings
+from coldwind.core.utils.model_manager import ModelManager
+from coldwind.core.config import settings
 
 
 class TestModelManagerErrorHandling(unittest.TestCase):

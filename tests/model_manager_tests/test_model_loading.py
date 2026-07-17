@@ -11,8 +11,8 @@ from unittest.mock import patch, MagicMock
 # Add paths for imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
-from src.utils.model_manager import ModelManager
-from src.config import settings
+from coldwind.core.utils.model_manager import ModelManager
+from coldwind.core.config import settings
 
 
 class TestModelManagerLoading(unittest.TestCase):
@@ -97,7 +97,7 @@ class TestModelManagerLoading(unittest.TestCase):
         ModelManager.load_model(settings.DEFAULT_MODEL)
 
         # Try to load same model again; verify it doesn't crash and emits an 'already loaded' log
-        with patch("src.ui.diagnostics.debug_helpers.debug_info") as mock_debug_info:
+        with patch("coldwind.desktop.ui.diagnostics.debug_helpers.debug_info") as mock_debug_info:
             ModelManager.load_model(settings.DEFAULT_MODEL)
 
             # We don't rely on exact formatting, just that the message indicates the condition.

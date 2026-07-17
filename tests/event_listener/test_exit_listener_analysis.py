@@ -21,9 +21,9 @@ from unittest.mock import patch, MagicMock
 
 # Add project root to path
 
-from src.utils.listeners.exit_listener import ExitListener
-from src.utils.listeners.event_listener import EventListener
-from src.config import settings
+from coldwind.core.utils.listeners.exit_listener import ExitListener
+from coldwind.core.utils.listeners.event_listener import EventListener
+from coldwind.core.config import settings
 
 
 class ExitListenerDiagnostic:

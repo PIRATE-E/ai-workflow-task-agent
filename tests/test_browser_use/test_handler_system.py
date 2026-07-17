@@ -10,16 +10,16 @@ if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
 # Import drivers FIRST to trigger registration
-from src.tools.lggraph_tools.tools.browser_tool.utils import events_drivers
+from coldwind.core.tools.lggraph_tools.tools.browser_tool.utils import events_drivers
 
-from src.tools.lggraph_tools.tools.browser_tool.Handler import (
+from coldwind.core.tools.lggraph_tools.tools.browser_tool.Handler import (
     Handler,
     HandlerEnums,
     HandlerExceptionRaises,
     HandlerMeta
 )
-from src.tools.lggraph_tools.tools.browser_tool.config import BrowserRequiredConfig
-from src.tools.lggraph_tools.tools.browser_tool.runner import Runner
+from coldwind.core.tools.lggraph_tools.tools.browser_tool.config import BrowserRequiredConfig
+from coldwind.core.tools.lggraph_tools.tools.browser_tool.runner import Runner
 
 
 class TestHandlerMetaclass:

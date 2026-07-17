@@ -1,0 +1,3252 @@
+[
+    {
+        "subject": "RAVINDRA KUMAR PRAJAPATI",
+        "predicate": "has ID",
+        "object": "82"
+    },
+    {
+        "subject": "RAVINDRA KUMAR PRAJAPATI",
+        "predicate": "has identifier",
+        "object": "231248000154"
+    },
+    {
+        "subject": "RAVINDRA KUMAR PRAJAPATI",
+        "predicate": "has phone number",
+        "object": "8896356116"
+    },
+    {
+        "subject": "RAVINDRA KUMAR PRAJAPATI",
+        "predicate": "has email",
+        "object": "prajapatiravines@gmail.com"
+    },
+    {
+        "subject": "RAVINDRA KUMAR PRAJAPATI",
+        "predicate": "has address",
+        "object": "Haldoni mor bisrakh road , Greater noida , 201306"
+    },
+    {
+        "subject": "SUMIT CHAUBEY",
+        "predicate": "has ID",
+        "object": "231248000182"
+    },
+    {
+        "subject": "SUMIT CHAUBEY",
+        "predicate": "has phone number",
+        "object": "9354023488"
+    },
+    {
+        "subject": "SUMIT CHAUBEY",
+        "predicate": "has email",
+        "object": "sumitc2019@gmail.com"
+    },
+    {
+        "subject": "SUMIT CHAUBEY",
+        "predicate": "has address",
+        "object": "sec 110 bhangel noida goyal colony"
+    },
+    {
+        "subject": "SUHAIL AHMAD",
+        "predicate": "has ID",
+        "object": "106"
+    },
+    {
+        "subject": "SUHAIL AHMAD",
+        "predicate": "has identifier",
+        "object": "231248000181"
+    },
+    {
+        "subject": "SUHAIL AHMAD",
+        "predicate": "has phone number",
+        "object": "8130725614"
+    },
+    {
+        "subject": "SUHAIL AHMAD",
+        "predicate": "has email address",
+        "object": "supersuhailkhan@gmail.com"
+    },
+    {
+        "subject": "SUHAIL AHMAD",
+        "predicate": "has address",
+        "object": "Pocket 1, Mayur vihar phase 1, East Delhi"
+    },
+    {
+        "subject": "ANISH KUMAR",
+        "predicate": "has ID",
+        "object": "231248000079"
+    },
+    {
+        "subject": "ANISH KUMAR",
+        "predicate": "has phone number",
+        "object": "6388100827"
+    },
+    {
+        "subject": "ANISH KUMAR",
+        "predicate": "has email",
+        "object": "anishkumar1388@gmail.com"
+    },
+    {
+        "subject": "ANISH KUMAR",
+        "predicate": "located in",
+        "object": "Uttar Pradesh, Chunar Mirzapur 231304"
+    },
+    {
+        "subject": "MUSKAN",
+        "predicate": "has internal ID",
+        "object": "56"
+    },
+    {
+        "subject": "MUSKAN",
+        "predicate": "has registration number",
+        "object": "231248000127"
+    },
+    {
+        "subject": "MUSKAN",
+        "predicate": "has phone number",
+        "object": "8860014698"
+    },
+    {
+        "subject": "MUSKAN",
+        "predicate": "has email",
+        "object": "muskan88thakur@gmail.com"
+    },
+    {
+        "subject": "MUSKAN",
+        "predicate": "has address",
+        "object": "Sector 13 Vasundhara"
+    },
+    {
+        "subject": "YASHRAJ KASAUDHAN",
+        "predicate": "has ID",
+        "object": "132"
+    },
+    {
+        "subject": "YASHRAJ KASAUDHAN",
+        "predicate": "has identifier",
+        "object": "231248000212"
+    },
+    {
+        "subject": "YASHRAJ KASAUDHAN",
+        "predicate": "has phone number",
+        "object": "9140760070"
+    },
+    {
+        "subject": "YASHRAJ KASAUDHAN",
+        "predicate": "has email",
+        "object": "yashrajkasaudhan@gmail.com"
+    },
+    {
+        "subject": "YASHRAJ KASAUDHAN",
+        "predicate": "located in",
+        "object": "Nagar Panchayat Nichlaul, 273304"
+    },
+    {
+        "subject": "MOHIT KUMAR",
+        "predicate": "has ID",
+        "object": "54"
+    },
+    {
+        "subject": "MOHIT KUMAR",
+        "predicate": "has code",
+        "object": "231248000125"
+    },
+    {
+        "subject": "MOHIT KUMAR",
+        "predicate": "has phone number",
+        "object": "8375003932"
+    },
+    {
+        "subject": "MOHIT KUMAR",
+        "predicate": "has email",
+        "object": "mohitkumarkvgm@gmail.com"
+    },
+    {
+        "subject": "MOHIT KUMAR",
+        "predicate": "has address",
+        "object": "C-25/G gulabi bagh railway colony Lajpat Nagar new delhi"
+    },
+    {
+        "subject": "YASH NANDAL",
+        "predicate": "has ID",
+        "object": "131"
+    },
+    {
+        "subject": "YASH NANDAL",
+        "predicate": "has account number",
+        "object": "231248000211"
+    },
+    {
+        "subject": "YASH NANDAL",
+        "predicate": "has phone number",
+        "object": "8684900035"
+    },
+    {
+        "subject": "YASH NANDAL",
+        "predicate": "has email",
+        "object": "nandalyash489@gmail.com"
+    },
+    {
+        "subject": "YASH NANDAL",
+        "predicate": "located in",
+        "object": "Rohtak, haryana"
+    },
+    {
+        "subject": "Record #133",
+        "predicate": "contains entity",
+        "object": "YASH NANDAL"
+    },
+    {
+        "subject": "GAURAV PRASAD",
+        "predicate": "has internal ID",
+        "object": "38"
+    },
+    {
+        "subject": "GAURAV PRASAD",
+        "predicate": "has external ID",
+        "object": "231248000105"
+    },
+    {
+        "subject": "GAURAV PRASAD",
+        "predicate": "has phone number",
+        "object": "9315313335"
+    },
+    {
+        "subject": "GAURAV PRASAD",
+        "predicate": "has email address",
+        "object": "gauravprasad9315@gmail.com"
+    },
+    {
+        "subject": "GAURAV PRASAD",
+        "predicate": "has address",
+        "object": "N 176/6 amar Market Sourabh vihar badarpur"
+    },
+    {
+        "subject": "SUBHAM KUMAR SONI",
+        "predicate": "has internal ID",
+        "object": "105"
+    },
+    {
+        "subject": "SUBHAM KUMAR SONI",
+        "predicate": "has external ID",
+        "object": "231248000179"
+    },
+    {
+        "subject": "SUBHAM KUMAR SONI",
+        "predicate": "has phone number",
+        "object": "8920816449"
+    },
+    {
+        "subject": "SUBHAM KUMAR SONI",
+        "predicate": "has email",
+        "object": "soni01580@gmail.com"
+    },
+    {
+        "subject": "SUBHAM KUMAR SONI",
+        "predicate": "has address",
+        "object": "harola sector 5 noida UP (201301)"
+    },
+    {
+        "subject": "NAMAN BAISOYA",
+        "predicate": "has ID",
+        "object": "57"
+    },
+    {
+        "subject": "NAMAN BAISOYA",
+        "predicate": "has identifier",
+        "object": "231248000128"
+    },
+    {
+        "subject": "NAMAN BAISOYA",
+        "predicate": "has phone number",
+        "object": "9311970698"
+    },
+    {
+        "subject": "NAMAN BAISOYA",
+        "predicate": "has email",
+        "object": "baisoyanaman05@gmail.com"
+    },
+    {
+        "subject": "NAMAN BAISOYA",
+        "predicate": "located in",
+        "object": "Greater Noida West,Greator noida,U.P."
+    },
+    {
+        "subject": "DHRUV MISHRA",
+        "predicate": "has ID",
+        "object": "231248000100"
+    },
+    {
+        "subject": "DHRUV MISHRA",
+        "predicate": "has phone number",
+        "object": "9315604082"
+    },
+    {
+        "subject": "DHRUV MISHRA",
+        "predicate": "has email",
+        "object": "dhruv26mishra@gmail.com"
+    },
+    {
+        "subject": "DHRUV MISHRA",
+        "predicate": "has address",
+        "object": "B-27 / C-1, IIT Campus, Hauz khas, New Delhi (110016)"
+    },
+    {
+        "subject": "RAVINDRA SINGH",
+        "predicate": "has serial number",
+        "object": "83"
+    },
+    {
+        "subject": "RAVINDRA SINGH",
+        "predicate": "has ID",
+        "object": "231248000155"
+    },
+    {
+        "subject": "RAVINDRA SINGH",
+        "predicate": "has phone number",
+        "object": "8006570257"
+    },
+    {
+        "subject": "RAVINDRA SINGH",
+        "predicate": "has email",
+        "object": "ravindragorla571@gmail.com"
+    },
+    {
+        "subject": "RAVINDRA SINGH",
+        "predicate": "located at",
+        "object": "C-309, SECTOR 19 , NOIDA GAUTAM BUDH NAGAR"
+    },
+    {
+        "subject": "RAGHAV SEHGAL",
+        "predicate": "has phone number",
+        "object": "9717329885"
+    },
+    {
+        "subject": "RAGHAV SEHGAL",
+        "predicate": "has email",
+        "object": "raghavji215@gmail.com"
+    },
+    {
+        "subject": "RAGHAV SEHGAL",
+        "predicate": "has ID",
+        "object": "231248000152"
+    },
+    {
+        "subject": "RAGHAV SEHGAL",
+        "predicate": "affiliated with",
+        "object": "NIT Faridabad"
+    },
+    {
+        "subject": "NIT Faridabad",
+        "predicate": "located in",
+        "object": "haryana"
+    },
+    {
+        "subject": "RAGHAV SEHGAL",
+        "predicate": "has attribute",
+        "object": "80"
+    },
+    {
+        "subject": "SUMIT KUMAR",
+        "predicate": "has ID",
+        "object": "108"
+    },
+    {
+        "subject": "SUMIT KUMAR",
+        "predicate": "has account number",
+        "object": "231248000183"
+    },
+    {
+        "subject": "SUMIT KUMAR",
+        "predicate": "has phone number",
+        "object": "9193463541"
+    },
+    {
+        "subject": "SUMIT KUMAR",
+        "predicate": "has email",
+        "object": "chauhansumit1514@gmail.com"
+    },
+    {
+        "subject": "SUMIT KUMAR",
+        "predicate": "has address",
+        "object": "noida sector 63  chotpur colony"
+    },
+    {
+        "subject": "SUMIT KUMAR TIWARI",
+        "predicate": "has ID",
+        "object": "109"
+    },
+    {
+        "subject": "SUMIT KUMAR TIWARI",
+        "predicate": "has secondary ID",
+        "object": "231248000184"
+    },
+    {
+        "subject": "SUMIT KUMAR TIWARI",
+        "predicate": "has phone number",
+        "object": "9654231312"
+    },
+    {
+        "subject": "SUMIT KUMAR TIWARI",
+        "predicate": "has email",
+        "object": "sumittiwari9482@gmail.com"
+    },
+    {
+        "subject": "SUMIT KUMAR TIWARI",
+        "predicate": "has address",
+        "object": "Gaziabad shankar vihar"
+    },
+    {
+        "subject": "NAND KISHOR",
+        "predicate": "has record number",
+        "object": "59"
+    },
+    {
+        "subject": "NAND KISHOR",
+        "predicate": "has identifier",
+        "object": "231248000130"
+    },
+    {
+        "subject": "NAND KISHOR",
+        "predicate": "has phone number",
+        "object": "9027250586"
+    },
+    {
+        "subject": "NAND KISHOR",
+        "predicate": "has email",
+        "object": "nand81477@gmail.com"
+    },
+    {
+        "subject": "NAND KISHOR",
+        "predicate": "has address",
+        "object": "babain khairagarh Firozabad U.p"
+    },
+    {
+        "subject": "AMAN KUMAR JHA",
+        "predicate": "has ID",
+        "object": "12"
+    },
+    {
+        "subject": "AMAN KUMAR JHA",
+        "predicate": "has customer number",
+        "object": "231248000076"
+    },
+    {
+        "subject": "AMAN KUMAR JHA",
+        "predicate": "has phone number",
+        "object": "9990385047"
+    },
+    {
+        "subject": "AMAN KUMAR JHA",
+        "predicate": "has email",
+        "object": "amanjha0426@gmail.com"
+    },
+    {
+        "subject": "AMAN KUMAR JHA",
+        "predicate": "has username",
+        "object": "assasdd"
+    },
+    {
+        "subject": "RAHUL SONI",
+        "predicate": "has internal ID",
+        "object": "81"
+    },
+    {
+        "subject": "RAHUL SONI",
+        "predicate": "has identifier",
+        "object": "231248000153"
+    },
+    {
+        "subject": "RAHUL SONI",
+        "predicate": "has phone number",
+        "object": "8076653390"
+    },
+    {
+        "subject": "RAHUL SONI",
+        "predicate": "has email address",
+        "object": "rahulsoni5544332211@gmail.com"
+    },
+    {
+        "subject": "RAHUL SONI",
+        "predicate": "has address",
+        "object": "C-119 ,Sector 44 Noida Gautam Budh Nagar U.P"
+    },
+    {
+        "subject": "RITIKA KARGETI",
+        "predicate": "has ID",
+        "object": "231248000157"
+    },
+    {
+        "subject": "RITIKA KARGETI",
+        "predicate": "has phone number",
+        "object": "7983062178"
+    },
+    {
+        "subject": "RITIKA KARGETI",
+        "predicate": "has email",
+        "object": "rritikakargeti@gmail.com"
+    },
+    {
+        "subject": "ANAMIKA YADAV",
+        "predicate": "has ID",
+        "object": "13"
+    },
+    {
+        "subject": "ANAMIKA YADAV",
+        "predicate": "13",
+        "object": "231248000078"
+    },
+    {
+        "subject": "ANAMIKA YADAV",
+        "predicate": "has phone number",
+        "object": "9410219443"
+    },
+    {
+        "subject": "ANAMIKA YADAV",
+        "predicate": "has email",
+        "object": "anamikayadav9007@gmail.com"
+    },
+    {
+        "subject": "ANAMIKA YADAV",
+        "predicate": "has address",
+        "object": "Haridarshan nagar, Mainpuri, Uttar Pradesh"
+    },
+    {
+        "subject": "RISHAB",
+        "predicate": "has record ID",
+        "object": "84"
+    },
+    {
+        "subject": "RISHAB",
+        "predicate": "has system ID",
+        "object": "231248000156"
+    },
+    {
+        "subject": "RISHAB",
+        "predicate": "has phone number",
+        "object": "8700874636"
+    },
+    {
+        "subject": "RISHAB",
+        "predicate": "has email address",
+        "object": "rishabgoyal842@gmail.com"
+    },
+    {
+        "subject": "RISHAB",
+        "predicate": "has residential address",
+        "object": "sec-37, greater Noida"
+    },
+    {
+        "subject": "NEHA",
+        "predicate": "has age",
+        "object": "60"
+    },
+    {
+        "subject": "SURAJ",
+        "predicate": "has ID",
+        "object": "111"
+    },
+    {
+        "subject": "SURAJ",
+        "predicate": "has identifier",
+        "object": "231248000186"
+    },
+    {
+        "subject": "SURAJ",
+        "predicate": "has phone number",
+        "object": "8130664893"
+    },
+    {
+        "subject": "SURAJ",
+        "predicate": "has email address",
+        "object": "surajrathore813066@gmail.com"
+    },
+    {
+        "subject": "SURAJ",
+        "predicate": "has address",
+        "object": "Badarpur, New Delhi, 110044"
+    },
+    {
+        "subject": "DEEPANSHU",
+        "predicate": "has age",
+        "object": "30"
+    },
+    {
+        "subject": "DEEPANSHU",
+        "predicate": "has ID",
+        "object": "231248000097"
+    },
+    {
+        "subject": "DEEPANSHU",
+        "predicate": "has phone number",
+        "object": "9548597980"
+    },
+    {
+        "subject": "DEEPANSHU",
+        "predicate": "has email",
+        "object": "deshwaldeepanshu67@gmail.com"
+    },
+    {
+        "subject": "DEEPANSHU",
+        "predicate": "has address",
+        "object": "nail almora uttarakhand"
+    },
+    {
+        "subject": "NAMRATA SINGH",
+        "predicate": "has ID",
+        "object": "58"
+    },
+    {
+        "subject": "NAMRATA SINGH",
+        "predicate": "has identifier",
+        "object": "231248000129"
+    },
+    {
+        "subject": "NAMRATA SINGH",
+        "predicate": "has phone number",
+        "object": "9971502279"
+    },
+    {
+        "subject": "NAMRATA SINGH",
+        "predicate": "has email",
+        "object": "3325namratarssis@gmail.com"
+    },
+    {
+        "subject": "NAMRATA SINGH",
+        "predicate": "has address",
+        "object": "sec49, Barola noida"
+    },
+    {
+        "subject": "YUVRAJ KUMAR",
+        "predicate": "has ID",
+        "object": "133"
+    },
+    {
+        "subject": "YUVRAJ KUMAR",
+        "predicate": "has secondary ID",
+        "object": "231248000213"
+    },
+    {
+        "subject": "YUVRAJ KUMAR",
+        "predicate": "has phone number",
+        "object": "9709602042"
+    },
+    {
+        "subject": "YUVRAJ KUMAR",
+        "predicate": "has email",
+        "object": "singhyuvraj.120803@gmail.com"
+    },
+    {
+        "subject": "YUVRAJ KUMAR",
+        "predicate": "has address",
+        "object": "Hb/6 canal colony Okhla Jamia nagar"
+    },
+    {
+        "subject": "ARYAN PRATAP SINGH",
+        "predicate": "has ID",
+        "object": "23"
+    },
+    {
+        "subject": "ARYAN PRATAP SINGH",
+        "predicate": "has identifier",
+        "object": "231248000090"
+    },
+    {
+        "subject": "ARYAN PRATAP SINGH",
+        "predicate": "has phone number",
+        "object": "6294473285"
+    },
+    {
+        "subject": "ARYAN PRATAP SINGH",
+        "predicate": "has email",
+        "object": "aryanpratap2416@gmail.com"
+    },
+    {
+        "subject": "ARYAN PRATAP SINGH",
+        "predicate": "has address",
+        "object": "H-19/C laxmi nagar East delhi 110092"
+    },
+    {
+        "subject": "SUMIT RANA",
+        "predicate": "has ID",
+        "object": "110"
+    },
+    {
+        "subject": "SUMIT RANA",
+        "predicate": "has identifier",
+        "object": "231248000185"
+    },
+    {
+        "subject": "SUMIT RANA",
+        "predicate": "has phone number",
+        "object": "9720169013"
+    },
+    {
+        "subject": "SUMIT RANA",
+        "predicate": "has email",
+        "object": "sr7727053@gmail.com"
+    },
+    {
+        "subject": "SUMIT RANA",
+        "predicate": "has address",
+        "object": "Naurangabad chawani, aligarh"
+    },
+    {
+        "subject": "Column A",
+        "predicate": "belongs to",
+        "object": "entity_columns"
+    },
+    {
+        "subject": "Column B",
+        "predicate": "belongs to",
+        "object": "relationship_columns"
+    },
+    {
+        "subject": "Column C",
+        "predicate": "belongs to",
+        "object": "entity_columns"
+    },
+    {
+        "subject": "Column F",
+        "predicate": "belongs to",
+        "object": "attribute_columns"
+    },
+    {
+        "subject": "Column G",
+        "predicate": "belongs to",
+        "object": "attribute_columns"
+    },
+    {
+        "subject": "Column H",
+        "predicate": "belongs to",
+        "object": "attribute_columns"
+    },
+    {
+        "subject": "SR",
+        "predicate": "has role",
+        "object": "ROLL"
+    },
+    {
+        "subject": "SR",
+        "predicate": "has name",
+        "object": "CNAME"
+    },
+    {
+        "subject": "SR",
+        "predicate": "has mobile number",
+        "object": "Mobile no"
+    },
+    {
+        "subject": "SR",
+        "predicate": "has email ID",
+        "object": "Email Id"
+    },
+    {
+        "subject": "SR",
+        "predicate": "has address",
+        "object": "Address"
+    },
+    {
+        "subject": "DEEPANSHU KUMAR",
+        "predicate": "has age",
+        "object": "31"
+    },
+    {
+        "subject": "DEEPANSHU KUMAR",
+        "predicate": "has ID",
+        "object": "231248000098"
+    },
+    {
+        "subject": "DEEPANSHU KUMAR",
+        "predicate": "has phone number",
+        "object": "9773862594"
+    },
+    {
+        "subject": "DEEPANSHU KUMAR",
+        "predicate": "has email",
+        "object": "deepanshudohal@gmail.com"
+    },
+    {
+        "subject": "DEEPANSHU KUMAR",
+        "predicate": "located in",
+        "object": "Dadri uttar pradesh"
+    },
+    {
+        "subject": "JEET KUMAR",
+        "predicate": "has attribute A",
+        "object": "45"
+    },
+    {
+        "subject": "JEET KUMAR",
+        "predicate": "has attribute B",
+        "object": "231248000113"
+    },
+    {
+        "subject": "Record #12",
+        "predicate": "contains",
+        "object": "ALIN ANTHONY"
+    },
+    {
+        "subject": "ALIN ANTHONY",
+        "predicate": "has column A value",
+        "object": "10"
+    },
+    {
+        "subject": "ALIN ANTHONY",
+        "predicate": "has column B value",
+        "object": "231248000074"
+    },
+    {
+        "subject": "ALIN ANTHONY",
+        "predicate": "has column F value",
+        "object": "9810920495"
+    },
+    {
+        "subject": "ALIN ANTHONY",
+        "predicate": "has column G value",
+        "object": "alinanthony261@gmail.com"
+    },
+    {
+        "subject": "HITESH KUMAR",
+        "predicate": "has identifier",
+        "object": "231248000111"
+    },
+    {
+        "subject": "HITESH KUMAR",
+        "predicate": "has phone number",
+        "object": "9536606535"
+    },
+    {
+        "subject": "HITESH KUMAR",
+        "predicate": "has email",
+        "object": "kumarh99733@gmail.com"
+    },
+    {
+        "subject": "HITESH KUMAR",
+        "predicate": "has address",
+        "object": "Hasanpur laduki, bulandshahr, uttar pradesh 203203"
+    },
+    {
+        "subject": "HITESH KUMAR",
+        "predicate": "has code",
+        "object": "44"
+    },
+    {
+        "subject": "S0URABH RAJ",
+        "predicate": "has internal ID",
+        "object": "87"
+    },
+    {
+        "subject": "S0URABH RAJ",
+        "predicate": "has account number",
+        "object": "231248000159"
+    },
+    {
+        "subject": "S0URABH RAJ",
+        "predicate": "has phone number",
+        "object": "8448012920"
+    },
+    {
+        "subject": "S0URABH RAJ",
+        "predicate": "has email",
+        "object": "sourabhr801@gmail.com"
+    },
+    {
+        "subject": "S0URABH RAJ",
+        "predicate": "has address",
+        "object": "akbarpur behrampur sandeep garden garden Tigri gol chakkar 201001"
+    },
+    {
+        "subject": "Record #88",
+        "predicate": "has column A value",
+        "object": "86"
+    },
+    {
+        "subject": "Record #88",
+        "predicate": "has column B value",
+        "object": "231248000158"
+    },
+    {
+        "subject": "Record #88",
+        "predicate": "has column C value",
+        "object": "ROHAIN KOUL"
+    },
+    {
+        "subject": "Record #64",
+        "predicate": "has column A value",
+        "object": "62"
+    },
+    {
+        "subject": "Record #64",
+        "predicate": "has column B value",
+        "object": "231248000133"
+    },
+    {
+        "subject": "Record #64",
+        "predicate": "has column C value",
+        "object": "OM JINDAL"
+    },
+    {
+        "subject": "OM JINDAL",
+        "predicate": "appears in",
+        "object": "Record #64"
+    },
+    {
+        "subject": "YASH KUMAR",
+        "predicate": "has unique identifier",
+        "object": "231248000208"
+    },
+    {
+        "subject": "YASH KUMAR",
+        "predicate": "has phone number",
+        "object": "8439673805"
+    },
+    {
+        "subject": "YASH KUMAR",
+        "predicate": "has email",
+        "object": "kyash4310@gmail.com"
+    },
+    {
+        "subject": "YASH KUMAR",
+        "predicate": "has address",
+        "object": "shiv Vihar, Rail vihar , loni, UP"
+    },
+    {
+        "subject": "Record 132",
+        "predicate": "has internal ID",
+        "object": "130"
+    },
+    {
+        "subject": "Record 132",
+        "predicate": "has unique identifier",
+        "object": "231248000208"
+    },
+    {
+        "subject": "Record 132",
+        "predicate": "has name",
+        "object": "YASH KUMAR"
+    },
+    {
+        "subject": "Record 132",
+        "predicate": "has phone number",
+        "object": "8439673805"
+    },
+    {
+        "subject": "Record 132",
+        "predicate": "has email",
+        "object": "kyash4310@gmail.com"
+    },
+    {
+        "subject": "Record 132",
+        "predicate": "has address",
+        "object": "shiv Vihar, Rail vihar , loni, UP"
+    },
+    {
+        "subject": "HARSH VARDHAN",
+        "predicate": "has age",
+        "object": "43"
+    },
+    {
+        "subject": "HARSH VARDHAN",
+        "predicate": "has identifier",
+        "object": "231248000110"
+    },
+    {
+        "subject": "HARSH VARDHAN",
+        "predicate": "has phone number",
+        "object": "7409345884"
+    },
+    {
+        "subject": "HARSH VARDHAN",
+        "predicate": "has email",
+        "object": "mailharshvardhan05@gmail.com"
+    },
+    {
+        "subject": "HARSH VARDHAN VARDHAN",
+        "predicate": "has address",
+        "object": "112, Samrathpur, Auraiya 206122"
+    },
+    {
+        "subject": "SACHIN KUMAR SAH",
+        "predicate": "has phone number",
+        "object": "9910166764"
+    },
+    {
+        "subject": "SACHIN KUMAR SAH",
+        "predicate": "has email",
+        "object": "sahs19500@gmail.com"
+    },
+    {
+        "subject": "SACHIN KUMAR SAH",
+        "predicate": "has address",
+        "object": "b-27 new ashok nagar delhi-110096"
+    },
+    {
+        "subject": "SACHIN KUMAR SAH",
+        "predicate": "has identifier",
+        "object": "231248000160"
+    },
+    {
+        "subject": "SACHIN KUMAR SAH",
+        "predicate": "has attribute A",
+        "object": "88"
+    },
+    {
+        "subject": "NIKHIL OJHA",
+        "predicate": "has ID",
+        "object": "61"
+    },
+    {
+        "subject": "NIKHIL OJHA",
+        "predicate": "has code",
+        "object": "231248000132"
+    },
+    {
+        "subject": "NIKHIL OJHA",
+        "predicate": "has phone number",
+        "object": "7856047628"
+    },
+    {
+        "subject": "NIKHIL OJHA",
+        "predicate": "has email",
+        "object": "ojhanikhil841@gmail.com"
+    },
+    {
+        "subject": "NIKHIL OJHA",
+        "predicate": "has address",
+        "object": "Siwan , Bihar"
+    },
+    {
+        "subject": "NIKHIL OJHA",
+        "predicate": "located in",
+        "object": "Siwan, Bihar"
+    },
+    {
+        "subject": "TANISHQ VERMA",
+        "predicate": "has ID",
+        "object": "113"
+    },
+    {
+        "subject": "TANISHQ VERMA",
+        "predicate": "has secondary ID",
+        "object": "231248000188"
+    },
+    {
+        "subject": "TANISHQ VERMA",
+        "predicate": "has phone number",
+        "object": "9990756678"
+    },
+    {
+        "subject": "TANISHQ VERMA",
+        "predicate": "has email",
+        "object": "rajtanishq23@gmail.com"
+    },
+    {
+        "subject": "TANISHQ VERMA",
+        "predicate": "has address",
+        "object": "E73 nidhi medicos mittal chowk pul pehladpur new delhi44"
+    },
+    {
+        "subject": "TANISHQ VERMA",
+        "predicate": "located in",
+        "object": "New Delhi"
+    },
+    {
+        "subject": "PARUL SAMA",
+        "predicate": "has phone number",
+        "object": "8595515525"
+    },
+    {
+        "subject": "PARUL SAMA",
+        "predicate": "has email",
+        "object": "samaparul03@gmail.com"
+    },
+    {
+        "subject": "PARUL SAMA",
+        "predicate": "has address",
+        "object": "Rch hospital quarter no 4 sector 30, Faridabad"
+    },
+    {
+        "subject": "PARUL SAMA",
+        "predicate": "has identifier",
+        "object": "231248000135"
+    },
+    {
+        "subject": "OM KUMAR SHARMA",
+        "predicate": "has ID",
+        "object": "231248000134"
+    },
+    {
+        "subject": "OM KUMAR SHARMA",
+        "predicate": "has phone number",
+        "object": "9643545145"
+    },
+    {
+        "subject": "OM KUMAR SHARMA",
+        "predicate": "has email",
+        "object": "sharmaom517@gmail.com"
+    },
+    {
+        "subject": "OM KUMAR SHARMA",
+        "predicate": "has address",
+        "object": "A2a Block Janakpuri new delhi 110058"
+    },
+    {
+        "subject": "Record #65",
+        "predicate": "has entity ID",
+        "object": "63"
+    },
+    {
+        "subject": "BHUMI SHARMA",
+        "predicate": "has age",
+        "object": "28"
+    },
+    {
+        "subject": "BHUMI SHARMA",
+        "predicate": "has identifier",
+        "object": "231248000095"
+    },
+    {
+        "subject": "BHUMI SHARMA",
+        "predicate": "has phone number",
+        "object": "8171642508"
+    },
+    {
+        "subject": "BHUMI SHARMA",
+        "predicate": "has email",
+        "object": "bhumiisharma1707@gmail.com"
+    },
+    {
+        "subject": "BHUMI SHARMA",
+        "predicate": "has address",
+        "object": "23 rani wala chowk, khurja, UP"
+    },
+    {
+        "subject": "UTKARSH VERMA",
+        "predicate": "has primary ID",
+        "object": "115"
+    },
+    {
+        "subject": "UTKARSH VERMA",
+        "predicate": "has secondary ID",
+        "object": "231248000190"
+    },
+    {
+        "subject": "UTKARSH VERMA",
+        "predicate": "has phone number",
+        "object": "9643391418"
+    },
+    {
+        "subject": "UTKARSH VERMA",
+        "predicate": "has email",
+        "object": "utkarshverma297@gmail.com"
+    },
+    {
+        "subject": "UTKARSH VERMA",
+        "predicate": "has address",
+        "object": "kuleshra greater Noida"
+    },
+    {
+        "subject": "CHIRAG BHARDWAJ",
+        "predicate": "has age",
+        "object": "29"
+    },
+    {
+        "subject": "CHIRAG BHARDWAJ",
+        "predicate": "has ID",
+        "object": "231248000096"
+    },
+    {
+        "subject": "CHIRAG BHARDWAJ",
+        "predicate": "has phone number",
+        "object": "8810562309"
+    },
+    {
+        "subject": "CHIRAG?",
+        "predicate": "has email",
+        "object": "SHUBHSHARMA092006@GMAIL.COM"
+    },
+    {
+        "subject": "CHIRAG BHARDWAJ",
+        "predicate": "has address",
+        "object": "Village nan district hapur, 245101"
+    },
+    {
+        "subject": "TANISHA PRADHAN",
+        "predicate": "has ID",
+        "object": "112"
+    },
+    {
+        "subject": "TANISHA PRADHAN",
+        "predicate": "has ID",
+        "object": "231248000187"
+    },
+    {
+        "subject": "TANISHA PRADHAN",
+        "predicate": "has phone number",
+        "object": "9910143141"
+    },
+    {
+        "subject": "TANISHA PRADHAN",
+        "predicate": "has email",
+        "object": "tanishapradhan155@gmail.com"
+    },
+    {
+        "subject": "TANISHA PRADHAN",
+        "predicate": "has address",
+        "object": "105-A, Pocket C/2, Mayur vihar ph 3 ,110096"
+    },
+    {
+        "subject": "TANISHA PRADHAN",
+        "predicate": "record number",
+        "object": "114"
+    },
+    {
+        "subject": "Record #1",
+        "predicate": "has column A value",
+        "object": "Nominal Roll BCA 2023-26"
+    },
+    {
+        "subject": "ANISH YADAV",
+        "predicate": "has ID",
+        "object": "231248000080"
+    },
+    {
+        "subject": "ANISH YADAV",
+        "predicate": "has phone number",
+        "object": "9389280450"
+    },
+    {
+        "subject": "ANISH YADAV",
+        "predicate": "has email",
+        "object": "ay1045848@gmail.com"
+    },
+    {
+        "subject": "ANISH YADAV",
+        "predicate": "has address",
+        "object": "Village seewara, pilakhtarfateh, firozabad, uttar pradesh, 205147"
+    },
+    {
+        "subject": "ANISH YADAV",
+        "predicate": "has serial number",
+        "object": "15"
+    },
+    {
+        "subject": "PIYUSH KUMAR SINGH",
+        "predicate": "has record number",
+        "object": "65"
+    },
+    {
+        "subject": "PIYUSH KUMAR SINGH",
+        "predicate": "has ID",
+        "object": "231248000136"
+    },
+    {
+        "subject": "PIYUSH KUMAR SINGH",
+        "predicate": "has phone number",
+        "object": "9306002276"
+    },
+    {
+        "subject": "PIYUSH KUMAR SINGH",
+        "predicate": "has email",
+        "object": "piratepiyush579@gmail.com"
+    },
+    {
+        "subject": "TANYA SINGH",
+        "predicate": "has ID",
+        "object": "114"
+    },
+    {
+        "subject": "TANYA SINGH",
+        "predicate": "has identifier",
+        "object": "231248000189"
+    },
+    {
+        "subject": "TANYA SINGH",
+        "predicate": "has phone number",
+        "object": "7017256274"
+    },
+    {
+        "subject": "TANYA SINGH",
+        "predicate": "has email",
+        "object": "tanyasingh0302@gmail.com"
+    },
+    {
+        "subject": "TANYA SINGH",
+        "predicate": "has address",
+        "object": "Jahangirabad, Bulandshar, Uttar Pradesh. 203394"
+    },
+    {
+        "subject": "HARSH RAI",
+        "predicate": "has ID",
+        "object": "42"
+    },
+    {
+        "subject": "HARSH RAI",
+        "predicate": "has bank account number",
+        "object": "231248000109/"
+    },
+    {
+        "subject": "HARSH RAI",
+        "predicate": "has phone number",
+        "object": "7225802136"
+    },
+    {
+        "subject": "HARSH RAI",
+        "predicate": "has email",
+        "object": "Theharsh045us@gmail.com"
+    },
+    {
+        "subject": "HARSH RAI",
+        "predicate": "has address",
+        "object": "Hariharpur Dhara, Mirzapur, Uttar Pradesh 231305"
+    },
+    {
+        "subject": "SAHIL KUMAR",
+        "predicate": "has identifier",
+        "object": "231248000162"
+    },
+    {
+        "subject": "SAHIL KUMAR",
+        "predicate": "has phone number",
+        "object": "8340675939"
+    },
+    {
+        "subject": "SAHIL KUMAR",
+        "predicate": "has email",
+        "object": "sahil880908@gmail.com"
+    },
+    {
+        "subject": "SAHIL KUMAR",
+        "predicate": "located in",
+        "object": "Khagra District-Bhagalpur (Bihar)"
+    },
+    {
+        "subject": "RADHIKA",
+        "predicate": "has ID",
+        "object": "79"
+    },
+    {
+        "subject": "RADHIKA",
+        "predicate": "has identifier",
+        "object": "231248000151"
+    },
+    {
+        "subject": "RADHIKA",
+        "predicate": "has phone number",
+        "object": "9319072669"
+    },
+    {
+        "subject": "RADHIKA",
+        "predicate": "has email",
+        "object": "r4400725@gmail.com"
+    },
+    {
+        "subject": "RADHIKA",
+        "predicate": "has address",
+        "object": "Badarpur, New Delhi"
+    },
+    {
+        "subject": "Record #91",
+        "predicate": "contains entity",
+        "object": "SAHIL HUSSAIN"
+    },
+    {
+        "subject": "SAHIL HUSSAIN",
+        "predicate": "has phone number",
+        "object": "9643488527"
+    },
+    {
+        "subject": "SAHIL HUSSAIN",
+        "predicate": "has email address",
+        "object": "sahilhussain7840@gmail.com"
+    },
+    {
+        "subject": "SAHIL HUSSAIN",
+        "predicate": "has address",
+        "object": "A-329 New ashok Nagar Vasundhara Enclave East Delhi -110096"
+    },
+    {
+        "subject": "SAHIL HUSSAIN",
+        "predicate": "has identifier",
+        "object": "231248000161"
+    },
+    {
+        "subject": "Record #91",
+        "predicate": "has record number",
+        "object": "89"
+    },
+    {
+        "subject": "SAKSHI DUBEY",
+        "predicate": "has phone number",
+        "object": "9582130867"
+    },
+    {
+        "subject": "SAKSHI DUBEY",
+        "predicate": "has email address",
+        "object": "sakshid691@gmail.com"
+    },
+    {
+        "subject": "SAKSHI DUBEY",
+        "predicate": "has address",
+        "object": "Shyam nagla Kannauj UP 209733"
+    },
+    {
+        "subject": "SAKSHI DUBEY",
+        "predicate": "has identifier",
+        "object": "231248000163"
+    },
+    {
+        "subject": "SAKSHI DUBEY",
+        "predicate": "has record number",
+        "object": "93"
+    },
+    {
+        "subject": "DRASHTI AGGARWAL",
+        "predicate": "has age",
+        "object": "35"
+    },
+    {
+        "subject": "DRASHTI AGGARWAL",
+        "predicate": "has ID",
+        "object": "231248000102"
+    },
+    {
+        "subject": "DRASHTI AGGARWAL",
+        "predicate": "has phone number",
+        "object": "9557672851"
+    },
+    {
+        "subject": "DRASHTI AGGARWAL",
+        "predicate": "has email",
+        "object": "aggarwaldrishty@gmail.com"
+    },
+    {
+        "subject": "DRASHTI AGGARWAL",
+        "predicate": "has address",
+        "object": "Bilaspur, Greater noida, Gautam Buddha Nagar(UP)"
+    },
+    {
+        "subject": "ANMOL",
+        "predicate": "has ID",
+        "object": "16"
+    },
+    {
+        "subject": "ANMOL",
+        "predicate": "has identifier",
+        "object": "231248000081"
+    },
+    {
+        "subject": "ANMOL",
+        "predicate": "has phone number",
+        "object": "9311377264"
+    },
+    {
+        "subject": "ANMOL",
+        "predicate": "has email",
+        "object": "rajf4828@gmail.com"
+    },
+    {
+        "subject": "ANMOL",
+        "predicate": "has address",
+        "object": "Sigma 2, Greater noida"
+    },
+    {
+        "subject": "SAMAR",
+        "predicate": "has internal ID",
+        "object": "92"
+    },
+    {
+        "subject": "SAMAR",
+        "predicate": "has unique ID",
+        "object": "231248000164"
+    },
+    {
+        "subject": "SAMAR",
+        "predicate": "has phone number",
+        "object": "8700662647"
+    },
+    {
+        "subject": "SAMAR",
+        "predicate": "has email",
+        "object": "Samarrajput2005@gmail.com"
+    },
+    {
+        "subject": "SAMAR",
+        "predicate": "has address",
+        "object": "3/32 A Moti nagar New delhi"
+    },
+    {
+        "subject": "ARUN KUMAR",
+        "predicate": "has ID",
+        "object": "231248000088"
+    },
+    {
+        "subject": "ARUN KUMAR",
+        "predicate": "has phone number",
+        "object": "8383864577"
+    },
+    {
+        "subject": "ARUN KUMAR",
+        "predicate": "has email",
+        "object": "arun999x0@gmail.com"
+    },
+    {
+        "subject": "ARUN KUMAR",
+        "predicate": "has address",
+        "object": "267,1/D, Lakhpat colony part 2, Badarpur,new Delhi"
+    },
+    {
+        "subject": "AZHAN HASHMI",
+        "predicate": "has ID",
+        "object": "231248000094"
+    },
+    {
+        "subject": "AZHAN HASHMI",
+        "predicate": "has phone number",
+        "object": "9250829331"
+    },
+    {
+        "subject": "AZHAN HASHMI",
+        "predicate": "has email address",
+        "object": "azhanhashmi788@gmail.com"
+    },
+    {
+        "subject": "AZHAN HASHMI",
+        "predicate": "has address",
+        "object": "New ashok nagar delhi 110096"
+    },
+    {
+        "subject": "AZHAN HASHMI",
+        "predicate": "has age",
+        "object": "27"
+    },
+    {
+        "subject": "Record #29",
+        "predicate": "contains entity",
+        "object": "AZHAN HASHMI"
+    },
+    {
+        "subject": "VANDANA SHARMA",
+        "predicate": "has record ID",
+        "object": "116"
+    },
+    {
+        "subject": "VANDANA SHARMA",
+        "predicate": "has identifier",
+        "object": "231248000191"
+    },
+    {
+        "subject": "VANDANA SHARMA",
+        "predicate": "has phone number",
+        "object": "9971513363"
+    },
+    {
+        "subject": "VANDANA SHARMA",
+        "predicate": "has email",
+        "object": "vandana2004sharma@gmail.com"
+    },
+    {
+        "subject": "VANDANA SHARMA",
+        "predicate": "has address",
+        "object": "Flat no.- 4/6, PKT- 7, Sector- 82, Noida, UP, 201304"
+    },
+    {
+        "subject": "ADARSH MAURYA",
+        "predicate": "has ID",
+        "object": "231248000070"
+    },
+    {
+        "subject": "ADARSH MAURYA",
+        "predicate": "has phone number",
+        "object": "6387528269"
+    },
+    {
+        "subject": "ADARSH MAURYA",
+        "predicate": "has email",
+        "object": "adarshmaurya7530@gmail.com"
+    },
+    {
+        "subject": "ADARSH MAURYA",
+        "predicate": "lives in",
+        "object": "devla, greater Noida"
+    },
+    {
+        "subject": "PRABHAT KUMAR BIND",
+        "predicate": "has ID",
+        "object": "66"
+    },
+    {
+        "subject": "PRABHAT KUMAR BIND",
+        "predicate": "has identifier",
+        "object": "231248000138"
+    },
+    {
+        "subject": "PRABHAT KUMAR BIND",
+        "predicate": "has phone number",
+        "object": "9454258933"
+    },
+    {
+        "subject": "PRABHAT KUMAR BIND",
+        "predicate": "has email",
+        "object": "bindprabhatkumar2003@gmail.com"
+    },
+    {
+        "subject": "PRABHAT KUMAR BIND",
+        "predicate": "has address",
+        "object": "Baiyadad, Bhatauli, Mirzapur, Uttar Pradesh"
+    },
+    {
+        "subject": "PRABHJOT KAUR",
+        "predicate": "has ID",
+        "object": "231248000139"
+    },
+    {
+        "subject": "PRABHJOT KAUR",
+        "predicate": "has age",
+        "object": "67"
+    },
+    {
+        "subject": "PRABHJOT KAUR",
+        "predicate": "has phone",
+        "object": "7087347307"
+    },
+    {
+        "subject": "PRABHJOT KAUR",
+        "predicate": "has email",
+        "object": "prabhjotkaur0000000011@gmail.com"
+    },
+    {
+        "subject": "PRABHJOT KAUR",
+        "predicate": "has address",
+        "object": "Barbil, keonjhar, odisha 758035"
+    },
+    {
+        "subject": "PRAKASH MISHRA",
+        "predicate": "has phone number",
+        "object": "8743821921"
+    },
+    {
+        "subject": "PRAKASH MISHRA",
+        "predicate": "has email",
+        "object": "ji676349@gmail.com"
+    },
+    {
+        "subject": "PRAKASH MISHRA",
+        "predicate": "resides in",
+        "object": "Dadri, Greater Noida"
+    },
+    {
+        "subject": "VANSH CHAUHAN",
+        "predicate": "has column A value",
+        "object": "117"
+    },
+    {
+        "subject": "VANSH CHAUHAN",
+        "predicate": "has column B value",
+        "object": "231248000192"
+    },
+    {
+        "subject": "ASTHA RAI",
+        "predicate": "has record number",
+        "object": "26"
+    },
+    {
+        "subject": "ASTHA RAI",
+        "predicate": "has unique identifier",
+        "object": "231248000093"
+    },
+    {
+        "subject": "ASTHA RAI",
+        "predicate": "has phone number",
+        "object": "8448680865"
+    },
+    {
+        "subject": "ASTHA RAI",
+        "predicate": "has email address",
+        "object": "asthasrai@gmail.com"
+    },
+    {
+        "subject": "ASTHA RAI",
+        "predicate": "lives at",
+        "object": "Merapur Basahi, Shivpur , Varanasi (U.P.) , 221003"
+    },
+    {
+        "subject": "VARINDER SINGH BEDI",
+        "predicate": "has ID",
+        "object": "119"
+    },
+    {
+        "subject": "VARINDER SINGH BEDI",
+        "predicate": "has ID",
+        "object": "231248000194"
+    },
+    {
+        "subject": "VARINDER SINGH BEDI",
+        "predicate": "has phone number",
+        "object": "7701821716"
+    },
+    {
+        "subject": "VARINDER SINGH BEDI",
+        "predicate": "has email",
+        "object": "Varindersinghbedi2005@gmail.com"
+    },
+    {
+        "subject": "VARINDER SINGH BEDI",
+        "predicate": "located in",
+        "object": "Delhi 110053"
+    },
+    {
+        "subject": "AAKASH GUSAIN",
+        "predicate": "has ID",
+        "object": "231248000066"
+    },
+    {
+        "subject": "AAKASH GUSAIN",
+        "predicate": "has phone number",
+        "object": "9310411719"
+    },
+    {
+        "subject": "AAKASH GUSAIN",
+        "predicate": "has email",
+        "object": "akashgusain2004@gmail.com"
+    },
+    {
+        "subject": "AAKASH GUSAIN",
+        "predicate": "has address",
+        "object": "Barola sec 49 , noida"
+    },
+    {
+        "subject": "ASHISH",
+        "predicate": "has age",
+        "object": "25"
+    },
+    {
+        "subject": "ASHISH",
+        "predicate": "has ID",
+        "object": "231248000092"
+    },
+    {
+        "subject": "ASHISH",
+        "predicate": "has phone number",
+        "object": "7982674874"
+    },
+    {
+        "subject": "ASHISH",
+        "predicate": "has email address",
+        "object": "ashishking.1010@gmail.com"
+    },
+    {
+        "subject": "ASHISH",
+        "predicate": "has address",
+        "object": "Greater Kailash 1 Chirag enclave dda flat 10/12"
+    },
+    {
+        "subject": "HARSHIT GUJWAR",
+        "predicate": "has phone number",
+        "object": "9625589463"
+    },
+    {
+        "subject": "HARSHIT GUJWAR",
+        "predicate": "has email",
+        "object": "harshitthakur042@gmail.com"
+    },
+    {
+        "subject": "HARSHIT GUJWAR",
+        "predicate": "has address",
+        "object": "Paharganj New Delhi-110055"
+    },
+    {
+        "subject": "HARSHIT GUJWAR",
+        "predicate": "has identifier",
+        "object": "231248000108"
+    },
+    {
+        "subject": "ANSHU VISHWAKARMA",
+        "predicate": "has ID",
+        "object": "231248000084"
+    },
+    {
+        "subject": "ANSHU VISHWAKARMA",
+        "predicate": "has phone number",
+        "object": "8468026654"
+    },
+    {
+        "subject": "ANSHU VISHWAKARMA",
+        "predicate": "has email",
+        "object": "anshuvish159@gmail.com"
+    },
+    {
+        "subject": "ANSHU VISHWAKARMA",
+        "predicate": "has address",
+        "object": "Uttar Pradesh, Chunar, Mirzapur 231304"
+    },
+    {
+        "subject": "ANSHU VISHWAKARMA",
+        "predicate": "has record number",
+        "object": "19"
+    },
+    {
+        "subject": "ABHAY",
+        "predicate": "has phone number",
+        "object": "9899168991"
+    },
+    {
+        "subject": "ABHAY",
+        "predicate": "has email",
+        "object": "mrabhaysingh09@gmail.com"
+    },
+    {
+        "subject": "ABHAY",
+        "predicate": "located in",
+        "object": "Kulesra, greater Noida"
+    },
+    {
+        "subject": "ABHAY",
+        "predicate": "has identifier",
+        "object": "231248000068"
+    },
+    {
+        "subject": "ABHAY",
+        "predicate": "has code",
+        "object": "5"
+    },
+    {
+        "subject": "VIJAY",
+        "predicate": "hasPhone",
+        "object": "9311036601"
+    },
+    {
+        "subject": "VIJAY",
+        "predicate": "hasEmail",
+        "object": "vijaybeniwal601@gmail.com"
+    },
+    {
+        "subject": "VIJAY",
+        "predicate": "hasAddress",
+        "object": "C 1 j j colony sector 7 Dwarka , south west Delhi"
+    },
+    {
+        "subject": "VIJAY",
+        "predicate": "hasID",
+        "object": "120"
+    },
+    {
+        "subject": "VIJAY",
+        "predicate": "hasID",
+        "object": "231248000196"
+    },
+    {
+        "subject": "SANIYA PARVEEN",
+        "predicate": "has serial number",
+        "object": "93"
+    },
+    {
+        "subject": "SANIYA PARVEEN",
+        "predicate": "has identifier",
+        "object": "231248000165"
+    },
+    {
+        "subject": "SANIYA PARVEEN",
+        "predicate": "has phone number",
+        "object": "7835992824"
+    },
+    {
+        "subject": "SANIYA PARVEEN",
+        "predicate": "has email address",
+        "object": "sania584348@gmail.com"
+    },
+    {
+        "subject": "SANIYA PARVEEN",
+        "predicate": "has address",
+        "object": "R-66 third floor, okhla New Delhi 110025"
+    },
+    {
+        "subject": "SANJAY PAL",
+        "predicate": "has code",
+        "object": "94"
+    },
+    {
+        "subject": "SANJAY PAL",
+        "predicate": "has ID",
+        "object": "231248000166"
+    },
+    {
+        "subject": "has phone number",
+        "predicate": "has phone number",
+        "object": "9956151547"
+    },
+    {
+        "subject": "SANJAY PAL",
+        "predicate": "has email",
+        "object": "sanjaypaul21062005@gmail.com"
+    },
+    {
+        "subject": "ARYAN YADAV",
+        "predicate": "has phone number",
+        "object": "7982674874"
+    },
+    {
+        "subject": "ARYAN YADAV",
+        "predicate": "has email address",
+        "object": "yadavaryan1007@gmail.com"
+    },
+    {
+        "subject": "ARYAN YADAV",
+        "predicate": "has postal address",
+        "object": "L-1007, Hindalco colony, Renukoot, (U.P.)"
+    },
+    {
+        "subject": "ARYAN YADAV",
+        "predicate": "has identifier",
+        "object": "231248000091"
+    },
+    {
+        "subject": "ARYAN YADAV",
+        "predicate": "has age",
+        "object": "24"
+    },
+    {
+        "subject": "VANSHIKA GUPTA",
+        "predicate": "has phone number",
+        "object": "8851097092"
+    },
+    {
+        "subject": "VANSHIKA GUPTA",
+        "predicate": "has email address",
+        "object": "vanshika2708gupta@gmail.com"
+    },
+    {
+        "subject": "VANSHIKA GUPTA",
+        "predicate": "has address",
+        "object": "A -703 budha marg mandawali delhi -110092"
+    },
+    {
+        "subject": "VANSHIKA GUPTA",
+        "predicate": "has record ID",
+        "object": "118"
+    },
+    {
+        "subject": "VANSHIKA GUPTA",
+        "predicate": "has ID",
+        "object": "231248000193"
+    },
+    {
+        "subject": "PRANJAL GUPTA",
+        "predicate": "has ID",
+        "object": "231248000142"
+    },
+    {
+        "subject": "PRANJAL GUPTA",
+        "predicate": "has phone number",
+        "object": "7820011712"
+    },
+    {
+        "subject": "PRANJAL GUPTA",
+        "predicate": "has email",
+        "object": "pranjalgupta69001@gmail.com"
+    },
+    {
+        "subject": "PRANJAL GUPTA",
+        "predicate": "resides at",
+        "object": "etah up thandi sadak"
+    },
+    {
+        "subject": "PRANJAL GUPTA",
+        "predicate": "has record number",
+        "object": "70"
+    },
+    {
+        "subject": "PRAKHAR GOYAL",
+        "predicate": "has identifier",
+        "object": "231248000141"
+    },
+    {
+        "subject": "PRAKHAR GOYAL",
+        "predicate": "has phone number",
+        "object": "7869499430"
+    },
+    {
+        "subject": "PRAKHAR GOYAL",
+        "predicate": "has email",
+        "object": "goyalprakhar60390@gmail.com"
+    },
+    {
+        "subject": "PRAKHAR GOYAL",
+        "predicate": "has address",
+        "object": "Gole ka mandir, Gwalior, Madhya Pradesh,474005"
+    },
+    {
+        "subject": "Gwalior",
+        "predicate": "located in",
+        "object": "Madhya Pradesh"
+    },
+    {
+        "subject": "Gole ka mandir",
+        "predicate": "located in",
+        "object": "Gwalior"
+    },
+    {
+        "subject": "ABDUL SAMAD",
+        "predicate": "has ID",
+        "object": "1"
+    },
+    {
+        "subject": "ABDUL SAMAD",
+        "predicate": "has code",
+        "object": "231248000002"
+    },
+    {
+        "subject": "VIKASH KUMAR",
+        "predicate": "has ID",
+        "object": "121"
+    },
+    {
+        "subject": "VIKASH KUMAR",
+        "predicate": "has identifier",
+        "object": "231248000197"
+    },
+    {
+        "subject": "VIKASH KUMAR",
+        "predicate": "has phone number",
+        "object": "9990307166"
+    },
+    {
+        "subject": "VIKASH KUMAR",
+        "predicate": "has email",
+        "object": "vk9739213@gmail.com"
+    },
+    {
+        "subject": "VIKASH KUMAR",
+        "predicate": "has address",
+        "object": "G-bolck gaddha colony jaitpur badarpur"
+    },
+    {
+        "subject": "Record #123",
+        "predicate": "contains entity",
+        "object": "VIKASH KUMAR"
+    },
+    {
+        "subject": "Record #123",
+        "predicate": "has ID",
+        "object": "121"
+    },
+    {
+        "subject": "Record #123",
+        "predicate": "has identifier",
+        "object": "231248000197"
+    },
+    {
+        "subject": "Record #123",
+        "predicate": "has phone number",
+        "object": "9990307166"
+    },
+    {
+        "subject": "Record #123",
+        "predicate": "has email",
+        "object": "vk9739213@gmail.com"
+    },
+    {
+        "subject": "Record #123",
+        "predicate": "has address",
+        "object": "G-bolck gaddha colony jaitpur badarpur"
+    },
+    {
+        "subject": "Record #20",
+        "predicate": "has column A",
+        "object": "18"
+    },
+    {
+        "subject": "Record #20",
+        "predicate": "has column B",
+        "object": "231248000083"
+    },
+    {
+        "subject": "Record #20",
+        "predicate": "has column C",
+        "object": "ANSHIT VYAS"
+    },
+    {
+        "subject": "AADI TYAGI",
+        "predicate": "has ID",
+        "object": "231248000065"
+    },
+    {
+        "subject": "AADI TYAGI",
+        "predicate": "has phone number",
+        "object": "7701925851"
+    },
+    {
+        "subject": "AADI TYAGI",
+        "predicate": "has email",
+        "object": "aadityagi0007@gmail.com"
+    },
+    {
+        "subject": "AADI TYAGI",
+        "predicate": "located at",
+        "object": "ENGINEERS ENCLAVE, GREATER NOIDA"
+    },
+    {
+        "subject": "PRASHANT KUMAR TALAN",
+        "predicate": "has record ID",
+        "object": "71"
+    },
+    {
+        "subject": "PRASHANT KUMAR TALAN",
+        "predicate": "has unique ID",
+        "object": "231248000143"
+    },
+    {
+        "subject": "PRASHANT KUMAR TALAN",
+        "predicate": "has phone number",
+        "object": "9719896062"
+    },
+    {
+        "subject": "PRASHANT KUMAR TALAN",
+        "predicate": "has email address",
+        "object": "prashanttalan11@gmail.com"
+    },
+    {
+        "subject": "SATISH KUMAR GAUD",
+        "predicate": "has ID",
+        "object": "95"
+    },
+    {
+        "subject": "SATISH KUMAR GAUD",
+        "predicate": "has entity ID",
+        "object": "231248000167"
+    },
+    {
+        "subject": "SATISH KUMAR GAUD",
+        "predicate": "has phone number",
+        "object": "7272821770"
+    },
+    {
+        "subject": "SATISH KUMAR GAUD",
+        "predicate": "has email address",
+        "object": "Satishsinha7272@gmail.com"
+    },
+    {
+        "subject": "SATISH KUMAR GAUD",
+        "predicate": "is located in",
+        "object": "jamdanipur, shahganj, jaunpur, Uttar Pradesh"
+    },
+    {
+        "subject": "Record #97",
+        "predicate": "contains",
+        "object": "SATISH KUMAR GAUD"
+    },
+    {
+        "subject": "AMAN CHAUHAN",
+        "predicate": "has ID",
+        "object": "231248000075"
+    },
+    {
+        "subject": "AMAN CHAUHAN",
+        "predicate": "has phone number",
+        "object": "9119075809"
+    },
+    {
+        "subject": "AMAN CHAUHAN",
+        "predicate": "has email",
+        "object": "amanchauhan9119075809@gmail.com"
+    },
+    {
+        "subject": "AMAN CHAUHAN",
+        "predicate": "located in",
+        "object": "Baghpat, Uttar Pradesh"
+    },
+    {
+        "subject": "KARTIKEY GUPTA",
+        "predicate": "has ID",
+        "object": "46"
+    },
+    {
+        "subject": "KARTIKEY GUPTA",
+        "predicate": "has account number",
+        "object": "231248000114"
+    },
+    {
+        "subject": "KARTIKEY GUPTA",
+        "predicate": "has phone number",
+        "object": "8882428063"
+    },
+    {
+        "subject": "KARTIKEY GUPTA",
+        "predicate": "has email",
+        "object": "kartikgupta87628@gmail.com"
+    },
+    {
+        "subject": "KARTIKEY GUPTA",
+        "predicate": "lives at",
+        "object": "Indirapuram, Ghaziabad, UP"
+    },
+    {
+        "subject": "PREETI CHAURSIA",
+        "predicate": "has record ID",
+        "object": "73"
+    },
+    {
+        "subject": "PREETI CHAURSIA",
+        "predicate": "has unique identifier",
+        "object": "231248000145"
+    },
+    {
+        "subject": "PREETI CHAURSIA",
+        "predicate": "has phone number",
+        "object": "9818336166"
+    },
+    {
+        "subject": "PREETI CHAURSIA",
+        "predicate": "has email",
+        "object": "chaurasiap488@gmail.com"
+    },
+    {
+        "subject": "PREETI CHAURSIA",
+        "predicate": "has address",
+        "object": "khora colony, mayur vihar ph 2"
+    },
+    {
+        "subject": "SAYAM BHATIA",
+        "predicate": "has ID",
+        "object": "97"
+    },
+    {
+        "subject": "SAYAM BHATIA",
+        "predicate": "has identifier",
+        "object": "231248000170"
+    },
+    {
+        "subject": "SAYAM BHATIA",
+        "predicate": "has phone number",
+        "object": "9718164770"
+    },
+    {
+        "subject": "SAYAM BHATIA",
+        "predicate": "has email",
+        "object": "sayambhatia200@gmail.com"
+    },
+    {
+        "subject": "SAYAM BHATIA",
+        "predicate": "has address",
+        "object": "parteek grand , pratap vihar , ghaziabad"
+    },
+    {
+        "subject": "KRISHNA SAHDEV",
+        "predicate": "has ID",
+        "object": "47"
+    },
+    {
+        "subject": "KRISHNA SAHDEV",
+        "predicate": "has account number",
+        "object": "231248000115"
+    },
+    {
+        "subject": "KRISHNA SAHDEV",
+        "predicate": "has phone number",
+        "object": "7827501093"
+    },
+    {
+        "subject": "KRISHNA SAHDEV",
+        "predicate": "has email",
+        "object": "krishnasahdev786@gmail.com"
+    },
+    {
+        "subject": "KRISHNA SAHDEV",
+        "predicate": "has address",
+        "object": "Vasundhara, Ghazizabad, U.P"
+    },
+    {
+        "subject": "ARCHI JAISWAL",
+        "predicate": "has phone number",
+        "object": "7235843150"
+    },
+    {
+        "subject": "ARCHI JAISWAL",
+        "predicate": "has email",
+        "object": "archijaiswal01@gmail.com"
+    },
+    {
+        "subject": "ARCHI JAISWAL",
+        "predicate": "located in",
+        "object": "Chetganj, Varanas"
+    },
+    {
+        "subject": "ARCHI JAISWAL",
+        "predicate": "has ID",
+        "object": "231248000086"
+    },
+    {
+        "subject": "ARCHI JAISWAL",
+        "predicate": "has attribute A",
+        "object": "20"
+    },
+    {
+        "subject": "VIKASH KUSHWAHA",
+        "predicate": "has ID",
+        "object": "122"
+    },
+    {
+        "subject": "VIKASH KUSHWAHA",
+        "predicate": "has identifier",
+        "object": "231248000198"
+    },
+    {
+        "subject": "VIKASH KUSHWAHA",
+        "predicate": "has phone number",
+        "object": "9918795467"
+    },
+    {
+        "subject": "VIKASH KUSHWAHA",
+        "predicate": "has email",
+        "object": "vikas.vk9918@icloud.com"
+    },
+    {
+        "subject": "VIKASH KUSHWAHA",
+        "predicate": "resides in",
+        "object": "Deoria, Gorakhpur, Uttar Pradesh"
+    },
+    {
+        "subject": "VISHAL GANGWAR",
+        "predicate": "has record ID",
+        "object": "123"
+    },
+    {
+        "subject": "VISHAL GANGWAR",
+        "predicate": "has identifier",
+        "object": "231248000200"
+    },
+    {
+        "subject": "VISHAL GANGWAR",
+        "predicate": "has phone number",
+        "object": "8287372450"
+    },
+    {
+        "subject": "VISHAL GANGWAR",
+        "predicate": "has email",
+        "object": "vishalgangwar1592@gmail.com"
+    },
+    {
+        "subject": "VISHAL GANGWAR",
+        "predicate": "has address",
+        "object": "Bhangel noida Gautam Buddha Nagar ,UP-201304"
+    },
+    {
+        "subject": "PRAVEEN KUMAR",
+        "predicate": "has ID",
+        "object": "72"
+    },
+    {
+        "subject": "PRAVEEN KUMAR",
+        "predicate": "has account number",
+        "object": "231248000144"
+    },
+    {
+        "subject": "PRAVEEN KUMAR",
+        "predicate": "has phone number",
+        "object": "9368758829"
+    },
+    {
+        "subject": "PRAVEEN KUMAR",
+        "predicate": "has email",
+        "object": "pk026859@gmail.com"
+    },
+    {
+        "subject": "PRAVEEN KUMAR",
+        "predicate": "has address",
+        "object": "babain khairagarh Firozabad U.P"
+    },
+    {
+        "subject": "SHANKAR MADAN MISHRA",
+        "predicate": "has phone number",
+        "object": "8591095483"
+    },
+    {
+        "subject": "SHANKAR MADAN MISHRA",
+        "predicate": "has email",
+        "object": "xshankarmishra@gmail.com"
+    },
+    {
+        "subject": "SHANKAR MADAN MISHRA",
+        "predicate": "has address",
+        "object": "Pooja medical, sector 44, noida 201303"
+    },
+    {
+        "subject": "SHANKAR MADAN MISHRA",
+        "predicate": "has identifier",
+        "object": "231248000171"
+    },
+    {
+        "subject": "SAURAV MAURYA",
+        "predicate": "has ID",
+        "object": "96"
+    },
+    {
+        "subject": "SAURAV MAURYA",
+        "predicate": "has secondary ID",
+        "object": "231248000169"
+    },
+    {
+        "subject": "SAURAV MAURYA",
+        "predicate": "has phone number",
+        "object": "9643357340"
+    },
+    {
+        "subject": "SAURAV MAURYA",
+        "predicate": "has email",
+        "object": "sauravmaurya123@gmail.com"
+    },
+    {
+        "subject": "SAURAV MAURYA",
+        "predicate": "has address",
+        "object": "Hno.10A Qutab Vihar, Dwarka, New Delhi 110071"
+    },
+    {
+        "subject": "ARYAN ATRISH",
+        "predicate": "has age",
+        "object": "22"
+    },
+    {
+        "subject": "ARYAN ATRISH",
+        "predicate": "has ID",
+        "object": "231248000089"
+    },
+    {
+        "subject": "ARYAN ATRISH",
+        "predicate": "has phone number",
+        "object": "9760493403"
+    },
+    {
+        "subject": "ARYAN ATRISH?",
+        "predicate": "has email",
+        "object": "aryanatrish011@gmail.com"
+    },
+    {
+        "subject": "ARYAN ATRISH",
+        "predicate": "has address",
+        "object": "chander nagar near lal kothi shiv shakti mandir saharanpur"
+    },
+    {
+        "subject": "ANMOL SINGH",
+        "predicate": "has phone number",
+        "object": "8920793065"
+    },
+    {
+        "subject": "ANMOL SINGH",
+        "predicate": "has email",
+        "object": "saritasingh906989@gmail.com"
+    },
+    {
+        "subject": "ANMOL SINGH",
+        "predicate": "has address",
+        "object": "BHANGEL NOIDA NEAR SHIV MANDIR"
+    },
+    {
+        "subject": "ANMOL SINGH",
+        "predicate": "has identifier",
+        "object": "231248000082"
+    },
+    {
+        "subject": "ADITYA RANA",
+        "predicate": "has ID",
+        "object": "231248000072"
+    },
+    {
+        "subject": "ADITYA RANA",
+        "predicate": "has phone number",
+        "object": "9310875134"
+    },
+    {
+        "subject": "ADITYA RANA",
+        "predicate": "has email address",
+        "object": "aadu6491@gmail.com"
+    },
+    {
+        "subject": "ADITYA RANA",
+        "predicate": "has mailing address",
+        "object": "H.no -362 Gali no -3 railway colony Delhi -92"
+    },
+    {
+        "subject": "ADITYA RANA",
+        "predicate": "has record number",
+        "object": "8"
+    },
+    {
+        "subject": "GOVIND JEE",
+        "predicate": "has ID",
+        "object": "231248000106"
+    },
+    {
+        "subject": "GOVIND JEE",
+        "predicate": "has phone number",
+        "object": "8709376013"
+    },
+    {
+        "subject": "GOVIND JEE",
+        "predicate": "has email",
+        "object": "jeegovind80@gmail.com"
+    },
+    {
+        "subject": "GOVIND JEE",
+        "predicate": "has address",
+        "object": "At- Kanimoh Post-Rata District-Banka State-Bihar"
+    },
+    {
+        "subject": "GOVIND JEE",
+        "predicate": "has record number",
+        "object": "39"
+    },
+    {
+        "subject": "KUMAR SAKSHAM",
+        "predicate": "has identifier",
+        "object": "231248000116"
+    },
+    {
+        "subject": "KUMAR SAKSHAM",
+        "predicate": "has phone number",
+        "object": "7667998081"
+    },
+    {
+        "subject": "KUMAR SAKSHAM",
+        "predicate": "has email",
+        "object": "kumarsaksham0403@gmail.com"
+    },
+    {
+        "subject": "KUMAR SAKSHAM",
+        "predicate": "located in",
+        "object": "Sasaram District"
+    },
+    {
+        "subject": "Sasaram District",
+        "predicate": "located in",
+        "object": "Rohtas State"
+    },
+    {
+        "subject": "Rohtas State",
+        "predicate": "located in",
+        "object": "Bihar"
+    },
+    {
+        "subject": "SHIVAM",
+        "predicate": "has ID",
+        "object": "99"
+    },
+    {
+        "subject": "SHIVAM",
+        "predicate": "has identifier",
+        "object": "231248000172"
+    },
+    {
+        "subject": "SHIVAM",
+        "predicate": "has phone number",
+        "object": "6395138527"
+    },
+    {
+        "subject": "SHIVAM",
+        "predicate": "has email",
+        "object": "rk910453610@gmail.com"
+    },
+    {
+        "subject": "SHIVAM",
+        "predicate": "has address",
+        "object": "Village salimpur Bharthana Etawah 206242"
+    },
+    {
+        "subject": "SHIVANGI RAI",
+        "predicate": "has record ID",
+        "object": "100"
+    },
+    {
+        "subject": "SHIVANGI RAI",
+        "predicate": "has unique identifier",
+        "object": "231248000173"
+    },
+    {
+        "subject": "SHIVANGI RAI",
+        "predicate": "has phone number",
+        "object": "9026317298"
+    },
+    {
+        "subject": "SHIVANGI RAI",
+        "predicate": "has email address",
+        "object": "shivangir289@gmail.com"
+    },
+    {
+        "subject": "SHIVANGI RAI",
+        "predicate": "has address",
+        "object": "Lanka, Ghazipur, Uttar Pradesh,233001"
+    },
+    {
+        "subject": "PREET PAL",
+        "predicate": "has record number",
+        "object": "74"
+    },
+    {
+        "subject": "PREET PAL",
+        "predicate": "has unique ID",
+        "object": "231248000146"
+    },
+    {
+        "subject": "PREET PAL",
+        "predicate": "has phone number",
+        "object": "8376008182"
+    },
+    {
+        "subject": "PREET PAL",
+        "predicate": "has email",
+        "object": "Ppal72867@gmail.com"
+    },
+    {
+        "subject": "PREET PAL",
+        "predicate": "has address",
+        "object": "aiccher, greater noida"
+    },
+    {
+        "subject": "aiccher",
+        "predicate": "located in",
+        "object": "greater noida"
+    },
+    {
+        "subject": "VISHAL SHARMA",
+        "predicate": "has ID",
+        "object": "125"
+    },
+    {
+        "subject": "VISHAL SHARMA",
+        "predicate": "has identifier",
+        "object": "231248000203"
+    },
+    {
+        "subject": "VISHAL SHARMA",
+        "predicate": "has phone number",
+        "object": "9368788692"
+    },
+    {
+        "subject": "VISHAL SHARMA",
+        "predicate": "has email",
+        "object": "panditvishalsharma52@gmail.com"
+    },
+    {
+        "subject": "VISHAL SHARMA",
+        "predicate": "resides at",
+        "object": "Vill-Pilkhani Post-Unchagaon Dist-Bulandshahr (U.P)"
+    },
+    {
+        "subject": "GAURAV",
+        "predicate": "has internal ID",
+        "object": "37"
+    },
+    {
+        "subject": "GAURAV",
+        "predicate": "has external ID",
+        "object": "231248000104"
+    },
+    {
+        "subject": "GAURAV",
+        "predicate": "has phone number",
+        "object": "8447597441"
+    },
+    {
+        "subject": "GAURAV",
+        "predicate": "has email address",
+        "object": "gk311785@gmail.com"
+    },
+    {
+        "subject": "GAURAV",
+        "predicate": "has address",
+        "object": "NC-9 canal colony okhla new delhi - 110025"
+    },
+    {
+        "subject": "MANOJ SAHANI",
+        "predicate": "has code",
+        "object": "49"
+    },
+    {
+        "subject": "MANOJ SAHANI",
+        "predicate": "has identifier",
+        "object": "231248000117"
+    },
+    {
+        "subject": "MANOJ SAHANI",
+        "predicate": "has phone number",
+        "object": "9821876871"
+    },
+    {
+        "subject": "MANOJ SAHANI",
+        "predicate": "has email",
+        "object": "sahanimanoj2324@gmail.com"
+    },
+    {
+        "subject": "MANOJ SAHANI",
+        "predicate": "has address",
+        "object": "C-91, Akbarpur Behrampur, Ghaziabad, UP-201001"
+    },
+    {
+        "subject": "WASEEM AKRAM",
+        "predicate": "has ID",
+        "object": "127"
+    },
+    {
+        "subject": "WASEEM AKRAM",
+        "predicate": "has code",
+        "object": "231248000205"
+    },
+    {
+        "subject": "WASEEM AKRAM",
+        "predicate": "has phone number",
+        "object": "8521256674"
+    },
+    {
+        "subject": "WASEEM AKRAM",
+        "predicate": "has email",
+        "object": "mrwasimakram531@gmail.com"
+    },
+    {
+        "subject": "PRINCE",
+        "predicate": "has ID",
+        "object": "231248000147"
+    },
+    {
+        "subject": "PRINCE",
+        "predicate": "has secondary ID",
+        "object": "231248000147"
+    },
+    {
+        "subject": "PRINCE",
+        "predicate": "has phone number",
+        "object": "9773755910"
+    },
+    {
+        "subject": "PRINCE",
+        "predicate": "has email",
+        "object": "princepandey.k181@gmail.com"
+    },
+    {
+        "subject": "PRINCE",
+        "predicate": "has address",
+        "object": "B-167 Sector-20 Noida Gautam Budh Nagar"
+    },
+    {
+        "subject": "MANVI SAJWAN",
+        "predicate": "has internal ID",
+        "object": "50"
+    },
+    {
+        "subject": "MANVI SAJWAN",
+        "predicate": "has account number",
+        "object": "231248000118"
+    },
+    {
+        "subject": "MANVI SAJWAN",
+        "predicate": "has phone number",
+        "object": "8810351138"
+    },
+    {
+        "subject": "MANVI SAJWAN",
+        "predicate": "has email address",
+        "object": "manvisajwan@gmail.com"
+    },
+    {
+        "subject": "MANVI SAJWAN",
+        "predicate": "has residential address",
+        "object": "Delhi , Mayur vihar phase 1 pocket 1 (49-F)"
+    },
+    {
+        "subject": "AKSHAT JAIN",
+        "predicate": "hasID",
+        "object": "231248000073"
+    },
+    {
+        "subject": "AKSHAT JAIN",
+        "predicate": "hasPhoneNumber",
+        "object": "6398619566"
+    },
+    {
+        "subject": "AKSHAT JAIN",
+        "predicate": "hasEmail",
+        "object": "aj084321@gmail.com"
+    },
+    {
+        "subject": "AKSHAT JAIN",
+        "predicate": "hasAddress",
+        "object": "Raj nagar extension, Ghaziabad ,UP (201017)"
+    },
+    {
+        "subject": "AKSHAT JAIN",
+        "predicate": "hasRecordIndex",
+        "object": "9"
+    },
+    {
+        "subject": "ADITIYA KUMAR",
+        "predicate": "has record number",
+        "object": "7"
+    },
+    {
+        "subject": "ADITIYA KUMAR",
+        "predicate": "has identifier",
+        "object": "231248000071"
+    },
+    {
+        "subject": "ADITIYA KUMAR",
+        "predicate": "has phone number",
+        "object": "8092567530"
+    },
+    {
+        "subject": "ADITIYA KUMAR",
+        "predicate": "has email",
+        "object": "www.aditya1818@gmail.com"
+    },
+    {
+        "subject": "ADITIYA KUMAR",
+        "predicate": "has address",
+        "object": "Khagra, Bhagalpur, Bihar 853204"
+    },
+    {
+        "subject": "Khagra",
+        "predicate": "located in",
+        "object": "Bhagalpur"
+    },
+    {
+        "subject": "Bhagalpur",
+        "predicate": "located in",
+        "object": "Bihar"
+    },
+    {
+        "subject": "Bihar",
+        "predicate": "has postal code",
+        "object": "853204"
+    },
+    {
+        "subject": "DURGESH MAURYA",
+        "predicate": "has age",
+        "object": "36"
+    },
+    {
+        "subject": "DURGESH MAURYA",
+        "predicate": "has identifier",
+        "object": "231248000103"
+    },
+    {
+        "subject": "DURGESH MAURYA",
+        "predicate": "has phone number",
+        "object": "6307985570"
+    },
+    {
+        "subject": "DURGESH MAURYA",
+        "predicate": "has email",
+        "object": "durgeshmaurya714@gmail.com"
+    },
+    {
+        "subject": "DURGESH MAURYA",
+        "predicate": "has address",
+        "object": "parwar, kurebhar, sultanpur, uttar pradesh"
+    },
+    {
+        "subject": "PRINCE JHA",
+        "predicate": "has email",
+        "object": "jhaprince385@gmail.com"
+    },
+    {
+        "subject": "PRINCE JHA",
+        "predicate": "has phone number",
+        "object": "83830337723"
+    },
+    {
+        "subject": "PRINCE JHA",
+        "predicate": "has address",
+        "object": "305 A krishnapuri mandawali Delhi 92"
+    },
+    {
+        "subject": "PRINCE JHA",
+        "predicate": "has identifier",
+        "object": "231248000148"
+    },
+    {
+        "subject": "SHUBHAM",
+        "predicate": "has ID",
+        "object": "103"
+    },
+    {
+        "subject": "SHUBHAM",
+        "predicate": "has secondary ID",
+        "object": "231248000176"
+    },
+    {
+        "subject": "SHUBHAM",
+        "predicate": "has phone number",
+        "object": "9599232070"
+    },
+    {
+        "subject": "SHUBHAM",
+        "predicate": "has email",
+        "object": "shubhamdhanuk572@gmail.com"
+    },
+    {
+        "subject": "SHUBHAM",
+        "predicate": "has address",
+        "object": "noida sector 31 nithari village water tank compound"
+    },
+    {
+        "subject": "MAYANK BISHT",
+        "predicate": "has record ID",
+        "object": "51"
+    },
+    {
+        "subject": "MAYANK BISHT",
+        "predicate": "has identifier",
+        "object": "231248000119"
+    },
+    {
+        "subject": "MAYANK BISHT",
+        "predicate": "has phone number",
+        "object": "8851421936"
+    },
+    {
+        "subject": "MAYANK BISHT",
+        "predicate": "has email",
+        "object": "007mayankbisht@gmail.com"
+    },
+    {
+        "subject": "MAYANK BISHT",
+        "predicate": "has address",
+        "object": "New Delhi, Mayur Vihar Phase 3, Pocket A1"
+    },
+    {
+        "subject": "VIVEK",
+        "predicate": "has ID",
+        "object": "126"
+    },
+    {
+        "subject": "VIVEK",
+        "predicate": "has Aadhar number",
+        "object": "231248000204"
+    },
+    {
+        "subject": "VIVEK",
+        "predicate": "has phone number",
+        "object": "9711735897"
+    },
+    {
+        "subject": "VIVEK",
+        "predicate": "has email",
+        "object": "viveekthakur645@gmail.com"
+    },
+    {
+        "subject": "VIVEK",
+        "predicate": "has address",
+        "object": "Hb/6 canal colony okhla New Delhi -110025"
+    },
+    {
+        "subject": "VISHAL KUMAR",
+        "predicate": "has identifier",
+        "object": "231248000201"
+    },
+    {
+        "subject": "VISHAL KUMAR",
+        "predicate": "has phone number",
+        "object": "9305462690"
+    },
+    {
+        "subject": "VISHAL KUMAR",
+        "predicate": "has email address",
+        "object": "kumar633668@gmail.com"
+    },
+    {
+        "subject": "VISHAL KUMAR",
+        "predicate": "has address",
+        "object": "C-27, Akbarpur Behrampur, Ghaziabad, UP-201009"
+    },
+    {
+        "subject": "VISHAL KUMAR",
+        "predicate": "has record ID",
+        "object": "124"
+    },
+    {
+        "subject": "YASH",
+        "predicate": "has ID",
+        "object": "128"
+    },
+    {
+        "subject": "YASH",
+        "predicate": "has secondary ID",
+        "object": "231248000206"
+    },
+    {
+        "subject": "YASH",
+        "predicate": "has phone number",
+        "object": "9654555009"
+    },
+    {
+        "subject": "YASH",
+        "predicate": "has email",
+        "object": "sukhbirbidhuri1982@gmail.com"
+    },
+    {
+        "subject": "YASH",
+        "predicate": "lives at",
+        "object": "Jallam Mohalla Tughalakabad Village Delhi 110044"
+    },
+    {
+        "subject": "SHIVANI SHRESTHA",
+        "predicate": "has internal ID",
+        "object": "101"
+    },
+    {
+        "subject": "AASTHA YADAV",
+        "predicate": "has record number",
+        "object": "4"
+    },
+    {
+        "subject": "AASTHA YADAV",
+        "predicate": "has identifier",
+        "object": "231248000067"
+    },
+    {
+        "subject": "AASTHA YADAV",
+        "predicate": "has phone number",
+        "object": "8619628201"
+    },
+    {
+        "subject": "AASTHA YADAV",
+        "predicate": "has email address",
+        "object": "yaastha682@gmail.com"
+    },
+    {
+        "subject": "AASTHA YADAV",
+        "predicate": "is located in",
+        "object": "Bhiwadi, Rajasthan"
+    },
+    {
+        "subject": "DIGVIJAY SINGH",
+        "predicate": "has unique identifier",
+        "object": "231248000101"
+    },
+    {
+        "subject": "DIGVIJAY SINGH",
+        "predicate": "has phone number",
+        "object": "7464902633"
+    },
+    {
+        "subject": "DIGVIJAY SINGH",
+        "predicate": "has email address",
+        "object": "digvijaysingh14174@gmail.com"
+    },
+    {
+        "subject": "DIGVIJAY SINGH",
+        "predicate": "has address",
+        "object": "Bajkhet.Bawari kichar . Block. (syaldey)  (Almora)"
+    },
+    {
+        "subject": "SOAIB ALI",
+        "predicate": "has person ID",
+        "object": "104"
+    },
+    {
+        "subject": "SOAIB ALI",
+        "predicate": "has registration number",
+        "object": "231248000177"
+    },
+    {
+        "subject": "SOAIB ALI",
+        "predicate": "has phone number",
+        "object": "7678441562"
+    },
+    {
+        "subject": "SOAIB ALI",
+        "predicate": "has email address",
+        "object": "soaibali69@gmail.com"
+    },
+    {
+        "subject": "SOAIB ALI",
+        "predicate": "has address",
+        "object": "Surajpur greater Noida, uttar pradesh , 201306"
+    },
+    {
+        "subject": "DEVANSHU KUMAR",
+        "predicate": "has attribute A",
+        "object": "32"
+    },
+    {
+        "subject": "DEVANSHU KUMAR",
+        "predicate": "has attribute B",
+        "object": "231248000099"
+    },
+    {
+        "subject": "Record #54",
+        "predicate": "contains",
+        "object": "MD ARSHLAN ALAM"
+    },
+    {
+        "subject": "MD ARSHLAN ALAM",
+        "predicate": "has internal ID",
+        "object": "52"
+    },
+    {
+        "subject": "MD ARSHLAN ALAM",
+        "predicate": "has employee number",
+        "object": "231248000122"
+    },
+    {
+        "subject": "MD ARSHLAN ALAM",
+        "predicate": "has phone number",
+        "object": "7870729866"
+    },
+    {
+        "subject": "MD ARSHLAN ALAM",
+        "predicate": "has email",
+        "object": "mdsafarajalam182@gamil.com"
+    },
+    {
+        "subject": "MD ARSHLAN ALAM",
+        "predicate": "has address",
+        "object": "Bada Parewa word no 1 raxaul"
+    },
+    {
+        "subject": "PRIYANSHU",
+        "predicate": "has record ID",
+        "object": "77"
+    },
+    {
+        "subject": "PRIYANSHU",
+        "predicate": "has identifier",
+        "object": "231248000149"
+    },
+    {
+        "subject": "PRIYANSHU",
+        "predicate": "has phone number",
+        "object": "9821369468"
+    },
+    {
+        "subject": "PRIYANSHU",
+        "predicate": "has email address",
+        "object": "onpriyanshuji@gmail.com"
+    },
+    {
+        "subject": "PRIYANSHU",
+        "predicate": "has address",
+        "object": "Kasna, Greater Noida, Gautam b+hudh nagar, Uttar Pradesh"
+    },
+    {
+        "subject": "YASH GUPTA",
+        "predicate": "has ID",
+        "object": "129"
+    },
+    {
+        "subject": "YASH GUPTA",
+        "predicate": "has secondary ID",
+        "object": "231248000207"
+    },
+    {
+        "subject": "YASH GUPTA",
+        "predicate": "has phone number",
+        "object": "7042103159"
+    },
+    {
+        "subject": "YASH GUPTA",
+        "predicate": "has email",
+        "object": "yg4709559@gmail.com"
+    },
+    {
+        "subject": "YASH GUPTA",
+        "predicate": "located in",
+        "object": "Sector 20 Noida"
+    },
+    {
+        "subject": "SHREYA NAUTIYAL",
+        "predicate": "has code",
+        "object": "102"
+    },
+    {
+        "subject": "SHREYA NAUTIYAL",
+        "predicate": "has identifier",
+        "object": "231248000175"
+    },
+    {
+        "subject": "SHREYA NAUTIYAL",
+        "predicate": "has phone number",
+        "object": "9953051176"
+    },
+    {
+        "subject": "SHREYA NAUTIYAL",
+        "predicate": "has email",
+        "object": "nautiyalshreya10@gmail.com"
+    },
+    {
+        "subject": "SHREYA NAUTIYAL",
+        "predicate": "has address",
+        "object": "Block c sector 22 Noida"
+    },
+    {
+        "subject": "MERAJ ALAM",
+        "predicate": "has identifier",
+        "object": "231248000123"
+    },
+    {
+        "subject": "MERAJ ALAM",
+        "predicate": "has phone number",
+        "object": "7827105836"
+    },
+    {
+        "subject": "MERAJ ALAM",
+        "predicate": "has email",
+        "object": "Cafoundation5268@gmail.com"
+    },
+    {
+        "subject": "MERAJ ALAM",
+        "predicate": "has address",
+        "object": "S-10-D/13 Batla House Jamia Nagar N.D110025"
+    },
+    {
+        "subject": "MERAJ ALAM",
+        "predicate": "has record number",
+        "object": "53"
+    },
+    {
+        "subject": "PUNIT SHARMA",
+        "predicate": "has ID",
+        "object": "78"
+    },
+    {
+        "subject": "PUNIT SHARMA",
+        "predicate": "has reference number",
+        "object": "231248000150"
+    },
+    {
+        "subject": "PUNIT SHARMA",
+        "predicate": "has phone number",
+        "object": "9871273958"
+    },
+    {
+        "subject": "PUNIT SHARMA",
+        "predicate": "has email",
+        "object": "punitsharmaavg52@gmail.com"
+    },
+    {
+        "subject": "PUNIT SHARMA",
+        "predicate": "located at",
+        "object": "Kulershra, Greater Noida, GB Nagar, Uttar Pradesh"
+    },
+    {
+        "subject": "GULSHAN KUMAR",
+        "predicate": "has column A value",
+        "object": "40"
+    },
+    {
+        "subject": "GULSHAN KUMAR",
+        "predicate": "has column B value",
+        "object": "231248000107"
+    },
+    {
+        "subject": "Record #57",
+        "predicate": "has column A value",
+        "object": "55"
+    },
+    {
+        "subject": "Record #57",
+        "predicate": "has column B value",
+        "object": "231248000126"
+    },
+    {
+        "subject": "Record #57",
+        "predicate": "has column C value",
+        "object": "MOHIT SINGH"
+    }
+]

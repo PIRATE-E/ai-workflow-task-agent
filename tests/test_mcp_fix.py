@@ -14,8 +14,8 @@ import sys
 import os
 
 
-from src.mcp.load_config import McpConfigFile
-from src.mcp.mcp_register_structure import Command
+from coldwind.core.mcp.load_config import McpConfigFile
+from coldwind.core.mcp.mcp_register_structure import Command
 
 
 def test_command_enum():

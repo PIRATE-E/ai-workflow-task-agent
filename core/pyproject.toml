@@ -1,0 +1,44 @@
+[project]
+name = "coldwind-core"
+version = "1.9.1"
+description = "Cold Wind AI — shared agent core, MCP protocol, tools, RAG"
+requires-python = ">=3.13"
+dependencies = [
+    "langchain>=0.3.27",
+    "langchain-community>=0.3.27",
+    "langchain-core>=0.3.74",
+    "langchain-mcp-adapters>=0.1.9",
+    "langchain-ollama>=0.3.6",
+    "langchain-text-splitters>=0.3.9",
+    "langgraph>=0.6.6",
+    "langgraph-checkpoint>=2.1.1",
+    "langgraph-prebuilt>=0.6.4",
+    "langgraph-sdk>=0.2.2",
+    "langsmith>=0.4.14",
+    "mcp>=1.13.0",
+    "pydantic>=2.11.7",
+    "pydantic-core>=2.33.2",
+    "pydantic-settings>=2.10.1",
+    "openai>=1.100.2",
+    "ollama>=0.5.3",
+    "chromadb>=1.0.20",
+    "neo4j>=5.28.2",
+    "pypdf>=6.0.0",
+    "numpy>=2.3.2",
+    "networkx>=3.5",
+    "tenacity>=9.1.2",
+    "python-dotenv>=1.1.1",
+    "pyyaml>=6.0.2",
+    "duckduckgo-search>=8.1.1",
+    "google-generativeai>=0.8.5",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/coldwind/core"]
+
+[tool.hatch.build.targets.wheel.sources]
+src = ""  # suggested by the ai because the hatching .pth file is not pointing to the correct location.
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

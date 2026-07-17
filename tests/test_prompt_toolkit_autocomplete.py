@@ -25,8 +25,8 @@ from pathlib import Path
 # Add project root to path
 
 # First, register the slash commands (normally done by ChatInitializer)
-from src.slash_commands.on_run_time_register import OnRunTimeRegistry
-from src.slash_commands.protocol import SlashCommand
+from coldwind.desktop.slash_commands.on_run_time_register import OnRunTimeRegistry
+from coldwind.desktop.slash_commands.protocol import SlashCommand
 
 
 def register_test_commands():
@@ -102,7 +102,7 @@ def main():
     print()
 
     # Now test the InputHandler
-    from src.ui.chatInputHandler import InputHandler
+    from coldwind.desktop.ui.chatInputHandler import InputHandler
 
     handler = InputHandler()
 

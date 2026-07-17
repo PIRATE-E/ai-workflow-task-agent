@@ -25,7 +25,7 @@ import os
 
 from rich.console import Console
 from rich.status import Status
-from src.utils.listeners.rich_status_listen import RichStatusListener
+from coldwind.core.utils.listeners.rich_status_listen import RichStatusListener
 
 
 def test_console_descriptor_validation():

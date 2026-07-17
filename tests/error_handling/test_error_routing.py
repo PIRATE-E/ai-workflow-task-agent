@@ -13,7 +13,7 @@ if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
 # Initialize Rich Traceback Manager (main process style)
-from src.ui.diagnostics.rich_traceback_manager import RichTracebackManager
+from coldwind.desktop.ui.diagnostics.rich_traceback_manager import RichTracebackManager
 
 RichTracebackManager.initialize(
     show_locals=False,
@@ -30,8 +30,8 @@ RichTracebackManager.initialize(
 )
 
 # Import settings and socket manager
-from src.config import settings
-from src.utils.socket_manager import SocketManager
+from coldwind.core.config import settings
+from coldwind.core.utils.socket_manager import SocketManager
 
 
 def test_error_routing():

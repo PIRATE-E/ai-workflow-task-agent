@@ -16,17 +16,17 @@ class TestErrorTransfer:
 
     def test_new_logger_write_importable(self):
         """new_logger_write should be importable."""
-        from src.utils.error_transfer import new_logger_write
+        from coldwind.core.utils.error_transfer import new_logger_write
         assert new_logger_write is not None
 
     def test_new_logger_write_callable(self):
         """new_logger_write should be callable."""
-        from src.utils.error_transfer import new_logger_write
+        from coldwind.core.utils.error_transfer import new_logger_write
         assert callable(new_logger_write)
 
     def test_new_logger_write_with_valid_message(self, tmp_path, monkeypatch):
         """new_logger_write should handle valid message."""
-        from src.utils.error_transfer import new_logger_write
+        from coldwind.core.utils.error_transfer import new_logger_write
 
         # Change to temp directory to avoid polluting project
         monkeypatch.chdir(tmp_path)
@@ -52,7 +52,7 @@ class TestErrorTransfer:
 
     def test_new_logger_write_with_invalid_json(self, tmp_path, monkeypatch):
         """new_logger_write should handle invalid JSON gracefully."""
-        from src.utils.error_transfer import new_logger_write
+        from coldwind.core.utils.error_transfer import new_logger_write
 
         monkeypatch.chdir(tmp_path)
 

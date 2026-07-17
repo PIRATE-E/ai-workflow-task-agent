@@ -20,8 +20,8 @@ from unittest.mock import Mock, patch
 if project_root not in sys.path:
 
 try:
-    from src.agents.agentic_orchestrator.AgentGraphCore import AgentGraphCore, TASK, REQUIRED_CONTEXT
-    from src.models.state import State
+    from coldwind.core.agents.agentic_orchestrator.AgentGraphCore import AgentGraphCore, TASK, REQUIRED_CONTEXT
+    from coldwind.core.models.state import State
     MODULES_AVAILABLE = True
 except ImportError as e:
     print(f"Import error: {e}")
@@ -72,7 +72,7 @@ def demo_hierarchical_workflow():
     # 3. Test state creation
     try:
         print("   ?? Creating workflow state...")
-        from src.agents.agentic_orchestrator.AgentGraphCore import MAIN_STATE, AgentState
+        from coldwind.core.agents.agentic_orchestrator.AgentGraphCore import MAIN_STATE, AgentState
         
         state = State(messages=[], message_type=None)
         main_state = MAIN_STATE(state=state)

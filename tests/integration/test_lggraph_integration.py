@@ -17,7 +17,7 @@ import time
 
 from utils.socket_manager import socket_manager
 
-from src.config import settings
+from coldwind.core.config import settings
 
 
 def simulate_lggraph_startup():

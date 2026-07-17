@@ -21,7 +21,7 @@ from unittest.mock import Mock, patch
 
 # Add project root to path
 
-from src.utils.open_ai_integration import OpenAIIntegration
+from coldwind.core.utils.open_ai_integration import OpenAIIntegration
 import openai
 
 

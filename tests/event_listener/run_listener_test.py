@@ -29,7 +29,7 @@ from rich.panel import Panel
 
 # Add project root to path
 
-from src.utils.listeners.rich_status_listen import RichStatusListener
+from coldwind.core.utils.listeners.rich_status_listen import RichStatusListener
 
 
 def basic_test():

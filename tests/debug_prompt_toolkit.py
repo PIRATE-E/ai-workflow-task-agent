@@ -21,8 +21,8 @@ print("="*50)
 
 # Step 1: Register commands
 print("\nStep 1: Register commands...")
-from src.slash_commands.on_run_time_register import OnRunTimeRegistry
-from src.slash_commands.protocol import SlashCommand
+from coldwind.desktop.slash_commands.on_run_time_register import OnRunTimeRegistry
+from coldwind.desktop.slash_commands.protocol import SlashCommand
 
 registry = OnRunTimeRegistry()
 print(f"  Initial registry size: {len(registry)}")
@@ -45,7 +45,7 @@ print(f"  Final registry size: {len(registry)}")
 
 # Step 2: Test completer
 print("\nStep 2: Test ChatCompleter...")
-from src.ui.chatInputHandler import ChatCompleter
+from coldwind.desktop.ui.chatInputHandler import ChatCompleter
 from prompt_toolkit.document import Document
 
 completer = ChatCompleter()

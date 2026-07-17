@@ -9,14 +9,14 @@ class TestRunnerInitialization:
 
     def test_runner_accepts_config(self, minimal_config):
         """Runner should accept BrowserRequiredConfig."""
-        from src.tools.lggraph_tools.tools.browser_tool.runner import Runner
+        from coldwind.core.tools.lggraph_tools.tools.browser_tool.runner import Runner
 
         runner = Runner(minimal_config)
         assert runner is not None
 
     def test_runner_singleton(self, minimal_config):
         """Runner should be a singleton."""
-        from src.tools.lggraph_tools.tools.browser_tool.runner import Runner
+        from coldwind.core.tools.lggraph_tools.tools.browser_tool.runner import Runner
 
         runner1 = Runner(minimal_config)
         runner2 = Runner(minimal_config)
@@ -35,7 +35,7 @@ class TestRunnerLifecycle:
     @pytest.mark.asyncio
     async def test_runner_executes_pre_requirements(self, minimal_config):
         """Runner should execute ON_PRE_REQUIREMENTS phase."""
-        from src.tools.lggraph_tools.tools.browser_tool.runner import Runner
+        from coldwind.core.tools.lggraph_tools.tools.browser_tool.runner import Runner
 
         runner = Runner(minimal_config)
 
@@ -54,8 +54,8 @@ class TestRunnerLifecycle:
     @pytest.mark.asyncio
     async def test_runner_handles_exception(self, minimal_config):
         """Runner should handle exceptions in lifecycle."""
-        from src.tools.lggraph_tools.tools.browser_tool.runner import Runner
-        from src.tools.lggraph_tools.tools.browser_tool.Handler import HandlerExceptionRaises
+        from coldwind.core.tools.lggraph_tools.tools.browser_tool.runner import Runner
+        from coldwind.core.tools.lggraph_tools.tools.browser_tool.Handler import HandlerExceptionRaises
 
         runner = Runner(minimal_config)
 

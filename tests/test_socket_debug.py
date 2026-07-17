@@ -17,7 +17,7 @@ from pathlib import Path
 print("=== SOCKET CONNECTION DEBUG ===\n")
 
 # Import settings first
-from src.config import settings
+from coldwind.core.config import settings
 print(f"1. ENABLE_SOCKET_LOGGING: {settings.ENABLE_SOCKET_LOGGING}")
 print(f"2. SOCKET_HOST: {settings.SOCKET_HOST}")
 print(f"3. SOCKET_PORT: {settings.SOCKET_PORT}")
@@ -27,14 +27,14 @@ print(f"4. LOG_DISPLAY_MODE: {settings.LOG_DISPLAY_MODE}")
 print(f"\n5. settings.socket_con before SocketManager: {settings.socket_con}")
 
 # Now try to get connection
-from src.utils.socket_manager import SocketManager
+from coldwind.core.utils.socket_manager import SocketManager
 
 manager = SocketManager()
 print(f"\n6. SocketManager._socket_con: {manager._socket_con}")
 print(f"7. SocketManager._log_server_process: {manager._log_server_process}")
 
 # Check if there's a stale server.lock file
-from src.config import settings as s
+from coldwind.core.config import settings as s
 lock_file = s.BASE_DIR / "basic_logs" / "server.lock"
 print(f"\n8. Lock file exists: {lock_file.exists()}")
 if lock_file.exists():

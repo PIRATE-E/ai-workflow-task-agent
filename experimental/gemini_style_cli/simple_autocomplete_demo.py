@@ -10,7 +10,7 @@ from prompt_toolkit.shortcuts import CompleteStyle
 from rich.panel import Panel
 from rich.text import Text
 
-from src.config import settings
+from coldwind.core.config import settings
 
 # Command registry - exactly like Gemini CLI
 COMMANDS = {
