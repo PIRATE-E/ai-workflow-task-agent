@@ -257,12 +257,12 @@ class SetupDriver(Handler):
                 except Exception as e:
                     raise e
 
-        # Initialize settings for LangChain messages
-        if settings.AIMessage is None and settings.HumanMessage is None:
-            from langchain_core.messages import AIMessage as LangChainAIMessage
-            from langchain_core.messages import HumanMessage as LangChainHumanMessage
-            settings.AIMessage = LangChainAIMessage
-            settings.HumanMessage = LangChainHumanMessage
+        # MIGRATED: the dead `settings.AIMessage = ...` / `settings.HumanMessage = ...`
+        # bootstrap block was removed (legacy writer to deprecated `settings.*` globals;
+        # `settings` is not even imported in this module, so it would have raised
+        # NameError). BrowserUseCompatibleLLM.ainvoke imports langchain's
+        # HumanMessage/AIMessage/SystemMessage inline at each branch — it has no
+        # need for these classes to be published onto a global.
 
         print("[DRIVER] Initializing ModelManager and BrowserUseCompatibleLLM...", flush=True)
         model_manager = ModelManager()
@@ -289,7 +289,9 @@ class SetupDriver(Handler):
             headless=config.headless,
             keep_alive=config.keep_alive,
             record_video_dir=config.video_dir if config.record_video else None,
-            user_data_dir=config.user_data_dir or settings.BROWSER_USE_USER_PROFILE_PATH,
+            # MIGRATED: settings.BROWSER_USE_USER_PROFILE_PATH →
+            # ContextRegistry.get().get_settings().BROWSER_USE_USER_PROFILE_PATH
+            user_data_dir=config.user_data_dir or ContextRegistry.get().get_settings().BROWSER_USE_USER_PROFILE_PATH,
         )
 
         # Store on runner for later use
@@ -386,7 +388,9 @@ class OnStartDriver(Handler):
         config = self.runner.config
 
         session_file_path = Path(
-            config.user_data_dir or settings.BROWSER_USE_USER_PROFILE_PATH) / "custom_sessions.json"
+            # MIGRATED: settings.BROWSER_USE_USER_PROFILE_PATH →
+            # ContextRegistry.get().get_settings().BROWSER_USE_USER_PROFILE_PATH
+            config.user_data_dir or ContextRegistry.get().get_settings().BROWSER_USE_USER_PROFILE_PATH) / "custom_sessions.json"
 
         if not session_file_path.exists():
             print("[DRIVER] No custom session file found, starting fresh.")
@@ -736,7 +740,9 @@ class OnCompleteDriver(Handler):
 
             # Save to file
             session_file_path = Path(
-                config.user_data_dir or settings.BROWSER_USE_USER_PROFILE_PATH) / 'custom_sessions.json'
+                # MIGRATED: settings.BROWSER_USE_USER_PROFILE_PATH →
+                # ContextRegistry.get().get_settings().BROWSER_USE_USER_PROFILE_PATH
+                config.user_data_dir or ContextRegistry.get().get_settings().BROWSER_USE_USER_PROFILE_PATH) / 'custom_sessions.json'
             async with aiofiles.open(session_file_path, 'w', encoding='utf-8') as f:
                 await f.write(json.dumps(session_data, indent=2))
 

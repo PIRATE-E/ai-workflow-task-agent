@@ -1,3 +1,4 @@
+from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
 from typing import Any
 
 from coldwind.core.mcp.manager import MCP_Manager
@@ -16,9 +17,9 @@ def file_system_tool(**kwargs) -> str | dict | list[dict[str, Any]]:
 
     try:
         # Safe debug system_logging
-        from coldwind.desktop.ui.diagnostics.debug_helpers import debug_info
+        
 
-        debug_info(
+        ContextRegistry.get().get_logger().log_info(
             heading="MCP_FILESYSTEM • CALL",
             body="Calling MCP server",
             metadata={"kwargs_preview": str(kwargs)[:100], "kwargs_count": len(kwargs)},
@@ -30,7 +31,7 @@ def file_system_tool(**kwargs) -> str | dict | list[dict[str, Any]]:
         arguments = kwargs
         response = MCP_Manager.call_mcp_server("filesystem", tool_name, arguments)
 
-        debug_info(
+        ContextRegistry.get().get_logger().log_info(
             heading="MCP_FILESYSTEM • PARAMETERS",
             body=f"Tool: {tool_name}",
             metadata={"tool_name": tool_name, "arguments": arguments},
@@ -42,7 +43,7 @@ def file_system_tool(**kwargs) -> str | dict | list[dict[str, Any]]:
         if response.get("success"):
             # Extract the actual content from the structured response
             data = response.get("data")
-            debug_info(
+            ContextRegistry.get().get_logger().log_info(
                 heading="MCP_FILESYSTEM • SUCCESS",
                 body="Response received from MCP server",
                 metadata={
@@ -60,9 +61,9 @@ def file_system_tool(**kwargs) -> str | dict | list[dict[str, Any]]:
         else:
             # Handle error response
             error_msg = response.get("error", "Unknown error occurred")
-            from coldwind.core.utils.debug_helpers import debug_error
+            
 
-            debug_error(
+            ContextRegistry.get().get_logger().log_error(
                 heading="MCP_FILESYSTEM • ERROR",
                 body=f"Error from MCP server: {error_msg}",
                 metadata={"error_message": error_msg, "response": response},

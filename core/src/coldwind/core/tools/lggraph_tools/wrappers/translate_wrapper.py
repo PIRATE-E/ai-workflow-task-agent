@@ -1,3 +1,5 @@
+from langchain_core.messages import AIMessage
+
 from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
 from coldwind.core.tools.lggraph_tools.tool_response_manager import ToolResponseManager
 
@@ -23,4 +25,4 @@ class TranslateToolWrapper:
         # Call the translate_text function with the message and target language
         result = translate_text(self.message, self.target_language)
         if result is not None:
-            ToolResponseManager().set_response([settings.AIMessage(content=result)])
+            ToolResponseManager().set_response([AIMessage(content=result)])

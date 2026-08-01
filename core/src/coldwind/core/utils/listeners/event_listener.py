@@ -4,17 +4,18 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Dict, List, Callable
 
+from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
+
 # 🔧 Structured diagnostics
 try:
-    from coldwind.desktop.ui.diagnostics.debug_helpers import debug_error, debug_info
     from coldwind.desktop.ui.diagnostics.rich_traceback_manager import RichTracebackManager
 except ImportError:  # Fallback minimal stubs if diagnostics not yet loaded
 
     def debug_error(heading: str, body: str, metadata=None):
-        print(f"[ERROR] {heading}: {body} | {metadata}")
+        ContextRegistry.get().get_logger().log_error(heading, body, metadata)
 
     def debug_info(heading: str, body: str, metadata=None):
-        print(f"[INFO] {heading}: {body} | {metadata}")
+        ContextRegistry.get().get_logger().log_info(heading, body, metadata)
 
     class RichTracebackManager:  # type: ignore
         @staticmethod
@@ -109,7 +110,7 @@ class EventListener:
                     key=lambda l: self.listener_priority.get((event_type, l), 0),
                     reverse=True,
                 )
-                debug_info(
+                ContextRegistry.get().get_logger().log_info(
                     heading="EVENT_LISTENER • REGISTERED",
                     body=f"Listener registered for {event_type.name}",
                     metadata={
@@ -130,7 +131,7 @@ class EventListener:
                     self.listeners[event_type].remove(listener)
                     self.listener_priority.pop((event_type, listener), None)
                     self.listener_filter.pop(listener, None)
-                    debug_info(
+                    ContextRegistry.get().get_logger().log_info(
                         heading="EVENT_LISTENER • UNREGISTERED",
                         body=f"Listener removed for {event_type.name}",
                         metadata={
@@ -166,7 +167,7 @@ class EventListener:
                             else [],
                         },
                     )
-                    debug_error(
+                    ContextRegistry.get().get_logger().log_error(
                         heading="EVENT_LISTENER • FILTER_ERROR",
                         body=f"Filter failed for listener {listener_name}",
                         metadata={"error": str(filter_err)},
@@ -194,7 +195,7 @@ class EventListener:
                             ),
                         },
                     )
-                    debug_error(
+                    ContextRegistry.get().get_logger().log_error(
                         heading="EVENT_LISTENER • CALLBACK_ERROR",
                         body=f"Unhandled exception in listener {listener_name}",
                         metadata={

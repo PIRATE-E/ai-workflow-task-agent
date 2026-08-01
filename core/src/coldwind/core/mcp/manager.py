@@ -48,11 +48,7 @@ from coldwind.core.mcp.mcp_register_structure import (
 )
 
 # ✅ Structured Debug Helpers
-from coldwind.desktop.ui.diagnostics.debug_helpers import (
-    debug_info,
-    debug_warning,
-    debug_error,
-)
+
 
 # 🎨 Rich Traceback Integration
 from coldwind.desktop.ui.diagnostics.rich_traceback_manager import (
@@ -298,7 +294,7 @@ class MCP_Manager:
             status="stopped",
             pid=None,
         )
-        debug_info(
+        ContextRegistry.get().get_logger().log_info(
             heading="MCP • SERVER_ADDED",
             body=f"Registered server '{name}' (runner={runner})",
             metadata={"package": package, "args": args},
@@ -349,7 +345,7 @@ class MCP_Manager:
             >>> print(tools.keys())  # ['list_repos', 'search_code', ...]
         """
         if mcp_server_name not in cls.mcp_servers:
-            debug_warning(
+            ContextRegistry.get().get_logger().log_warning(
                 heading="MCP • TOOL_DISCOVERY_MISSED",
                 body="Requested tool discovery on unknown server",
                 metadata={"server": mcp_server_name},
@@ -372,7 +368,7 @@ class MCP_Manager:
             try:
                 response_line = proc.stdout.readline().strip()
                 if not response_line:
-                    debug_warning(
+                    ContextRegistry.get().get_logger().log_warning(
                         heading="MCP • TOOL_DISCOVERY_EMPTY_RESPONSE",
                         body="Server returned empty response for tools/list",
                         metadata={"server": mcp_server_name},
@@ -391,7 +387,7 @@ class MCP_Manager:
                     else:
                         # Final fallback: decode with error replacement
                         response_line = response_line.decode("utf-8", errors="replace")
-                        debug_warning(
+                        ContextRegistry.get().get_logger().log_warning(
                             heading="MCP • TOOL_DISCOVERY_ENCODING_FALLBACK",
                             body="Used encoding fallback with character replacement",
                             metadata={"server": mcp_server_name},
@@ -406,7 +402,7 @@ class MCP_Manager:
                         response_line = response_line.encode(
                             "utf-8", errors="replace"
                         ).decode("utf-8")
-                        debug_warning(
+                        ContextRegistry.get().get_logger().log_warning(
                             heading="MCP • TOOL_DISCOVERY_STRING_ENCODING_FIX",
                             body="Fixed string encoding issues",
                             metadata={"server": mcp_server_name},
@@ -415,14 +411,14 @@ class MCP_Manager:
                 response_line_json = json.loads(response_line)
 
             except UnicodeDecodeError as encoding_error:
-                debug_error(
+                ContextRegistry.get().get_logger().log_error(
                     heading="MCP • TOOL_DISCOVERY_ENCODING_ERROR",
                     body=f"All encoding strategies failed: {encoding_error}",
                     metadata={"server": mcp_server_name},
                 )
                 return {}
             except json.JSONDecodeError as json_error:
-                debug_error(
+                ContextRegistry.get().get_logger().log_error(
                     heading="MCP • TOOL_DISCOVERY_JSON_ERROR",
                     body=f"JSON parsing failed: {json_error}",
                     metadata={
@@ -438,7 +434,7 @@ class MCP_Manager:
                 error_code = error_info.get("code", "unknown")
                 error_message = error_info.get("message", "unknown error")
 
-                debug_warning(
+                ContextRegistry.get().get_logger().log_warning(
                     heading="MCP • TOOL_DISCOVERY_SERVER_ERROR",
                     body=f"Server returned error: {error_message} (code: {error_code})",
                     metadata={
@@ -451,7 +447,7 @@ class MCP_Manager:
 
                 # For git server, this might be normal - just continue without tools
                 if mcp_server_name == "git" and error_code == -32602:
-                    debug_info(
+                    ContextRegistry.get().get_logger().log_info(
                         heading="MCP • GIT_SERVER_PROTOCOL_ISSUE",
                         body="Git server has different protocol requirements, continuing without tools",
                         metadata={"server": mcp_server_name},
@@ -465,7 +461,7 @@ class MCP_Manager:
                 and "tools" in response_line_json["result"]
             ):
                 tools_found = response_line_json["result"]["tools"]
-                debug_info(
+                ContextRegistry.get().get_logger().log_info(
                     heading="MCP • TOOLS_DISCOVERED",
                     body=f"Discovered {len(tools_found)} tools",
                     metadata={
@@ -479,13 +475,13 @@ class MCP_Manager:
                         MCP_Manager.mcp_servers[mcp_server_name].get("wrapper"),
                     )
                 else:
-                    debug_warning(
+                    ContextRegistry.get().get_logger().log_warning(
                         heading="MCP • NO_TOOLS",
                         body="Server returned empty tool list",
                         metadata={"server": mcp_server_name},
                     )
             else:
-                debug_error(
+                ContextRegistry.get().get_logger().log_error(
                     heading="MCP • INVALID_TOOL_RESPONSE",
                     body="Server returned unexpected tools/list format",
                     metadata={
@@ -496,7 +492,7 @@ class MCP_Manager:
             return response_line_json
 
         except Exception as discovery_error:
-            debug_error(
+            ContextRegistry.get().get_logger().log_error(
                 heading="MCP • TOOL_DISCOVERY_EXCEPTION",
                 body=f"Tool discovery failed with exception: {discovery_error}",
                 metadata={
@@ -561,7 +557,7 @@ class MCP_Manager:
                 args = server_info.get("args", [])
 
                 # 🔧 DEBUG: Add comprehensive debugging
-                debug_info(
+                ContextRegistry.get().get_logger().log_info(
                     heading="MCP • DEBUG_SERVER_START",
                     body=f"Starting server '{name}' with detailed debug info",
                     metadata={
@@ -583,7 +579,7 @@ class MCP_Manager:
 
                     command = [command_str] + args
 
-                    debug_info(
+                    ContextRegistry.get().get_logger().log_info(
                         heading="MCP • DEBUG_COMMAND_ARRAY",
                         body=f"Command array created for '{name}'",
                         metadata={
@@ -597,7 +593,7 @@ class MCP_Manager:
                     )
 
                 except Exception as cmd_error:
-                    debug_error(
+                    ContextRegistry.get().get_logger().log_error(
                         heading="MCP • DEBUG_COMMAND_ERROR",
                         body=f"Error creating command for '{name}': {cmd_error}",
                         metadata={"server": name, "runner": str(runner)},
@@ -605,20 +601,25 @@ class MCP_Manager:
                     return False
 
                 # Check working directory
+                # MIGRATED: settings.BASE_DIR → ContextRegistry.get().get_settings().BASE_DIR
                 try:
-                    working_dir = str(settings.BASE_DIR.parent.resolve())
-                    debug_info(
+                    working_dir = str(
+                        ContextRegistry.get().get_settings().BASE_DIR.parent.resolve()
+                    )
+                    ContextRegistry.get().get_logger().log_info(
                         heading="MCP • DEBUG_WORKING_DIR",
                         body=f"Working directory for '{name}': {working_dir}",
                         metadata={
                             "server": name,
                             "working_dir": working_dir,
-                            "base_dir": str(settings.BASE_DIR),
+                            "base_dir": str(
+                                ContextRegistry.get().get_settings().BASE_DIR
+                            ),
                             "parent_exists": pathlib.Path(working_dir).exists(),
                         },
                     )
                 except Exception as wd_error:
-                    debug_error(
+                    ContextRegistry.get().get_logger().log_error(
                         heading="MCP • DEBUG_WORKING_DIR_ERROR",
                         body=f"Error getting working directory: {wd_error}",
                         metadata={"server": name},
@@ -652,7 +653,7 @@ class MCP_Manager:
                         "failed"  # Set to failed until handshake completes
                     )
 
-                    debug_info(
+                    ContextRegistry.get().get_logger().log_info(
                         heading="MCP • SERVER_PROCESS_STARTED",
                         body=f"Successfully started process for '{name}'",
                         metadata={
@@ -681,7 +682,7 @@ class MCP_Manager:
                         server_process.stdin.write(json.dumps(init_request) + "\n")
                         server_process.stdin.flush()
                         init_response = server_process.stdout.readline()
-                        debug_info(
+                        ContextRegistry.get().get_logger().log_info(
                             heading="MCP • SERVER_INITIALIZED",
                             body=f"Handshake completed for '{name}'",
                             metadata={"init_response_preview": init_response[:120]},
@@ -700,7 +701,7 @@ class MCP_Manager:
                                 server_info["status"] = "running"
 
                             else:
-                                debug_warning(
+                                ContextRegistry.get().get_logger().log_warning(
                                     heading="MCP • DISCOVERY_EMPTY",
                                     body="No tools returned after discovery",
                                     metadata={"server": name},
@@ -714,7 +715,7 @@ class MCP_Manager:
                                     "init_response": str(init_response),
                                 },
                             )
-                            debug_error(
+                            ContextRegistry.get().get_logger().log_error(
                                 heading="MCP • DISCOVERY_ERROR",
                                 body=f"Tool discovery failed: {tool_discovery_error}",
                                 metadata={"server": name},
@@ -730,14 +731,14 @@ class MCP_Manager:
                                 "process_id": server_process.pid,
                             },
                         )
-                        debug_warning(
+                        ContextRegistry.get().get_logger().log_warning(
                             heading="MCP • INIT_FAILED",
                             body=f"Initialization failed: {init_error}",
                             metadata={"server": name},
                         )
                         return False  # Server process started but handshake failed, treat as failure for now
 
-                    debug_info(
+                    ContextRegistry.get().get_logger().log_info(
                         heading="MCP • SERVER_STARTED",
                         body=f"Started server '{name}'",
                         metadata={"args": args},
@@ -754,7 +755,7 @@ class MCP_Manager:
                             "runner": runner,
                         },
                     )
-                    debug_error(
+                    ContextRegistry.get().get_logger().log_error(
                         heading="MCP • PROCESS_ERROR",
                         body=f"Command failed: {process_error}",
                         metadata={"server": name, "command": str(command)},
@@ -770,14 +771,14 @@ class MCP_Manager:
                             "runner": runner,
                         },
                     )
-                    debug_error(
+                    ContextRegistry.get().get_logger().log_error(
                         heading="MCP • STARTUP_ERROR",
                         body=f"Failed to start server: {e}",
                         metadata={"server": name},
                     )
                     return False
             else:
-                debug_error(
+                ContextRegistry.get().get_logger().log_error(
                     heading="MCP • UNKNOWN_SERVER",
                     body="Attempted to start non-existent server",
                     metadata={"server": name},
@@ -789,7 +790,7 @@ class MCP_Manager:
                 context=f"MCP Server Startup Wrapper - {name}",
                 extra_context={"server_name": name},
             )
-            debug_error(
+            ContextRegistry.get().get_logger().log_error(
                 heading="MCP • CRITICAL_START_ERROR",
                 body=f"Critical error starting server: {e}",
                 metadata={"server": name},
@@ -824,8 +825,10 @@ class MCP_Manager:
             True  # If MCP_ENABLED=true in config
         """
         # Perform any necessary initialization here
-        MCP_Manager.mcp_enabled = settings.MCP_CONFIG.get("MCP_ENABLED")
-        debug_info(
+        # MIGRATED: settings.MCP_CONFIG.get('MCP_ENABLED') →
+        # ContextRegistry.get().get_settings().mcp_config.get('MCP_ENABLED')
+        MCP_Manager.mcp_enabled = ContextRegistry.get().get_settings().mcp_enabled
+        ContextRegistry.get().get_logger().log_info(
             heading="MCP • MANAGER_INIT",
             body="MCP Manager initialized",
             metadata={"enabled": bool(MCP_Manager.mcp_enabled)},
@@ -889,13 +892,13 @@ class MCP_Manager:
         # Check if server exists and is running
         if name not in MCP_Manager.mcp_servers:
             msg = f"Server '{name}' not found"
-            debug_error(heading="MCP • CALL_ERROR", body=msg, metadata={"server": name})
+            ContextRegistry.get().get_logger().log_error(heading="MCP • CALL_ERROR", body=msg, metadata={"server": name})
             return {"success": False, "error": msg}
         if MCP_Manager.mcp_servers[name]["status"] != "running":
             msg = f"Server '{name}' is not running"
-            debug_error(heading="MCP • CALL_ERROR", body=msg, metadata={"server": name})
+            ContextRegistry.get().get_logger().log_error(heading="MCP • CALL_ERROR", body=msg, metadata={"server": name})
             return {"success": False, "error": msg}
-        debug_info(
+        ContextRegistry.get().get_logger().log_info(
             heading="MCP • TOOL_CALL",
             body=f"Calling tool '{tool_name}'",
             metadata={"server": name, "args": args},
@@ -903,7 +906,7 @@ class MCP_Manager:
         proc = MCP_Manager.running_servers.get(name)
         if not proc:
             msg = f"Server '{name}' process not found"
-            debug_error(heading="MCP • CALL_ERROR", body=msg, metadata={"server": name})
+            ContextRegistry.get().get_logger().log_error(heading="MCP • CALL_ERROR", body=msg, metadata={"server": name})
             return {"success": False, "error": msg}
         try:
             mcp_request = {
@@ -920,7 +923,7 @@ class MCP_Manager:
                 response_line = proc.stdout.readline().strip()
                 if not response_line:
                     msg = f"No response from server '{name}'"
-                    debug_error(
+                    ContextRegistry.get().get_logger().log_error(
                         heading="MCP • CALL_ERROR", body=msg, metadata={"server": name}
                     )
                     return {"success": False, "error": msg}
@@ -937,7 +940,7 @@ class MCP_Manager:
                     else:
                         # Final fallback: decode with error replacement
                         response_line = response_line.decode("utf-8", errors="replace")
-                        debug_warning(
+                        ContextRegistry.get().get_logger().log_warning(
                             heading="MCP • CALL_ENCODING_FALLBACK",
                             body="Used encoding fallback with character replacement for tool call",
                             metadata={"server": name, "tool": tool_name},
@@ -952,7 +955,7 @@ class MCP_Manager:
                         response_line = response_line.encode(
                             "utf-8", errors="replace"
                         ).decode("utf-8")
-                        debug_warning(
+                        ContextRegistry.get().get_logger().log_warning(
                             heading="MCP • CALL_STRING_ENCODING_FIX",
                             body="Fixed string encoding issues in tool call response",
                             metadata={"server": name, "tool": tool_name},
@@ -960,7 +963,7 @@ class MCP_Manager:
 
             except UnicodeDecodeError as encoding_error:
                 msg = f"Encoding error reading response: {encoding_error}"
-                debug_error(
+                ContextRegistry.get().get_logger().log_error(
                     heading="MCP • CALL_ENCODING_ERROR",
                     body=msg,
                     metadata={"server": name, "tool": tool_name},
@@ -971,20 +974,20 @@ class MCP_Manager:
                 json_response = json.loads(response_line)
                 if "error" in json_response:
                     msg = f"MCP server error: {json_response['error']}"
-                    debug_error(
+                    ContextRegistry.get().get_logger().log_error(
                         heading="MCP • TOOL_ERROR",
                         body=msg,
                         metadata={"server": name, "tool": tool_name},
                     )
                     return {"success": False, "error": msg}
                 if "result" in json_response:
-                    debug_info(
+                    ContextRegistry.get().get_logger().log_info(
                         heading="MCP • TOOL_SUCCESS",
                         body="Tool executed successfully",
                         metadata={"server": name, "tool": tool_name},
                     )
                     return {"success": True, "data": json_response["result"]}
-                debug_warning(
+                ContextRegistry.get().get_logger().log_warning(
                     heading="MCP • NO_RESULT_FIELD",
                     body="Response missing 'result' field; returning raw payload",
                     metadata={"server": name, "tool": tool_name},
@@ -992,7 +995,7 @@ class MCP_Manager:
                 return {"success": True, "data": json_response}
             except json.JSONDecodeError as e:
                 msg = f"Invalid JSON response: {e}"
-                debug_error(
+                ContextRegistry.get().get_logger().log_error(
                     heading="MCP • PARSE_ERROR",
                     body=msg,
                     metadata={"server": name, "tool": tool_name},
@@ -1000,7 +1003,7 @@ class MCP_Manager:
                 return {"success": False, "error": msg, "raw_response": response_line}
         except Exception as e:
             msg = f"Communication error: {e}"
-            debug_error(
+            ContextRegistry.get().get_logger().log_error(
                 heading="MCP • COMM_ERROR",
                 body=msg,
                 metadata={"server": name, "tool": tool_name},
@@ -1046,7 +1049,7 @@ class MCP_Manager:
             False  # Server not running
         """
         if name not in cls.running_servers:
-            debug_warning(
+            ContextRegistry.get().get_logger().log_warning(
                 heading="MCP • STOP_IGNORED",
                 body="Stop requested for server not running",
                 metadata={"server": name},
@@ -1058,14 +1061,14 @@ class MCP_Manager:
             proc.wait(timeout=5)
             del cls.running_servers[name]
             cls.mcp_servers[name]["status"] = "stopped"
-            debug_info(
+            ContextRegistry.get().get_logger().log_info(
                 heading="MCP • SERVER_STOPPED",
                 body="Server stopped successfully",
                 metadata={"server": name},
             )
             return True
         except Exception as e:
-            debug_error(
+            ContextRegistry.get().get_logger().log_error(
                 heading="MCP • STOP_ERROR",
                 body=f"Failed to stop server: {e}",
                 metadata={"server": name},
@@ -1109,7 +1112,7 @@ class MCP_Manager:
             True  # All servers stopped successfully
         """
         if not cls.running_servers:
-            debug_info(
+            ContextRegistry.get().get_logger().log_info(
                 heading="MCP • STOP_ALL_SKIP",
                 body="No running servers to stop",
                 metadata={},
@@ -1121,20 +1124,20 @@ class MCP_Manager:
                 if not cls.stop_server(server_name):
                     success = False
             except Exception as e:
-                debug_error(
+                ContextRegistry.get().get_logger().log_error(
                     heading="MCP • STOP_ALL_ERROR",
                     body=f"Exception stopping '{server_name}': {e}",
                     metadata={"server": server_name},
                 )
                 success = False
         if success:
-            debug_info(
+            ContextRegistry.get().get_logger().log_info(
                 heading="MCP • STOP_ALL_COMPLETE",
                 body="All servers stopped",
                 metadata={},
             )
         else:
-            debug_warning(
+            ContextRegistry.get().get_logger().log_warning(
                 heading="MCP • STOP_ALL_PARTIAL",
                 body="Some servers failed to stop",
                 metadata={},
@@ -1177,7 +1180,7 @@ class MCP_Manager:
         try:
             cls.stop_all_servers()
         except Exception as e:
-            debug_error(
+            ContextRegistry.get().get_logger().log_error(
                 heading="MCP • CLEANUP_ERROR", body=f"Cleanup failed: {e}", metadata={}
             )
 
@@ -1224,7 +1227,7 @@ class MCP_Manager:
 
         if server_name not in cls.mcp_servers:
             msg = f"Server '{server_name}' not found"
-            debug_error(
+            ContextRegistry.get().get_logger().log_error(
                 heading="MCP • URI_READ_ERROR",
                 body=msg,
                 metadata={"server": server_name},
@@ -1232,13 +1235,13 @@ class MCP_Manager:
             return {"success": False, "error": msg}
         if MCP_Manager.mcp_servers[server_name]["status"] != "running":
             msg = f"Server '{server_name}' is not running"
-            debug_error(
+            ContextRegistry.get().get_logger().log_error(
                 heading="MCP • URI_READ_ERROR",
                 body=msg,
                 metadata={"server": server_name},
             )
             return {"success": False, "error": msg}
-        debug_info(
+        ContextRegistry.get().get_logger().log_info(
             heading="MCP • URI_READ",
             body=f"Reading URI resource '{uri_resource}'",
             metadata={"server": server_name, "uri": uri_resource},
@@ -1246,7 +1249,7 @@ class MCP_Manager:
         proc = MCP_Manager.running_servers.get(server_name)
         if not proc:
             msg = f"Server '{server_name}' process not found"
-            debug_error(
+            ContextRegistry.get().get_logger().log_error(
                 heading="MCP • URI_READ_ERROR",
                 body=msg,
                 metadata={"server": server_name},
@@ -1266,7 +1269,7 @@ class MCP_Manager:
                 response_line = proc.stdout.readline().strip()
                 if not response_line:
                     msg = f"No response from server '{server_name}'"
-                    debug_error(
+                    ContextRegistry.get().get_logger().log_error(
                         heading="MCP • URI_READ_ERROR",
                         body=msg,
                         metadata={"server": server_name},
@@ -1285,7 +1288,7 @@ class MCP_Manager:
                     else:
                         # Final fallback: decode with error replacement
                         response_line = response_line.decode("utf-8", errors="replace")
-                        debug_warning(
+                        ContextRegistry.get().get_logger().log_warning(
                             heading="MCP • URI_READ_ENCODING_FALLBACK",
                             body="Used encoding fallback with character replacement for URI read",
                             metadata={"server": server_name, "uri": uri_resource},
@@ -1300,14 +1303,14 @@ class MCP_Manager:
                         response_line = response_line.encode(
                             "utf-8", errors="replace"
                         ).decode("utf-8")
-                        debug_warning(
+                        ContextRegistry.get().get_logger().log_warning(
                             heading="MCP • URI_READ_STRING_ENCODING_FIX",
                             body="Fixed string encoding issues in URI read response",
                             metadata={"server": server_name, "uri": uri_resource},
                         )
             except UnicodeDecodeError as encoding_error:
                 msg = f"Encoding error reading response: {encoding_error}"
-                debug_error(
+                ContextRegistry.get().get_logger().log_error(
                     heading="MCP • URI_READ_ENCODING_ERROR",
                     body=msg,
                     metadata={"server": server_name, "uri": uri_resource},
@@ -1317,7 +1320,7 @@ class MCP_Manager:
                 json_response = json.loads(response_line)
                 if "error" in json_response:
                     msg = f"MCP server error: {json_response['error']}"
-                    debug_error(
+                    ContextRegistry.get().get_logger().log_error(
                         heading="MCP • URI_READ_TOOL_ERROR",
                         body=msg,
                         metadata={"server": server_name, "uri": uri_resource},
@@ -1325,13 +1328,13 @@ class MCP_Manager:
                     return {"success": False, "error": msg}
                 ## pass main successful response
                 if "result" in json_response:
-                    debug_info(
+                    ContextRegistry.get().get_logger().log_info(
                         heading="MCP • URI_READ_SUCCESS",
                         body="URI resource read successfully",
                         metadata={"server": server_name, "uri": uri_resource},
                     )
                     return {"success": True, "data": json_response["result"]}
-                debug_warning(
+                ContextRegistry.get().get_logger().log_warning(
                     heading="MCP • URI_READ_NO_RESULT_FIELD",
                     body="Response missing 'result' field; returning raw payload",
                     metadata={"server": server_name, "uri": uri_resource},
@@ -1340,7 +1343,7 @@ class MCP_Manager:
                 return {"success": True, "data": json_response}
             except json.JSONDecodeError as e:
                 msg = f"Invalid JSON response: {e}"
-                debug_error(
+                ContextRegistry.get().get_logger().log_error(
                     heading="MCP • URI_READ_PARSE_ERROR",
                     body=msg,
                     metadata={"server": server_name, "uri": uri_resource},
@@ -1348,10 +1351,9 @@ class MCP_Manager:
                 return {"success": False, "error": msg, "raw_response": response_line}
         except Exception as e:
             msg = f"Communication error: {e}"
-            debug_error(
+            ContextRegistry.get().get_logger().log_error(
                 heading="MCP • URI_READ_COMM_ERROR",
                 body=msg,
                 metadata={"server": server_name, "uri": uri_resource},
             )
             return {"success": False, "error": msg}
-

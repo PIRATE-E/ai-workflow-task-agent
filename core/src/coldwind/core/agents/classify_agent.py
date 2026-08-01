@@ -3,7 +3,7 @@ from langchain_core.messages import HumanMessage
 from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
 from coldwind.core.models.state import StateAccessor
 from coldwind.core.tools.lggraph_tools.tool_assign import ToolAssign
-from coldwind.desktop.ui.diagnostics.debug_helpers import debug_info
+
 from coldwind.core.utils.model_manager import ModelManager
 from coldwind.desktop.slash_commands.parser import ParseCommand
 from coldwind.desktop.slash_commands.executionar import ExecutionAr
@@ -18,7 +18,7 @@ def classify_message_type(state) -> dict:
         /llm, /tool, and /agent. If no valid command is detected, the default route is /llm.
     """
     print("\t\t----Node is classify_message")
-    console = settings.console
+    console = ContextRegistry.get().get_console()
 
     # Access state directly from LangGraph parameter (no sync needed)
     messages = state.get("messages", [])
@@ -144,8 +144,8 @@ Classify thoughtfully based on true user intent, not just keywords."""
 
     response = llm.invoke(
         [
-            settings.HumanMessage(content=system_prompt),
-            settings.HumanMessage(content=content),
+            HumanMessage(content=system_prompt),
+            HumanMessage(content=content),
         ],
     )
 

@@ -11,7 +11,7 @@ which is more graceful way to exit the application
 
 from coldwind.core.utils.listeners.event_listener import EventListener
 from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
-from coldwind.desktop.ui.diagnostics.debug_helpers import debug_critical, debug_info
+
 
 class ExitListener:
     """
@@ -32,7 +32,8 @@ class ExitListener:
         self.ticket_sources = []  # Track where tickets came from
 
         # Initialize previous flag state
-        self.previous_exit_flag = settings.exit_flag
+        # MIGRATED: settings.exit_flag → ContextRegistry.get().is_exiting()
+        self.previous_exit_flag = ContextRegistry.get().is_exiting()
         ExitListener.manager = EventListener.EventManager()
 
     def check_condition(self, event_data) -> bool:
@@ -69,7 +70,7 @@ class ExitListener:
             filter_func=self.check_condition
         )
 
-        debug_info(
+        ContextRegistry.get().get_logger().log_info(
             heading="EXIT_LISTENER • REGISTERED",
             body="Two-emit exit system registered successfully",
             metadata={
@@ -94,7 +95,8 @@ class ExitListener:
             source_name: Human-readable name for the source
         """
         # Get current flag state for proper old_value
-        current_flag = settings.exit_flag
+        # MIGRATED: settings.exit_flag → ContextRegistry.get().is_exiting()
+        current_flag = ContextRegistry.get().is_exiting()
 
         # Always set flag to True when issuing ticket
         ContextRegistry.get().request_exit()
@@ -111,7 +113,7 @@ class ExitListener:
             },
         )
 
-        debug_info(
+        ContextRegistry.get().get_logger().log_info(
             heading="EXIT_LISTENER • TICKET_ISSUED",
             body=f"Exit ticket issued by {source_name}",
             metadata={
@@ -150,7 +152,7 @@ class ExitListener:
             self.exit_tickets_received += 1
             self.ticket_sources.append(ticket_source)
 
-            debug_critical(
+            ContextRegistry.get().get_logger().log_critical(
                 heading="EXIT_LISTENER • TICKET_COLLECTED",
                 body=f"Exit ticket #{self.exit_tickets_received}/{self.required_tickets} from {ticket_source}",
                 metadata={
@@ -166,7 +168,7 @@ class ExitListener:
 
             # ✅ Only exit when we have enough tickets
             if self.exit_tickets_received >= self.required_tickets:
-                debug_critical(
+                ContextRegistry.get().get_logger().log_critical(
                     heading="EXIT_LISTENER • EXIT_TRIGGERED",
                     body=f"All {self.required_tickets} tickets collected! Exiting application.",
                     metadata={
@@ -177,7 +179,7 @@ class ExitListener:
                 self.on_event()
             else:
                 remaining = self.required_tickets - self.exit_tickets_received
-                debug_info(
+                ContextRegistry.get().get_logger().log_info(
                     heading="EXIT_LISTENER • WAITING",
                     body=f"Waiting for {remaining} more ticket(s) before exit",
                     metadata={

@@ -24,7 +24,7 @@ if __package__ is None:
 # browser dependencies - only import what's needed for BrowserUseCompatibleLLM in parent process
 
 from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
-from coldwind.desktop.ui.diagnostics.debug_helpers import debug_info
+
 
 # Import Runner and config for event-driven execution
 from coldwind.core.tools.lggraph_tools.tools.browser_tool.runner import Runner
@@ -38,13 +38,31 @@ class BrowserHandler:
 
     UPDATE (Feb 2026): Now supports Runner-based event-driven execution via use_runner flag.
     """
-    time_out: int = ContextRegistry.get().get_settings().browser_use_timeout
-    enabled: bool = ContextRegistry.get().get_settings().browser_use_enabled
+    # 🔓 BORN UNASSIGNED (fixes import-time ContextRegistry.get() crash).
+    # Previously these were class-body assignments that called
+    # ContextRegistry.get().get_settings() during class definition — which
+    # crashed because the registry/context is not active at import time.
+    #
+    # Bare annotations (no default) are deliberate: if we forget to populate
+    # them in __init__, the first read raises AttributeError("'BrowserHandler'
+    # object/class has no attribute 'time_out'" / 'enabled') — a loud, local
+    # failure rather than silent wrong behavior. A plausible default like `0`
+    # would mask the bug (subprocess.wait(timeout=0) silently times out).
+    time_out: int
+    enabled: bool
     running_processes: List[subprocess.Popen] = []
 
     # Flag to switch between legacy subprocess and new Runner-based execution
 
     def __init__(self, query: str, head_less_mode: bool = False, log: bool = True, keep_alive: bool = True):
+        # Resolve config at the very top, before any read (professional
+        # pattern — the active context must exist by the time a BrowserHandler
+        # is constructed, which is always post-boot). Missing registry/context
+        # raises RuntimeError here, loudly and at the right layer.
+        _settings = ContextRegistry.get().get_settings()
+        BrowserHandler.time_out = _settings.browser_use_timeout
+        BrowserHandler.enabled = _settings.browser_use_enabled
+
         if not self.enabled:
             raise RuntimeError("Browser use tool is disabled in the settings.")
         self.query = query
@@ -65,7 +83,8 @@ class BrowserHandler:
         # result_file_name = f"browser_result_{uuid.uuid4().hex}.json"
         # self.result_file = settings.BASE_DIR / "basic_logs" / result_file_name
         # self.result_file.parent.mkdir(parents=True, exist_ok=True)
-        self.result_file = Path(settings.BROWSER_USE_LOG_FILE).resolve()
+        # MIGRATED: settings.BROWSER_USE_LOG_FILE → get_settings().BROWSER_USE_LOG_FILE
+        self.result_file = Path(ContextRegistry.get().get_settings().BROWSER_USE_LOG_FILE).resolve()
 
         # Prepare arguments for subprocess
         args_dict = {
@@ -86,7 +105,8 @@ class BrowserHandler:
         try:
             # Setup stdout/stderr redirection
             if self.log:
-                log_path = settings.BASE_DIR / "basic_logs" / "browser.txt"
+                # MIGRATED: settings.BASE_DIR → get_settings().BASE_DIR
+                log_path = ContextRegistry.get().get_settings().BASE_DIR / "basic_logs" / "browser.txt"
                 log_path.parent.mkdir(parents=True, exist_ok=True)
 
                 # Open log file for subprocess output
@@ -128,7 +148,7 @@ class BrowserHandler:
             self.process_id = self.process.pid
             self.running_processes.append(self.process)
 
-            debug_info(
+            ContextRegistry.get().get_logger().log_info(
                 "BROWSER SUBPROCESS",
                 f"Started browser subprocess with PID: {self.process_id}",
                 metadata={
@@ -221,7 +241,7 @@ class BrowserHandler:
                     process.kill()
                     process.wait()
 
-            debug_info(
+            ContextRegistry.get().get_logger().log_info(
                 "BROWSER TOOL CLEAN UP",
                 f"BrowserHandler: Cleaned up process with PID {process.pid}",
                 metadata={
@@ -272,7 +292,8 @@ def browser_use_tool(query: str, head_less_mode: bool = True, log: bool = True, 
         # Try to log the error if system_logging is enabled
         if log:
             try:
-                log_path = settings.BASE_DIR / "basic_logs" / "browser.txt"
+                # MIGRATED: settings.BASE_DIR → get_settings().BASE_DIR
+                log_path = ContextRegistry.get().get_settings().BASE_DIR / "basic_logs" / "browser.txt"
                 log_path.parent.mkdir(parents=True, exist_ok=True)
                 with open(log_path, "a", encoding="utf-8") as f:
                     f.write(f"\n[ERROR] {error_msg}\n")

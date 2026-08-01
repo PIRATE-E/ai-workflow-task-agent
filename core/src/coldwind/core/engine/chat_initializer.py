@@ -43,6 +43,7 @@ Warning:
     - Network-dependent operations may fail silently
     - Some initialization errors are non-fatal (logged but don't stop startup)
 """
+
 import asyncio
 import gc
 import json
@@ -57,11 +58,19 @@ from rich import console, inspect
 from rich import prompt as rich_prompt  # Renamed to avoid conflict
 
 from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
+from coldwind.core.runtime.runtime_obj_enum import CoreRunTimeObjects
+
+# Legacy `settings` import retained ONLY for the PNG_FILE_PATH path constant until
+# it migrates to DesktopConfig.png_file_path (separate path-migration pass). No
+# runtime objects (console, message classes, socket_con, listeners, neo4j_driver)
+# are read from or written to `settings` anymore in this module — all of them
+# route through ContextRegistry.get() and CoreRunTimeObjects.
+from coldwind.core.config import settings
 from coldwind.core.config.settings import PNG_FILE_PATH
 from coldwind.core.mcp.load_config import McpConfigFile
 from coldwind.core.mcp.manager import MCP_Manager
 from coldwind.core.models.state import StateAccessor, State
-from coldwind.desktop.ui.diagnostics.debug_helpers import debug_warning, debug_info
+
 
 # 🎨 Rich Traceback Integration
 from coldwind.desktop.ui.diagnostics.rich_traceback_manager import (
@@ -69,7 +78,7 @@ from coldwind.desktop.ui.diagnostics.rich_traceback_manager import (
     rich_exception_handler,
 )
 from coldwind.desktop.ui.print_message_style import print_message
-from coldwind.core.utils.socket_manager import SocketManager
+# from coldwind.core.utils.socket_manager import SocketManager
 
 from coldwind.core.utils.listeners.exit_listener import ExitListener
 
@@ -148,7 +157,7 @@ class ChatInitializer:
         if ContextRegistry.get().get_settings().mcp_enabled:
             self._initialize_mcp_servers_sync()
         else:
-            debug_info(
+            ContextRegistry.get().get_logger().log_info(
                 heading="MCP • SKIPPED",
                 body="MCP server initialization skipped (MCP_ENABLED=false)",
                 metadata={"enabled": False},
@@ -163,8 +172,21 @@ class ChatInitializer:
 
     @rich_exception_handler("Core Classes Setup")
     def _set_core_classes(self):
+        """Hook the langchain message classes + desktop socket + exit listener into
+        the canonical runtime channels (ContextRegistry dynamic service store and
+        the concrete slot setters on the active RuntimeContextInterface).
+
+        Migration note: this previously assigned to legacy `settings.*` globals
+        (settings.console / settings.HumanMessage / settings.socket_con /
+        settings.listeners). Those globals are deprecated — all runtime objects
+        now live exclusively on the active context owned by ContextRegistry.
+        The console itself is already created inside DesktopRunTimeContext.__init__,
+        so `self.console` here is kept only as a local convenience handle that
+        mirrors the context's console.
+        """
         try:
-            # Import here to avoid circular imports
+            # Import here to avoid circular imports (chat_initializer is imported
+            # very early; langchain_core only needs to load when we boot messages).
             from langchain_core.messages import HumanMessage, AIMessage, BaseMessage
 
             try:
@@ -174,13 +196,21 @@ class ChatInitializer:
             except Exception:
                 pass
 
-            # we must set the console for rich console to use it in different classes to the settings
-            settings.console = self.console
+            context = ContextRegistry.get()
 
-            # Set message classes for centralized access
-            settings.HumanMessage = HumanMessage
-            settings.AIMessage = AIMessage
-            settings.BaseMessage = BaseMessage
+            # Register the langchain message classes bundle under the canonical
+            # Core-only dynamic-service enum key. Consumers unpack the 3-tuple:
+            #     HumanMessage, AIMessage, BaseMessage = context.get_service(
+            #         CoreRunTimeObjects.message_classes
+            #     )
+            context.register_service(
+                CoreRunTimeObjects.message_classes,
+                (HumanMessage, AIMessage, BaseMessage),
+            )
+
+            # Keep `self.console` as a local handle mirroring the context's console
+            # (the context already owns a Console instance created in __init__).
+            self.console = context.get_console()
 
             # now import the ToolResponseManager to set the response
             from coldwind.core.tools.lggraph_tools.tool_response_manager import (
@@ -189,12 +219,13 @@ class ChatInitializer:
 
             self.ToolResponseManager = ToolResponseManager()
 
-            # Set the socket connection for system_logging
-            settings.socket_con = SocketManager.get_socket_con()
+            # Socket connection lives on the context's slot (disabled legacy auto-spawn).
+            # context.set_socket_connection(SocketManager.get_socket_con())
 
-            # register the exit listener
-            settings.listeners["exit"] = ExitListener()
-            settings.listeners["exit"].register()
+            # register the exit listener on the context's listener slot
+            exit_listener = ExitListener()
+            context.register_listener("exit", exit_listener)
+            exit_listener.register()
 
         except Exception as e:
             RichTracebackManager.handle_exception(
@@ -243,9 +274,14 @@ class ChatInitializer:
             )
         # print the final state for debugging
         inspect(self._state)
+        # Unpack the langchain message bundle from the canonical dynamic store
+        # (previously: settings.AIMessage — the legacy global is no longer set).
+        _HumanMessage, AIMessage, _BaseMessage = ContextRegistry.get().get_service(
+            CoreRunTimeObjects.message_classes
+        )
         return {
             "messages": [
-                settings.AIMessage(content="Thank you for using the LangGraph Chatbot!")
+                AIMessage(content="Thank you for using the LangGraph Chatbot!")
             ]
         }
 
@@ -351,13 +387,13 @@ class ChatInitializer:
             #         None, MCP_Manager.start_server, server_name
             #     )
             #     if not got_start:
-            #         debug_warning(
+            #         ContextRegistry.get().get_logger().log_warning(
             #             heading="MCP Server Startup Failed",
             #             body=f"Failed to start MCP server: {server_name}",
             #             metadata={"server_name": server_name},
             #         )
             #     else:
-            #         debug_info(
+            #         ContextRegistry.get().get_logger().log_info(
             #             heading="MCP Server Started",
             #             body=f"MCP server '{server_name}' started successfully.",
             #             metadata={"server_name": server_name},
@@ -390,7 +426,11 @@ class ChatInitializer:
 
     @rich_exception_handler("Neo4j Database Initialization")
     def initialize_neo4j(self):
-        from coldwind.desktop.ui.diagnostics.debug_helpers import debug_warning, debug_info
+        from coldwind.core.runtime.runtime_obj_enum import CoreRunTimeObjects
+        from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
+        from coldwind.core.interfaces.runtime_interface import (
+            PlatformRuntimeContextInterface,
+        )
 
         """Attempt to initialize Neo4j connection; skip silently if unavailable."""
         try:
@@ -398,28 +438,39 @@ class ChatInitializer:
                 from neo4j import GraphDatabase  # type: ignore
             except Exception:
                 # Neo4j not installed; log and return
-                debug_warning(
+                ContextRegistry.get().get_logger().log_warning(
                     heading="Neo4j Driver Not Found",
                     body="Neo4j driver is not installed. Skipping Neo4j initialization.",
                     metadata={
                         "neo4j_uri": ContextRegistry.get().get_settings().neo4j_uri,
-                        "neo4j_user": ContextRegistry.get().get_settings().neo4j_user,
+                        "neo4j_username": ContextRegistry.get().get_settings().neo4j_username,
                     },
                 )
                 return
             # if neo4j driver is installed, try to create the driver
-            settings.neo4j_driver = GraphDatabase.driver(
-                ContextRegistry.get().get_settings().neo4j_uri,
-                auth=(ContextRegistry.get().get_settings().neo4j_user, ContextRegistry.get().get_settings().neo4j_password),
+            context: PlatformRuntimeContextInterface = ContextRegistry.get()
+            context.register_service(
+                CoreRunTimeObjects.neo4j_driver,
+                GraphDatabase.driver(
+                    ContextRegistry.get().get_settings().neo4j_uri,
+                    auth=(
+                        ContextRegistry.get().get_settings().neo4j_username,
+                        ContextRegistry.get().get_settings().neo4j_password,
+                    ),
+                ),
             )
-            if settings.neo4j_driver is None:
+            # Verify registration succeeded by reading back from the SAME channel we
+            # just wrote to (the dynamic service store). The previous code read the
+            # legacy `settings.neo4j_driver` global which is never assigned in this
+            # path — it stayed None even on success, falsely triggering RuntimeError.
+            if context.get_service(CoreRunTimeObjects.neo4j_driver) is None:
                 raise RuntimeError("Failed to create Neo4j driver.")
-            debug_info(
+            ContextRegistry.get().get_logger().log_info(
                 heading="Neo4j Driver Initialized",
                 body="Neo4j driver created successfully.",
                 metadata={
                     "neo4j_uri": ContextRegistry.get().get_settings().neo4j_uri,
-                    "neo4j_user": ContextRegistry.get().get_settings().neo4j_user,
+                    "neo4j_username": ContextRegistry.get().get_settings().neo4j_username,
                     "driver_status": "created_successfully",
                 },
             )
@@ -430,21 +481,32 @@ class ChatInitializer:
                 context="Neo4j Database Connection (optional)",
                 extra_context={
                     "neo4j_uri": ContextRegistry.get().get_settings().neo4j_uri,
-                    "neo4j_user": ContextRegistry.get().get_settings().neo4j_user,
+                    "neo4j_username": ContextRegistry.get().get_settings().neo4j_username,
                     "driver_status": "failed_to_create_optional",
                 },
             )
-            if settings.socket_con:
-                debug_warning(
+            # Use the new channel for the socket-con existence check — the legacy
+            # `settings.socket_con` write in this file was happening on the wrong
+            # channel for the failure-reporting path too.
+            if ContextRegistry.get().get_socket_connection():
+                ContextRegistry.get().get_logger().log_warning(
                     heading="Neo4j Driver Initialization Failed",
                     body="Neo4j driver initialization failed. Continuing without Neo4j support.",
                     metadata={
                         "neo4j_uri": ContextRegistry.get().get_settings().neo4j_uri,
-                        "neo4j_user": ContextRegistry.get().get_settings().neo4j_user,
+                        "neo4j_username": ContextRegistry.get().get_settings().neo4j_username,
                         "error_message": str(e),
                     },
                 )
-            settings.neo4j_driver = None
+            # Mark the failed driver in the SAME channel that owns Neo4j (the dynamic
+            # service store), not the legacy `settings.neo4j_driver` global. Callers
+            # that ask `get_service(CoreRunTimeObjects.neo4j_driver)` get None here,
+            # matching the actual failure. (Note: register_service is keyed by enum,
+            # so we register the None marker under the same key to preserve the
+            # "we tried and failed" observability without poking another channel.)
+            context = ContextRegistry.get()
+            if CoreRunTimeObjects.neo4j_driver not in context._dynamic_services:
+                context.register_service(CoreRunTimeObjects.neo4j_driver, None)
 
     @rich_exception_handler("Tool Registration")
     def tools_register(self):
@@ -555,7 +617,7 @@ class ChatInitializer:
             ToolAssign.set_tools_list(tools)
             self.tools = ToolAssign.get_tools_list()
 
-            debug_info(
+            ContextRegistry.get().get_logger().log_info(
                 heading="Tools Registered",
                 body=f"Registered {len(self.tools)} tools successfully.",
                 metadata={
@@ -581,6 +643,13 @@ class ChatInitializer:
                 raise ValueError(
                     "Chat is not properly initialized. Please ensure all components are set up."
                 )
+            # Grab the active context once for this loop iteration — all runtime
+            # objects (message classes, exit flag, listeners) are read from here
+            # instead of the deprecated `settings.*` globals.
+            context = ContextRegistry.get()
+            HumanMessage, _AIMessage, _BaseMessage = context.get_service(
+                CoreRunTimeObjects.message_classes
+            )
             # testing new chat input
             # user_input = prompt.Prompt.ask(
             #     "[bold cyan]You[/bold cyan]", default="", show_default=False
@@ -588,7 +657,7 @@ class ChatInitializer:
 
             user_input = InputHandler().get_user_input()
 
-            if user_input.lower() == "exit" or settings.exit_flag:
+            if user_input.lower() == "exit" or context.is_exiting():
                 self.console.print("[bold red]Exiting the chat...[/bold red]")
                 try:
                     self.on_exit()
@@ -602,7 +671,7 @@ class ChatInitializer:
             else:
                 try:
                     self._state["messages"].append(
-                        settings.HumanMessage(content=user_input)
+                        HumanMessage(content=user_input)
                     )
                     print_message(user_input, sender="user")
                     self._state = self.graph.invoke(self._state)
@@ -620,15 +689,15 @@ class ChatInitializer:
                     ):  # Check last 2 messages
 
                         # Only NOW set the flag to True (first time)
-                        ContextRegistry.get().request_exit()
+                        context.request_exit()
 
-                        settings.listeners["exit"].emit_exit_ticket(
+                        context.get_listeners()["exit"].emit_exit_ticket(
                             source_class=ChatInitializer,
                             source_name="workflow_completion",
                         )
                     else:
                         # ✅ CRITICAL FIX: Reset flag to False for non-exit messages
-                        settings.exit_flag = False
+                        context.reset_exit_request()
 
                     try:
                         self.state_accessor.sync_with_langgraph(self._state)
@@ -685,7 +754,7 @@ class ChatInitializer:
         init_thread.start()
         init_thread.join()  # Wait for completion
 
-        debug_info(
+        ContextRegistry.get().get_logger().log_info(
             heading="MCP • SYNC_INIT_COMPLETE",
             body="All MCP servers initialized synchronously",
             metadata={"servers_count": len(MCP_Manager.mcp_servers)},
@@ -693,12 +762,16 @@ class ChatInitializer:
 
     def _register_slash_commands(self):
         """Register core slash commands like /help, /clear, /agent"""
-        from coldwind.desktop.slash_commands.commands.clear import register_clear_command
+        from coldwind.desktop.slash_commands.commands.clear import (
+            register_clear_command,
+        )
         from coldwind.desktop.slash_commands.commands.help import register_help_command
         from coldwind.desktop.slash_commands.commands.exit import register_exit_command
 
         # core/routing slash commands
-        from coldwind.desktop.slash_commands.commands.core_slashs.agent import register_agent_command
+        from coldwind.desktop.slash_commands.commands.core_slashs.agent import (
+            register_agent_command,
+        )
         from coldwind.desktop.slash_commands.commands.core_slashs.chat_llm import (
             register_chat_llm_command,
         )
@@ -730,7 +803,7 @@ class ChatInitializer:
         init_thread.start()
         init_thread.join()  # Wait for completion
 
-        debug_info(
+        ContextRegistry.get().get_logger().log_info(
             heading="Slash Commands Registered",
             body="Core slash commands registered successfully.",
             metadata={},
@@ -761,7 +834,7 @@ class ChatInitializer:
         init_thread = threading.Thread(target=run_async_init)
         init_thread.start()
         init_thread.join()  # Wait for completion
-        debug_info(
+        ContextRegistry.get().get_logger().log_info(
             heading="Logging Handlers Registered",
             body="Core logging handlers registered successfully.",
             metadata={},

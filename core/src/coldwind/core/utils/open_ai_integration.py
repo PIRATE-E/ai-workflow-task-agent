@@ -12,7 +12,12 @@ except ImportError:
 
 from openai import OpenAI, AsyncOpenAI
 
-from coldwind.core.config.settings import OPEN_AI_API_KEY, OPENAI_TIMEOUT, API_DEFAULT_API_MODEL
+from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
+
+# Legacy direct imports removed — config values now accessed via ContextRegistry.get().get_settings()
+# OPENAI_API_KEY → ContextRegistry.get().get_settings().openai_api_key
+# OPENAI_TIMEOUT → ContextRegistry.get().get_settings().openai_timeout
+# API_DEFAULT_API_MODEL → ContextRegistry.get().get_settings().api_default_api_model
 from coldwind.core.utils.listeners.rich_status_listen import RichStatusListener
 
 
@@ -64,18 +69,20 @@ class OpenAIIntegration:
             return
 
         self._initialized = True
-        key = api_key or OPEN_AI_API_KEY
-        self.model = model or ContextRegistry.get().get_settings().api_default_api_model
+        # 🔧 MIGRATION: config values now sourced from ContextRegistry (Pydantic CoreSettings)
+        self._settings = ContextRegistry.get().get_settings()
+        key = api_key or self._settings.openai_api_key
+        self.model = model or self._settings.api_default_api_model
         self.base_url = "https://integrate.api.nvidia.com/v1"
 
         if not key:
             raise ValueError(
-                "API key must be provided either as an argument or through the OPEN_AI_API_KEY environment variable."
+                "API key must be provided either as an argument or through the OPENAI_API_KEY environment variable."
             )
 
         self.api_key = key
         self.client = OpenAI(
-            base_url=self.base_url, api_key=key, timeout=OPENAI_TIMEOUT, max_retries=2
+            base_url=self.base_url, api_key=key, timeout=self._settings.openai_timeout, max_retries=2
         )
 
     async def _get_async_client(self) -> AsyncOpenAI:
@@ -90,7 +97,7 @@ class OpenAIIntegration:
                 self._async_lock = AsyncOpenAI(
                     base_url=self.base_url,
                     api_key=self.api_key,
-                    timeout=OPENAI_TIMEOUT,
+                    timeout=self._settings.openai_timeout,
                     max_retries=2,
                 )
         return self._async_lock
@@ -146,9 +153,9 @@ class OpenAIIntegration:
         """
         # 🔧 FIX: Check circuit breaker first
         if self._is_circuit_open():
-            from coldwind.desktop.ui.diagnostics.debug_helpers import debug_warning
+            
 
-            debug_warning(
+            ContextRegistry.get().get_logger().log_warning(
                 heading="OPENAI • CIRCUIT_BREAKER_BLOCK",
                 body="Request blocked by circuit breaker",
                 metadata={"circuit_open_until": self._circuit_open_until},
@@ -163,7 +170,7 @@ class OpenAIIntegration:
             raise ValueError("Prompt cannot be empty.")
 
         # Enhanced system_logging for debugging
-        from coldwind.desktop.ui.diagnostics.debug_helpers import debug_api_call
+        
 
         if prompt:
             debug_api_call(
@@ -186,9 +193,9 @@ class OpenAIIntegration:
 
         while attempt <= max_attempts:
             try:
-                from coldwind.desktop.ui.diagnostics.debug_helpers import debug_info
+                
 
-                debug_info(
+                ContextRegistry.get().get_logger().log_info(
                     heading="OPENAI • API_ATTEMPT",
                     body=f"Attempting API call (attempt {attempt}/{max_attempts})",
                     metadata={"attempt": attempt, "stream": stream},
@@ -215,7 +222,7 @@ class OpenAIIntegration:
                     )
 
                 # Enhanced response system_logging
-                from coldwind.desktop.ui.diagnostics.debug_helpers import debug_api_call
+                
 
                 debug_api_call(
                     api_name="OpenAI",
@@ -238,13 +245,13 @@ class OpenAIIntegration:
                     )
 
             except Exception as e:
-                from coldwind.desktop.ui.diagnostics.debug_helpers import debug_error
+                
 
                 error_str = str(e)
 
                 # Handle specific NVIDIA API errors
                 if "'NoneType' object is not iterable" in error_str:
-                    debug_error(
+                    ContextRegistry.get().get_logger().log_error(
                         heading="OPENAI • UNEXPECTED_ERROR",
                         body=f"Unexpected error on attempt {attempt}: {error_str}",
                         metadata={"attempt": attempt, "error_type": type(e).__name__},
@@ -257,7 +264,7 @@ class OpenAIIntegration:
                         attempt += 1
                         continue
                     else:
-                        debug_error(
+                        ContextRegistry.get().get_logger().log_error(
                             heading="OPENAI • UNEXPECTED_FAILURE",
                             body=f"Unexpected error in generate_text: {error_str}",
                             metadata={"error_type": type(e).__name__},
@@ -266,7 +273,7 @@ class OpenAIIntegration:
                         return self._get_fallback_response("unexpected")
 
                 elif "502" in error_str or "Error code: 502" in error_str:
-                    debug_error(
+                    ContextRegistry.get().get_logger().log_error(
                         heading="OPENAI • 502_ERROR",
                         body=f"502 error on attempt {attempt}: {error_str}",
                         metadata={"attempt": attempt, "error_code": "502"},
@@ -289,7 +296,7 @@ class OpenAIIntegration:
                         or "500" in error_str
                         or "400" in error_str
                 ):
-                    debug_error(
+                    ContextRegistry.get().get_logger().log_error(
                         heading="OPENAI • API_ERROR",
                         body=f"API error on attempt {attempt}: {error_str}",
                         metadata={"attempt": attempt, "error_type": type(e).__name__},
@@ -345,7 +352,7 @@ class OpenAIIntegration:
             raise ValueError("OpenAI integration not initialized")
 
         # Enhanced system_logging for debugging
-        from coldwind.desktop.ui.diagnostics.debug_helpers import debug_api_call
+        
 
         if prompt:
             debug_api_call(
@@ -383,7 +390,7 @@ class OpenAIIntegration:
                     max_tokens=4096,
                     stream=False,
                 ),
-                timeout=OPENAI_TIMEOUT,
+                timeout=self._settings.openai_timeout,
             )
 
             # Enhanced response system_logging
@@ -393,9 +400,9 @@ class OpenAIIntegration:
             return self._handle_non_streaming_response_with_debugging(completion)
 
         except Exception as e:
-            from coldwind.desktop.ui.diagnostics.debug_helpers import debug_error
+            
 
-            debug_error(
+            ContextRegistry.get().get_logger().log_error(
                 heading="OPENAI • API_CALL_FAILED",
                 body=f"OpenAI async call failed: {e}",
                 metadata={"error_type": type(e).__name__, "context": "async_api_call"},
@@ -451,7 +458,7 @@ class OpenAIIntegration:
                     max_tokens=4096,
                     stream=True,
                 ),
-                timeout=OPENAI_TIMEOUT,
+                timeout=self._settings.openai_timeout,
             )
 
             async for chunk in completion:
@@ -463,9 +470,9 @@ class OpenAIIntegration:
                     yield chunk.choices[0].delta.content
 
         except Exception as e:
-            from coldwind.desktop.ui.diagnostics.debug_helpers import debug_error
+            
 
-            debug_error(
+            ContextRegistry.get().get_logger().log_error(
                 heading="OPENAI • STREAMING_CALL_FAILED",
                 body=f"OpenAI async streaming call failed: {e}",
                 metadata={
@@ -504,9 +511,9 @@ class OpenAIIntegration:
         """
         # 🔧 FIX: Add comprehensive None and error checking
         if completion is None:
-            from coldwind.desktop.ui.diagnostics.debug_helpers import debug_error
+            
 
-            debug_error(
+            ContextRegistry.get().get_logger().log_error(
                 heading="OPENAI • NULL_STREAMING_COMPLETION",
                 body="Streaming completion object is None - possible API failure",
                 metadata={"completion_status": "null"},
@@ -543,9 +550,9 @@ class OpenAIIntegration:
                         yield content
 
                 except Exception as chunk_error:
-                    from coldwind.desktop.ui.diagnostics.debug_helpers import debug_warning
+                    
 
-                    debug_warning(
+                    ContextRegistry.get().get_logger().log_warning(
                         heading="OPENAI • CHUNK_PROCESSING_ERROR",
                         body=f"Error processing streaming chunk: {chunk_error}",
                         metadata={
@@ -557,9 +564,9 @@ class OpenAIIntegration:
                     continue
 
         except Exception as streaming_error:
-            from coldwind.desktop.ui.diagnostics.debug_helpers import debug_error
+            
 
-            debug_error(
+            ContextRegistry.get().get_logger().log_error(
                 heading="OPENAI • STREAMING_ERROR",
                 body=f"Error during streaming: {streaming_error}",
                 metadata={"error_type": type(streaming_error).__name__},
@@ -576,9 +583,9 @@ class OpenAIIntegration:
         """
         # 🔧 FIX: Comprehensive None checking first
         if completion is None:
-            from coldwind.desktop.ui.diagnostics.debug_helpers import debug_error
+            
 
-            debug_error(
+            ContextRegistry.get().get_logger().log_error(
                 heading="OPENAI • NULL_COMPLETION",
                 body="Completion object is None - possible API failure",
                 metadata={"completion_status": "null"},
@@ -591,9 +598,9 @@ class OpenAIIntegration:
         # 🔧 FIX: Enhanced choices validation
         try:
             if not hasattr(completion, "choices"):
-                from coldwind.desktop.ui.diagnostics.debug_helpers import debug_error
+                
 
-                debug_error(
+                ContextRegistry.get().get_logger().log_error(
                     heading="OPENAI • NO_CHOICES_ATTRIBUTE",
                     body="Completion object missing 'choices' attribute",
                     metadata={"completion_type": type(completion).__name__},
@@ -602,9 +609,9 @@ class OpenAIIntegration:
 
             choices = completion.choices
             if choices is None or len(choices) == 0:
-                from coldwind.desktop.ui.diagnostics.debug_helpers import debug_error
+                
 
-                debug_error(
+                ContextRegistry.get().get_logger().log_error(
                     heading="OPENAI • NO_CHOICES",
                     body="No choices found in API response",
                     metadata={
@@ -625,9 +632,9 @@ class OpenAIIntegration:
                 raise Exception("First choice is None")
 
             if not hasattr(choice, "message") or choice.message is None:
-                from coldwind.desktop.ui.diagnostics.debug_helpers import debug_error
+                
 
-                debug_error(
+                ContextRegistry.get().get_logger().log_error(
                     heading="OPENAI • NO_MESSAGE",
                     body="First choice has no message",
                     metadata={
@@ -640,9 +647,9 @@ class OpenAIIntegration:
             msg = choice.message
 
         except Exception as structure_error:
-            from coldwind.desktop.ui.diagnostics.debug_helpers import debug_critical
+            
 
-            debug_critical(
+            ContextRegistry.get().get_logger().log_critical(
                 heading="OPENAI • RESPONSE_STRUCTURE_ERROR",
                 body=f"Error accessing completion structure: {structure_error}",
                 metadata={
@@ -661,11 +668,11 @@ class OpenAIIntegration:
         content = getattr(msg, "content", None)
         reasoning_content = getattr(msg, "reasoning_content", None)
 
-        from coldwind.desktop.ui.diagnostics.debug_helpers import debug_info, debug_warning
+        
 
         # 🎯 Return regular content immediately if available
         if content and str(content).strip():
-            debug_info(
+            ContextRegistry.get().get_logger().log_info(
                 heading="OPENAI • CONTENT_FOUND",
                 body=f"Standard content found: {str(content)}",
                 metadata={
@@ -677,7 +684,7 @@ class OpenAIIntegration:
 
         # 🚨 Extract JSON from reasoning_content only when needed
         elif reasoning_content and str(reasoning_content).strip():
-            debug_warning(
+            ContextRegistry.get().get_logger().log_warning(
                 heading="OPENAI • REASONING_CONTENT_DETECTED",
                 body="No standard content - attempting JSON extraction from reasoning_content",
                 metadata={
@@ -691,7 +698,7 @@ class OpenAIIntegration:
                 reasoning_content
             )
             if extracted_json:
-                debug_info(
+                ContextRegistry.get().get_logger().log_info(
                     heading="OPENAI • JSON_EXTRACTION_SUCCESS",
                     body=f"Successfully extracted: {extracted_json}",
                     metadata={"extraction_successful": True},
@@ -704,7 +711,7 @@ class OpenAIIntegration:
         for field_name in ["text", "message", "response", "output"]:
             alt_content = getattr(msg, field_name, None)
             if alt_content and str(alt_content).strip():
-                debug_info(
+                ContextRegistry.get().get_logger().log_info(
                     heading="OPENAI • ALTERNATIVE_CONTENT",
                     body=f"Content found via {field_name}: {str(alt_content)[:100]}...",
                     metadata={"content_source": field_name},
@@ -714,7 +721,7 @@ class OpenAIIntegration:
         # Final fallback
         if hasattr(msg, "__str__") and str(msg).strip():
             content_str = str(msg).strip()
-            debug_info(
+            ContextRegistry.get().get_logger().log_info(
                 heading="OPENAI • MESSAGE_STRING",
                 body=f"Using message string: {content_str[:100]}...",
                 metadata={"content_source": "message_string"},
@@ -722,9 +729,9 @@ class OpenAIIntegration:
             return content_str
 
         # If everything fails, record failure and provide fallback
-        from coldwind.desktop.ui.diagnostics.debug_helpers import debug_error
+        
 
-        debug_error(
+        ContextRegistry.get().get_logger().log_error(
             heading="OPENAI • COMPLETE_FAILURE",
             body="No content found in response - providing fallback",
             metadata={"failure_type": "content_extraction_failure"},
@@ -758,9 +765,9 @@ class OpenAIIntegration:
                 prompt_generator.get_json_extraction_prompts()
             )
 
-            from coldwind.desktop.ui.diagnostics.debug_helpers import debug_info
+            
 
-            debug_info(
+            ContextRegistry.get().get_logger().log_info(
                 heading="OPENAI • JSON_EXTRACTION_ATTEMPT",
                 body="Starting LLM-based JSON extraction from reasoning content",
                 metadata={
@@ -777,10 +784,11 @@ class OpenAIIntegration:
             )
 
             # Create a separate client to avoid recursion
+            _settings = ContextRegistry.get().get_settings()
             extractor_client = OpenAI(
                 base_url="https://integrate.api.nvidia.com/v1",
-                api_key=OPEN_AI_API_KEY,
-                timeout=OPENAI_TIMEOUT,
+                api_key=_settings.openai_api_key,
+                timeout=_settings.openai_timeout,
                 max_retries=1,
             )
 
@@ -802,9 +810,9 @@ class OpenAIIntegration:
                     and extraction_completion.choices[0].message
             ):
                 extracted = extraction_completion.choices[0].message.content
-                from coldwind.desktop.ui.diagnostics.debug_helpers import debug_info
+                
 
-                debug_info(
+                ContextRegistry.get().get_logger().log_info(
                     heading="OPENAI • EXTRACTION_RESPONSE",
                     body=f"LLM extraction response received: {extracted}",
                     metadata={
@@ -819,9 +827,9 @@ class OpenAIIntegration:
                         # Direct JSON validation without calling ModelManager.convert_to_json
                         json.loads(extracted.strip())
 
-                        from coldwind.desktop.ui.diagnostics.debug_helpers import debug_info
+                        
 
-                        debug_info(
+                        ContextRegistry.get().get_logger().log_info(
                             heading="OPENAI • JSON_EXTRACTION_SUCCESS",
                             body="Successfully extracted valid JSON from reasoning_content",
                             metadata={
@@ -832,9 +840,9 @@ class OpenAIIntegration:
                         return extracted.strip()
 
                     except json.JSONDecodeError as json_error:
-                        from coldwind.desktop.ui.diagnostics.debug_helpers import debug_warning
+                        
 
-                        debug_warning(
+                        ContextRegistry.get().get_logger().log_warning(
                             heading="OPENAI • INVALID_JSON_EXTRACTED",
                             body=f"Extracted content is not valid JSON: {json_error}",
                             metadata={
@@ -849,9 +857,9 @@ class OpenAIIntegration:
 
                         ModelManager.convert_to_json(extracted.strip())
             else:
-                from coldwind.desktop.ui.diagnostics.debug_helpers import debug_critical
+                
 
-                debug_critical(
+                ContextRegistry.get().get_logger().log_critical(
                     heading="OPENAI • NO_EXTRACTED_CONTENT",
                     body="No content extracted from reasoning_content",
                     metadata={"reasoning_content_length": len(reasoning_content)},
@@ -860,9 +868,9 @@ class OpenAIIntegration:
             return None
 
         except Exception as extraction_error:
-            from coldwind.desktop.ui.diagnostics.debug_helpers import debug_warning
+            
 
-            debug_warning(
+            ContextRegistry.get().get_logger().log_warning(
                 heading="OPENAI • JSON_EXTRACTION_ERROR",
                 body=f"JSON extraction failed: {str(extraction_error)}",
                 metadata={
@@ -892,9 +900,10 @@ class OpenAIIntegration:
         """
         from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
 
+        # MIGRATED: settings.listeners.get('eval') → ContextRegistry.get().get_listeners().get('eval')
         with cls._thread_lock:
             OpenAIIntegration.requests_count += 1
-            eval_listener: RichStatusListener = settings.listeners.get("eval", None)
+            eval_listener: RichStatusListener = ContextRegistry.get().get_listeners().get("eval", None)
             # if eval_listener is not None:
             #     eval_listener.emit_on_variable_change(
             #         OpenAIIntegration,
@@ -910,9 +919,9 @@ class OpenAIIntegration:
                 elapsed_time = current_time - OpenAIIntegration._last_request_time
                 if elapsed_time < 60:
                     wait_time = 60 - elapsed_time
-                    from coldwind.desktop.ui.diagnostics.debug_helpers import debug_critical
+                    
 
-                    debug_critical(
+                    ContextRegistry.get().get_logger().log_critical(
                         heading="OPENAI • RATE_LIMIT",
                         body="API rate limit hit - waiting for reset",
                         metadata={
@@ -950,7 +959,8 @@ class OpenAIIntegration:
         # Use proper async lock instead of sync lock
         async with cls._client_lock:
             OpenAIIntegration.requests_count += 1
-            eval_listener: RichStatusListener = settings.listeners.get("eval", None)
+            # MIGRATED: settings.listeners.get('eval') → ContextRegistry.get().get_listeners().get('eval')
+            eval_listener: RichStatusListener = ContextRegistry.get().get_listeners().get("eval", None)
 
             if eval_listener is not None:
                 eval_listener.emit_on_variable_change(
@@ -970,9 +980,9 @@ class OpenAIIntegration:
                 if elapsed_time < 60:
                     wait_time = 60 - elapsed_time
                     # make update that we hit rate limit
-                    from coldwind.desktop.ui.diagnostics.debug_helpers import debug_critical
+                    
 
-                    debug_critical(
+                    ContextRegistry.get().get_logger().log_critical(
                         heading="OPENAI • RATE_LIMIT",
                         body="API rate limit hit - waiting for reset",
                         metadata={
@@ -1006,9 +1016,9 @@ class OpenAIIntegration:
             try:
                 cls.instance.client.close()
             except Exception as e:
-                from coldwind.desktop.ui.diagnostics.debug_helpers import debug_error
+                
 
-                debug_error(
+                ContextRegistry.get().get_logger().log_error(
                     heading="OPENAI • CLEANUP_ERROR",
                     body=f"Error during OpenAI sync client cleanup: {e}",
                     metadata={
@@ -1092,9 +1102,9 @@ class OpenAIIntegration:
             OpenAIIntegration._circuit_open = False
             OpenAIIntegration._circuit_open_until = None
             OpenAIIntegration._failure_count = 0
-            from coldwind.desktop.ui.diagnostics.debug_helpers import debug_info
+            
 
-            debug_info(
+            ContextRegistry.get().get_logger().log_info(
                 heading="OPENAI • CIRCUIT_BREAKER_RESET",
                 body="Circuit breaker reset after timeout",
                 metadata={"timeout_duration": OpenAIIntegration._circuit_timeout},
@@ -1107,9 +1117,9 @@ class OpenAIIntegration:
         """Record an API failure and potentially open circuit breaker."""
         OpenAIIntegration._failure_count += 1
 
-        from coldwind.desktop.ui.diagnostics.debug_helpers import debug_warning
+        
 
-        debug_warning(
+        ContextRegistry.get().get_logger().log_warning(
             heading="OPENAI • API_FAILURE_RECORDED",
             body=f"API failure recorded (count: {OpenAIIntegration._failure_count}/{OpenAIIntegration._max_failures})",
             metadata={
@@ -1123,9 +1133,9 @@ class OpenAIIntegration:
             OpenAIIntegration._circuit_open_until = (
                     time.time() + OpenAIIntegration._circuit_timeout
             )
-            from coldwind.desktop.ui.diagnostics.debug_helpers import debug_critical
+            
 
-            debug_critical(
+            ContextRegistry.get().get_logger().log_critical(
                 heading="OPENAI • CIRCUIT_BREAKER_OPEN",
                 body=f"Circuit breaker opened after {OpenAIIntegration._failure_count} failures",
                 metadata={"timeout_duration": OpenAIIntegration._circuit_timeout},
@@ -1134,9 +1144,9 @@ class OpenAIIntegration:
     def _record_success(self):
         """Record an API success and reset failure count."""
         if OpenAIIntegration._failure_count > 0:
-            from coldwind.desktop.ui.diagnostics.debug_helpers import debug_info
+            
 
-            debug_info(
+            ContextRegistry.get().get_logger().log_info(
                 heading="OPENAI • API_RECOVERY",
                 body="API call successful - resetting failure count",
                 metadata={"previous_failures": OpenAIIntegration._failure_count},

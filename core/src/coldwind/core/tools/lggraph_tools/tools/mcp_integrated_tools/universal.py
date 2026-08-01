@@ -6,14 +6,11 @@ def universal_tool(**kwargs):
     It abstracts the details of the MCP server interaction, making it easy to use.
 
     :param kwargs: Dynamic parameters that vary by MCP tool
-    :return: Result from the specific MCP tool operation
+    :return: Result from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
+from the specific MCP tool operation
     """
     from coldwind.core.mcp.manager import MCP_Manager
-    from coldwind.desktop.ui.diagnostics.debug_helpers import (
-        debug_info,
-        debug_critical,
-        debug_warning,
-    )
+    
     from coldwind.core.mcp.mcp_register_structure import MPC_TOOL_SERVER_MAPPING
 
     # 🔧 FIX: Enhanced tool_name extraction with validation
@@ -21,7 +18,7 @@ def universal_tool(**kwargs):
 
     # Critical validation: tool_name must be provided
     if not tool_name or tool_name == "unknown tool":
-        debug_critical(
+        ContextRegistry.get().get_logger().log_critical(
             heading="MCP_UNIVERSAL • MISSING_TOOL_NAME",
             body="No valid tool_name provided - this will cause MCP server errors",
             metadata={
@@ -46,7 +43,7 @@ def universal_tool(**kwargs):
     if not server_name:
         # Tool not found in any discovered server
         available_tools = list(MPC_TOOL_SERVER_MAPPING.keys())[:20]  # Show first 20
-        debug_warning(
+        ContextRegistry.get().get_logger().log_warning(
             heading="MCP_UNIVERSAL • TOOL_NOT_FOUND",
             body=f"Tool '{tool_name}' not found in any running server",
             metadata={
@@ -62,7 +59,7 @@ def universal_tool(**kwargs):
             "running_servers": list(MCP_Manager.running_servers.keys()),
         }
 
-    debug_info(
+    ContextRegistry.get().get_logger().log_info(
         heading="MCP_UNIVERSAL • TOOL_ROUTING",
         body=f"Routing tool '{tool_name}' to server '{server_name}'",
         metadata={
@@ -75,7 +72,7 @@ def universal_tool(**kwargs):
     try:
         response = MCP_Manager.call_mcp_server(server_name, tool_name, arguments)
     except Exception as call_error:
-        debug_critical(
+        ContextRegistry.get().get_logger().log_critical(
             heading="MCP_UNIVERSAL • SERVER_CALL_EXCEPTION",
             body=f"Exception calling MCP server: {call_error}",
             metadata={
@@ -93,7 +90,7 @@ def universal_tool(**kwargs):
         }
 
     if response is None:
-        debug_critical(
+        ContextRegistry.get().get_logger().log_critical(
             heading="MCP_UNIVERSAL • ERROR",
             body="No response from MCP server",
             metadata={
@@ -112,7 +109,7 @@ def universal_tool(**kwargs):
             uri = data.get('params', {}).get('uri')
             if uri:
                 # now it is confirmed that it is uri ##
-                debug_info(
+                ContextRegistry.get().get_logger().log_info(
                     heading="MCP_UNIVERSAL • URI_DETECTED",
                     body=f"URI detected in MCP response: {uri}",
                     metadata={
@@ -126,7 +123,7 @@ def universal_tool(**kwargs):
                 else:
                     return {"success": False, "error": f"Failed to resolve URI: {uri}"}
             pass
-        debug_info(
+        ContextRegistry.get().get_logger().log_info(
             heading="MCP_UNIVERSAL • SUCCESS",
             body="Response received from MCP server",
             metadata={
@@ -140,7 +137,7 @@ def universal_tool(**kwargs):
     else:
         # Handle error response
         error_msg = response.get("error", "Unknown error occurred")
-        debug_info(
+        ContextRegistry.get().get_logger().log_info(
             heading="MCP_UNIVERSAL • ERROR",
             body=f"Error from MCP server: {error_msg}",
             metadata={

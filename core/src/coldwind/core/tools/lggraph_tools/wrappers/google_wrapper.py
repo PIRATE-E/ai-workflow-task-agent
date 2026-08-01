@@ -1,5 +1,7 @@
 import json
 
+from langchain_core.messages import HumanMessage, AIMessage, BaseMessage
+
 from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
 from coldwind.core.tools.lggraph_tools.tool_response_manager import ToolResponseManager
 from coldwind.core.tools.lggraph_tools.tools.google_search_tool import search_google_tool
@@ -12,7 +14,7 @@ class GoogleSearchToolWrapper:
     This class is used to manage the response from the Google Search Tool.
     """
 
-    def _parse_response(self) -> settings.BaseMessage | None:
+    def _parse_response(self) -> BaseMessage | None:
         """
         CONVERT the response from the Google Search Tool into a human-readable format by extracting the snippets and process it using llm.
         :return: Parsed response.
@@ -49,8 +51,8 @@ class GoogleSearchToolWrapper:
             llm = ModelManager(model=ContextRegistry.get().get_settings().gpt_model, temperature=0.7)
             response = llm.invoke(
                 [
-                    settings.HumanMessage(content=enhanced_prompt),
-                    settings.HumanMessage(content=snippets),
+                    HumanMessage(content=enhanced_prompt),
+                    HumanMessage(content=snippets),
                 ]
             )
 
@@ -80,7 +82,7 @@ class GoogleSearchToolWrapper:
             # If the response is a dictionary, we can assume it's a valid response
             ToolResponseManager().set_response(
                 [
-                    settings.AIMessage(
+                    AIMessage(
                         content=response.content,
                         additional_kwargs=response.additional_kwargs,
                         response_metadata=getattr(response, "response_metadata", {}),
@@ -91,5 +93,5 @@ class GoogleSearchToolWrapper:
         else:
             # If the response is None, we can set an empty response
             ToolResponseManager().set_response(
-                [settings.AIMessage(content="No results found for the query.")]
+                [AIMessage(content="No results found for the query.")]
             )

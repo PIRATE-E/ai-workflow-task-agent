@@ -26,7 +26,12 @@ except Exception:  # neo4j not installed
     GraphDatabase = None  # type: ignore
     _neo4j_available = False
 
+# MIGRATED: direct langchain import for HumanMessage (was settings.HumanMessage).
+from langchain_core.messages import HumanMessage
+
 from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
+# MIGRATED: neo4j_driver is now registered as a dynamic CoreRunTimeObjects service.
+from coldwind.core.runtime.runtime_obj_enum import CoreRunTimeObjects
 from coldwind.core.utils.open_ai_integration import OpenAIIntegration
 import pathlib
 
@@ -44,25 +49,28 @@ except Exception:  # Fallback minimal Prompt implementation
             )
 
 
+def _get_neo4j_driver() -> "Any | None":
+    """MIGRATED: retrieve the Neo4j driver from the registry dynamic store.
+
+    Replaces `from coldwind.core.config.settings import neo4j_driver as driver`.
+    `get_service()` raises RuntimeError when the service is not registered
+    (e.g. when Neo4j is unavailable at boot or on a headless platform), so this
+    helper returns None on failure — preserving the original graceful-degradation
+    behavior that the RAG functions rely on via `if driver is None: return ...`.
+    """
+    try:
+        return ContextRegistry.get().get_service(CoreRunTimeObjects.neo4j_driver)
+    except Exception:
+        return None
+
+
 
 
 # --- Neo4j driver setup (optional) ---
-# if _neo4j_available:
-#     try:
-#         if getattr(settings, "neo4j_driver", None) is None:
-#             driver = GraphDatabase.driver(
-#                 ContextRegistry.get().get_settings().neo4j_uri,
-#                 auth=(ContextRegistry.get().get_settings().neo4j_user, ContextRegistry.get().get_settings().neo4j_password),
-#             )
-#         else:
-#             driver = settings.neo4j_driver  # type: ignore
-#     except Exception as e:  # Connection issue – degrade instead of crash
-#         if getattr(settings, "socket_con", None):  # pragma: no cover
-#             settings.socket_con.send_error(f"[Neo4j Disabled] Connection failed: {e}")
-#         driver = None
-#         _neo4j_available = False
-# else:
-#     driver = None  # Neo4j features disabled
+# MIGRATED: the old commented-out driver setup block below referenced the legacy
+# settings.neo4j_driver global. Neo4j driver is now resolved at call sites via
+# the `_get_neo4j_driver()` helper above (registry get_service with graceful None).
+# Original dead code removed to avoid rot/misleading future readers.
 
 GEMINI_CLI_PATH = "C:\\Users\\pirat\\AppData\\Roaming\\npm\\gemini.cmd"
 SUBPROCESS_TIMEOUT = 120  # 2 minutes timeout per request
@@ -230,8 +238,10 @@ async def prompt_gemini_for_triples_api(
         try:
             return model.generate_content(prompt_g)
         except Exception as e_G:  # pragma: no cover
-            if getattr(settings, "socket_con", None):
-                settings.socket_con.send_error(f"Error calling Gemini API: {e_G}")
+            # MIGRATED: settings.socket_con → ContextRegistry.get().get_socket_connection()
+            _socket_con = ContextRegistry.get().get_socket_connection()
+            if _socket_con is not None:
+                _socket_con.send_error(f"Error calling Gemini API: {e_G}")
             return None
 
     loop = asyncio.get_event_loop()
@@ -316,9 +326,11 @@ async def prompt_openai_for_triples(
             ]
         )
 
-        if not response or response.strip() == "" or response.strip() == "[]":
-            if getattr(settings, "socket_con", None):
-                settings.socket_con.send_error(
+        if not response or response.text.strip() == "" or response.text.strip() == "[]":
+            # MIGRATED: settings.socket_con → ContextRegistry.get().get_socket_connection()
+            _socket_con = ContextRegistry.get().get_socket_connection()
+            if _socket_con is not None:
+                _socket_con.send_error(
                     "[WARNING] No response or empty response from OpenAI API."
                 )
             return {"chunk": chunk, "triples": []}
@@ -354,15 +366,19 @@ async def prompt_openai_for_triples(
                     "triples": [parsed_response] if parsed_response else [],
                 }
         else:
-            if getattr(settings, "socket_con", None):
-                settings.socket_con.send_error(
+            # MIGRATED: settings.socket_con → ContextRegistry.get().get_socket_connection()
+            _socket_con = ContextRegistry.get().get_socket_connection()
+            if _socket_con is not None:
+                _socket_con.send_error(
                     f"[WARNING] Unexpected response type: {type(parsed_response)}"
                 )
             return {"chunk": chunk, "triples": []}
 
     except Exception as api_error:  # pragma: no cover
-        if getattr(settings, "socket_con", None):
-            settings.socket_con.send_error(
+        # MIGRATED: settings.socket_con → ContextRegistry.get().get_socket_connection()
+        _socket_con = ContextRegistry.get().get_socket_connection()
+        if _socket_con is not None:
+            _socket_con.send_error(
                 f"[ERROR] OpenAI API call failed: {api_error}"
             )
         return {"chunk": chunk, "triples": [], "error": str(api_error)}
@@ -376,7 +392,8 @@ def prompt_local_llm_for_triples(chunk: Document) -> list:
     prompt = f"""
         You are analyzing text to extract meaningful relationships for a knowledge graph.
         \n        **Your Task:**\n        Extract clear, factual relationships between entities in the text below.\n        Focus on concrete entities (people, companies, products, technologies) and their connections.\n        \n        **Text to Analyze:**\n        \"\"\"{chunk.page_content}\"\"\"\n        \n        **Output Format:**\n        Return a JSON array where each relationship is represented as:\n        {{"subject": "entity1", "predicate": "relationship", "object": "entity2"}}\n        \n        Focus on quality over quantity - extract only meaningful, verifiable relationships.\n        """
-    response = llm.invoke([settings.HumanMessage(content=prompt)])
+    # MIGRATED: settings.HumanMessage → direct langchain HumanMessage import.
+    response = llm.invoke([HumanMessage(content=prompt)])
     output = response.content
 
     print(f"LLM response: {output}")
@@ -414,7 +431,8 @@ def prompt_local_llm_for_triples(chunk: Document) -> list:
 
 def clear_database():
     """Deletes all nodes and relationships from the Neo4j database if available."""
-    from coldwind.core.config.settings import neo4j_driver as driver  # type: ignore
+    # MIGRATED: settings.neo4j_driver → _get_neo4j_driver() (registry get_service helper).
+    driver = _get_neo4j_driver()
 
     if not _neo4j_available or driver is None:
         print("Neo4j not available; clear_database skipped.")
@@ -423,8 +441,10 @@ def clear_database():
         with driver.session() as session:  # type: ignore
             session.run("MATCH (n) DETACH DELETE n")
     except Exception as e:  # pragma: no cover
-        if getattr(settings, "socket_con", None):
-            settings.socket_con.send_error(f"Error clearing Neo4j database: {e}")
+        # MIGRATED: settings.socket_con → ContextRegistry.get().get_socket_connection()
+        _socket_con = ContextRegistry.get().get_socket_connection()
+        if _socket_con is not None:
+            _socket_con.send_error(f"Error clearing Neo4j database: {e}")
         else:
             print(f"Error clearing Neo4j database: {e}")
     print("Database cleared successfully.")
@@ -442,7 +462,8 @@ def _insert_triple(tx, subject, relation, object):
 
 def insert_triples(triples):
     """Insert multiple triples into Neo4j if available."""
-    from coldwind.core.config.settings import neo4j_driver as driver  # type: ignore
+    # MIGRATED: settings.neo4j_driver → _get_neo4j_driver() (registry get_service helper).
+    driver = _get_neo4j_driver()
 
     if not _neo4j_available or driver is None:
         return
@@ -457,8 +478,9 @@ def insert_triples(triples):
 
 def get_triples(cypher_query: str):
     """Retrieve triples via Cypher if Neo4j is available; else return empty list."""
-    from coldwind.core.config.settings import neo4j_driver as driver  # type: ignore
-    from coldwind.desktop.ui.diagnostics.debug_helpers import debug_error
+    # MIGRATED: settings.neo4j_driver → _get_neo4j_driver() (registry get_service helper).
+    driver = _get_neo4j_driver()
+    
 
     if not _neo4j_available or driver is None:
         return []
@@ -485,7 +507,7 @@ def get_triples(cypher_query: str):
                 )
             return triples
     except Exception as e:  # pragma: no cover
-        debug_error(
+        ContextRegistry.get().get_logger().log_error(
             heading="Error retrieving triples",
             body=f"Failed to execute Cypher query: {cypher_query}\nError: {e}",
             metadata={
@@ -526,8 +548,9 @@ def extract_triple_text(triple):
 
 def get_retrieve_triples(cypher_query: str):
     """Retrieve raw records via Cypher if available; else empty list."""
-    from coldwind.core.config.settings import neo4j_driver as driver  # type: ignore
-    from coldwind.desktop.ui.diagnostics.debug_helpers import debug_error
+    # MIGRATED: settings.neo4j_driver → _get_neo4j_driver() (registry get_service helper).
+    driver = _get_neo4j_driver()
+    
 
     if not _neo4j_available or driver is None:
         return []
@@ -539,7 +562,7 @@ def get_retrieve_triples(cypher_query: str):
                 records.append(dict(record))
             return records
     except Exception as e:  # pragma: no cover
-        debug_error(
+        ContextRegistry.get().get_logger().log_error(
             heading="Error retrieving records",
             body=f"Failed to execute Cypher query: {cypher_query}\nError: {e}",
             metadata={
@@ -554,7 +577,8 @@ def get_retrieve_triples(cypher_query: str):
 
 def get_all_labels_and_names() -> dict[str, list[str]]:
     """Return labels & names if Neo4j available; else empty placeholders."""
-    from coldwind.core.config.settings import neo4j_driver as driver  # type: ignore
+    # MIGRATED: settings.neo4j_driver → _get_neo4j_driver() (registry get_service helper).
+    driver = _get_neo4j_driver()
 
     if not _neo4j_available or driver is None:
         return {"labels": [], "names": []}
@@ -573,7 +597,8 @@ def get_all_labels_and_names() -> dict[str, list[str]]:
 
 def get_all_relationship_types() -> list[str]:
     """Return relation types if Neo4j available; else empty list."""
-    from coldwind.core.config.settings import neo4j_driver as driver  # type: ignore
+    # MIGRATED: settings.neo4j_driver → _get_neo4j_driver() (registry get_service helper).
+    driver = _get_neo4j_driver()
 
     if not _neo4j_available or driver is None:
         return []

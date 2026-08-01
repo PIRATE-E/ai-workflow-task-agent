@@ -4,14 +4,19 @@ import subprocess
 import time
 from typing import ClassVar, Optional, Any, Iterator, Union
 
+# MIGRATED: AIMessage added to direct langchain import (was settings.AIMessage).
 from langchain_core.language_models import LanguageModelInput
-from langchain_core.messages import BaseMessageChunk, BaseMessage, AIMessageChunk
+from langchain_core.messages import (
+    BaseMessageChunk,
+    BaseMessage,
+    AIMessageChunk,
+    AIMessage,
+)
 from langchain_core.runnables import RunnableConfig
 from langchain_ollama import ChatOllama
 
 from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
 from coldwind.core.utils.open_ai_integration import OpenAIIntegration
-from coldwind.desktop.ui.diagnostics.debug_helpers import debug_info, debug_warning, debug_error
 
 # 🎨 Rich Traceback Integration (updated path after refactor)
 try:  # Lazy-resilient import in case path shifts
@@ -28,7 +33,7 @@ except ImportError:  # Fallback (older path compatibility)
     safe_execute = getattr(_rtm, "safe_execute", lambda f, *a, **k: f(*a, **k))  # type: ignore
 
 # 🔧 COMPLETELY ISOLATED DEBUG LOGGING - NO IMPORTS, NO DEPENDENCIES
-# (Replaced by debug_helpers unified system_logging)
+# (Replaced by ContextRegistry.get().get_logger().debug_helpers unified system_logging)
 
 
 class ModelManager(ChatOllama):
@@ -44,12 +49,36 @@ class ModelManager(ChatOllama):
     _openai_integration: ClassVar[Optional[OpenAIIntegration]] = None
     _is_openai_mode: ClassVar[bool] = False
 
-    model_list: ClassVar[list[str]] = [
-        ContextRegistry.get().get_settings().default_model,
-        ContextRegistry.get().get_settings().cypher_model,
-        ContextRegistry.get().get_settings().classifier_model,
-    ]
-    api_model_list: ClassVar[list[str]] = [ContextRegistry.get().get_settings().gpt_model, ContextRegistry.get().get_settings().kimi_model]
+    # 🐞 BORN EMPTY (fixes import-time ContextRegistry.get() crash — see
+    # ContextRegistry boot-order invariant). Populated lazily by
+    # _populate_model_lists() on first __init__ / load_model, which only runs
+    # after the registry/context is active. Kept as a MUTABLE class attribute
+    # so external code and tests can still append/restore it — see
+    # test_model_list_modification_protection in test_error_handling.py.
+    model_list: ClassVar[list[str]] = []
+    api_model_list: ClassVar[list[str]] = []
+
+    @staticmethod
+    def _populate_model_lists() -> None:
+        """Resolve model names from Core settings into the class attrs.
+
+        Idempotent — no-op if already populated. MUST be called only after the
+        runtime context is active (i.e. at boot from __init__ / load_model, never
+        at import time). Reads CoreSettings via the active context's
+        get_settings() slot.
+        """
+        if ModelManager.model_list:
+            return  # already populated — keep idempotent
+        _settings = ContextRegistry.get().get_settings()
+        ModelManager.model_list = [
+            _settings.default_model,
+            _settings.cypher_model,
+            _settings.classifier_model,
+        ]
+        ModelManager.api_model_list = [
+            _settings.gpt_model,
+            _settings.kimi_model,
+        ]
 
     def __new__(cls, *args: Any, **kwargs: Any) -> "ModelManager":
         """
@@ -74,16 +103,29 @@ class ModelManager(ChatOllama):
                 return
 
             self._initialized = True
+            # 🔓 Lazy populate class model lists (post-boot, context now active).
+            # Previously these were evaluated at class-body/import time, which
+            # crashed because ContextRegistry.get() ran before the context was
+            # activated. Now resolved lazily on first instance construction.
+            ModelManager._populate_model_lists()
 
             # Check if this should use OpenAI integration
             if len(kwargs) == 0 or "model" not in kwargs:
-                kwargs["model"] = ContextRegistry.get().get_settings().api_default_api_model
+                kwargs["model"] = (
+                    ContextRegistry.get().get_settings().api_default_api_model
+                )
             if kwargs.get("model") in ModelManager.api_model_list:
                 try:
                     # For OpenAI models, create integration and mark as OpenAI mode
                     ModelManager._openai_integration = OpenAIIntegration(
-                        api_key=kwargs.get("api_key", ContextRegistry.get().get_settings().open_ai_api_key),
-                        model=kwargs.get("model", ContextRegistry.get().get_settings().api_default_api_model),
+                        api_key=kwargs.get(
+                            "api_key",
+                            ContextRegistry.get().get_settings().openai_api_key,
+                        ),
+                        model=kwargs.get(
+                            "model",
+                            ContextRegistry.get().get_settings().api_default_api_model,
+                        ),
                     )
                     ModelManager._is_openai_mode = True
                     # Still initialize ChatOllama with a default model to avoid issues
@@ -98,7 +140,10 @@ class ModelManager(ChatOllama):
                         extra_context={
                             "model": kwargs.get("model", "Unknown"),
                             "api_key_available": bool(
-                                kwargs.get("api_key", ContextRegistry.get().get_settings().open_ai_api_key)
+                                kwargs.get(
+                                    "api_key",
+                                    ContextRegistry.get().get_settings().openai_api_key,
+                                )
                             ),
                         },
                     )
@@ -109,13 +154,20 @@ class ModelManager(ChatOllama):
                     ModelManager._openai_integration = None
                     ModelManager._is_openai_mode = False
                     super().__init__(*args, **kwargs)
-                    ModelManager.load_model(kwargs.get("model", ContextRegistry.get().get_settings().default_model))
+                    ModelManager.load_model(
+                        kwargs.get(
+                            "model", ContextRegistry.get().get_settings().default_model
+                        )
+                    )
                 except Exception as ollama_error:
                     RichTracebackManager.handle_exception(
                         ollama_error,
                         context="Ollama Model Setup",
                         extra_context={
-                            "model": kwargs.get("model", ContextRegistry.get().get_settings().default_model),
+                            "model": kwargs.get(
+                                "model",
+                                ContextRegistry.get().get_settings().default_model,
+                            ),
                             "args": str(args)[:100],
                             "kwargs": str(
                                 {k: v for k, v in kwargs.items() if k != "api_key"}
@@ -149,7 +201,7 @@ class ModelManager(ChatOllama):
         # OpenAI Integration Cleanup
         if cls._openai_integration is not None:
             try:
-                debug_info(
+                ContextRegistry.get().get_logger().ContextRegistry.get().get_logger().log_info(
                     "MODEL_MANAGER • CLEANUP",
                     "Cleaning up OpenAI integration",
                     {"cleanup_type": "openai_integration"},
@@ -157,7 +209,7 @@ class ModelManager(ChatOllama):
                 OpenAIIntegration.cleanup()
                 cls._openai_integration = None
                 cls._is_openai_mode = False
-                debug_info(
+                ContextRegistry.get().get_logger().ContextRegistry.get().get_logger().log_info(
                     "MODEL_MANAGER • CLEANUP_SUCCESS",
                     "OpenAI integration cleanup completed",
                     {"cleanup_type": "openai_integration", "status": "completed"},
@@ -168,7 +220,7 @@ class ModelManager(ChatOllama):
                     context="OpenAI Integration Cleanup",
                     extra_context={"integration_status": "cleanup_failed"},
                 )
-                debug_error(
+                ContextRegistry.get().get_logger().ContextRegistry.get().get_logger().log_error(
                     "MODEL_MANAGER • CLEANUP_ERROR",
                     f"Error during OpenAI integration cleanup: {openai_cleanup_error}",
                     {
@@ -179,14 +231,14 @@ class ModelManager(ChatOllama):
         # Ollama Model Cleanup
         if cls.current_model:
             try:
-                debug_info(
+                ContextRegistry.get().get_logger().ContextRegistry.get().get_logger().log_info(
                     "MODEL_MANAGER • MODEL_CLEANUP",
                     f"Cleaning up model: {cls.current_model}",
                     {"cleanup_type": "model", "model_name": cls.current_model},
                 )
                 cls._stop_model()
                 cls.current_model = None
-                debug_info(
+                ContextRegistry.get().get_logger().ContextRegistry.get().get_logger().log_info(
                     "MODEL_MANAGER • MODEL_CLEANUP_SUCCESS",
                     "Model cleanup completed",
                     {"cleanup_type": "model", "status": "completed"},
@@ -197,7 +249,7 @@ class ModelManager(ChatOllama):
                     context="Ollama Model Cleanup",
                     extra_context={"current_model": cls.current_model},
                 )
-                debug_error(
+                ContextRegistry.get().get_logger().ContextRegistry.get().get_logger().log_error(
                     "MODEL_MANAGER • MODEL_CLEANUP_ERROR",
                     f"Error during model cleanup: {model_cleanup_error}",
                     {
@@ -217,6 +269,10 @@ class ModelManager(ChatOllama):
         Raises:
             ValueError: If the model_name is not in the list of available models.
         """
+        # 🔓 Lazy populate before reading model_list (covers the load_model path
+        # when it's called without an instance being constructed first, e.g.
+        # some tests call ModelManager.load_model() directly).
+        ModelManager._populate_model_lists()
         running_one = subprocess.Popen(
             "ollama ps", shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE
         )
@@ -229,7 +285,7 @@ class ModelManager(ChatOllama):
             raise ValueError(
                 f"Model {model_name} is not available. Available models: {ModelManager.model_list}"
             )
-        debug_info(
+        ContextRegistry.get().get_logger().ContextRegistry.get().get_logger().log_info(
             "MODEL_MANAGER • MODEL_LOADING",
             f"Loading model {model_name}",
             {
@@ -240,7 +296,7 @@ class ModelManager(ChatOllama):
         )
         if ModelManager.current_model is not None:
             if ModelManager.current_model == model_name:
-                debug_info(
+                ContextRegistry.get().get_logger().ContextRegistry.get().get_logger().log_info(
                     "MODEL_MANAGER • MODEL_ALREADY_LOADED",
                     f"Model {model_name} is already loaded",
                     {"model": model_name, "status": "already_loaded"},
@@ -248,14 +304,14 @@ class ModelManager(ChatOllama):
             else:
                 ModelManager._stop_model()
                 ModelManager.current_model = model_name
-                debug_info(
+                ContextRegistry.get().get_logger().ContextRegistry.get().get_logger().log_info(
                     "MODEL_MANAGER • MODEL_SWITCHED",
                     f"Switched to model {model_name}",
                     {"model": model_name, "status": "switched"},
                 )
         else:
             ModelManager.current_model = model_name
-            debug_info(
+            ContextRegistry.get().get_logger().ContextRegistry.get().get_logger().log_info(
                 "MODEL_MANAGER • MODEL_LOADED",
                 f"Model {model_name} loaded successfully",
                 {"model": model_name, "status": "loaded"},
@@ -267,7 +323,7 @@ class ModelManager(ChatOllama):
         Stops the currently running model using the Ollama CLI.
         """
         if cls.current_model:
-            debug_info(
+            ContextRegistry.get().get_logger().ContextRegistry.get().get_logger().log_info(
                 "MODEL_MANAGER • MODEL_STOPPING",
                 f"Stopping model: {cls.current_model}",
                 {"model": cls.current_model, "action": "stopping"},
@@ -319,7 +375,8 @@ class ModelManager(ChatOllama):
                 open_ai_response = ModelManager._openai_integration.generate_text(
                     prompt=getattr(input, "content", str(input))
                 )
-            return settings.AIMessage(content=str(open_ai_response))
+            # MIGRATED: settings.AIMessage → direct langchain AIMessage import (response construction).
+            return AIMessage(content=str(open_ai_response))
         else:
             return super().invoke(input=input, config=config, stop=stop, **kwargs)
 
@@ -349,9 +406,11 @@ class ModelManager(ChatOllama):
         ):
             # If using OpenAIIntegration, delegate to it
             open_ai_response = ModelManager._openai_integration.generate_text(
-                prompt=getattr(input[0], "content")
-                if isinstance(input, list) and not isinstance(input[0], dict)
-                else input.content,
+                prompt=(
+                    getattr(input[0], "content")
+                    if isinstance(input, list) and not isinstance(input[0], dict)
+                    else input.content
+                ),
                 stream=True,
             )
             return self._normalize_streaming_response(open_ai_response)
@@ -398,7 +457,7 @@ class ModelManager(ChatOllama):
         """
         # Handle already parsed objects (most common case for async responses)
         if isinstance(response, (dict, list)):
-            debug_info(
+            ContextRegistry.get().get_logger().ContextRegistry.get().get_logger().log_info(
                 "MODEL_MANAGER • JSON_CONVERSION",
                 "Response already parsed as JSON",
                 {
@@ -416,7 +475,7 @@ class ModelManager(ChatOllama):
 
         # Handle empty or None responses
         if not content or content.strip() == "":
-            debug_warning(
+            ContextRegistry.get().get_logger().ContextRegistry.get().get_logger().log_warning(
                 "MODEL_MANAGER • JSON_CONVERSION_EMPTY",
                 "Empty response detected, returning fallback",
                 {
@@ -429,7 +488,7 @@ class ModelManager(ChatOllama):
         # Try 1: Direct JSON parsing (highest priority)
         try:
             parsed = json.loads(content)
-            debug_info(
+            ContextRegistry.get().get_logger().ContextRegistry.get().get_logger().log_info(
                 "MODEL_MANAGER • JSON_CONVERSION_DIRECT",
                 "Direct JSON parsing successful",
                 {
@@ -449,7 +508,7 @@ class ModelManager(ChatOllama):
         if markdown_match:
             try:
                 parsed = json.loads(markdown_match.group(1))
-                debug_info(
+                ContextRegistry.get().get_logger().ContextRegistry.get().get_logger().log_info(
                     "MODEL_MANAGER • JSON_CONVERSION_MARKDOWN",
                     "JSON extracted from markdown code block",
                     {
@@ -508,7 +567,7 @@ class ModelManager(ChatOllama):
             json_objects.sort(key=lambda x: 0 if x[0] == "object" else 1)
             json_type, parsed_json = json_objects[0]
 
-            debug_info(
+            ContextRegistry.get().get_logger().ContextRegistry.get().get_logger().log_info(
                 "MODEL_MANAGER • JSON_CONVERSION_EXTRACTED",
                 f"JSON {json_type} extracted via pattern matching",
                 {
@@ -521,7 +580,7 @@ class ModelManager(ChatOllama):
             return parsed_json
 
         # Fallback: wrap content with enhanced error information
-        debug_warning(
+        ContextRegistry.get().get_logger().ContextRegistry.get().get_logger().log_warning(
             "MODEL_MANAGER • JSON_CONVERSION_FAILED",
             "All JSON parsing methods failed, returning content fallback",
             {

@@ -1,4 +1,7 @@
-from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
+# MIGRATED: direct langchain import for AIMessage (response-construction wrapper).
+# Runtime context access (when needed) via ContextRegistry.get().get_settings().
+from langchain_core.messages import AIMessage
+
 from coldwind.core.tools.lggraph_tools.tool_response_manager import ToolResponseManager
 from coldwind.core.tools.lggraph_tools.tools.run_shell_command_tool import run_shell_command
 
@@ -24,11 +27,11 @@ class ShellCommandWrapper:
         """
         response = run_shell_command(self.command, self.creation_flag)
         if self.capture_output:
-            ToolResponseManager().set_response([settings.AIMessage(content=response)])
+            ToolResponseManager().set_response([AIMessage(content=response)])
         else:
             ToolResponseManager().set_response(
                 [
-                    settings.AIMessage(
+                    AIMessage(
                         content="Command executed without capturing output."
                     )
                 ]

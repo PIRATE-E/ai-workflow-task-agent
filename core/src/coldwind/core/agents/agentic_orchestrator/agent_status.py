@@ -1,4 +1,7 @@
 # 🎭 User-friendly status updates with funny quotes
+from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
+
+
 class AgentStatusUpdater:
     """Provides user-friendly status updates with funny quotes like Gemini CLI"""
 
@@ -65,9 +68,10 @@ class AgentStatusUpdater:
     def update_status(cls, category: str, task_id: int = None, extra_info: str = ""):
         """Update user status with funny quotes and request count info"""
         try:
-            from ...config import settings
-
-            eval_listener = settings.listeners.get("eval", None)
+            # The eval listener lives on the active context's listener slot
+            # (previously: settings.listeners). The listener itself is a desktop
+            # runtime object, accessed through the platform-neutral context.
+            eval_listener = ContextRegistry.get().get_listeners().get("eval", None)
             if eval_listener is None:
                 return
 

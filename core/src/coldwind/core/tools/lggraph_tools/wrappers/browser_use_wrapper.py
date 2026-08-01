@@ -1,4 +1,7 @@
-from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
+# MIGRATED: direct langchain import for AIMessage (response-construction wrapper).
+# Runtime context access (when needed) via ContextRegistry.get().get_settings().
+from langchain_core.messages import AIMessage
+
 from coldwind.core.tools.lggraph_tools.tool_response_manager import ToolResponseManager
 from coldwind.core.tools.lggraph_tools.tools.browser_tool import browser_use_tool
 
@@ -17,14 +20,14 @@ class BrowserUseWrapper:
             response = browser_use_tool(self.query, self.head_less_mode, self.log, self.keep_alive)
             if response is not None:
                 ToolResponseManager().set_response(
-                    [settings.AIMessage(content=response)]
+                    [AIMessage(content=response)]
                 )
             else:
                 ToolResponseManager().set_response(
-                    [settings.AIMessage(content="No response from browser use tool.")]
+                    [AIMessage(content="No response from browser use tool.")]
                 )
         except Exception as e:
             error_message = f"BrowserAgent failed with an exception: {e}"
             ToolResponseManager().set_response(
-                [settings.AIMessage(content=error_message)]
+                [AIMessage(content=error_message)]
             )

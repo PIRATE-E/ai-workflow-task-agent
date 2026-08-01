@@ -4,34 +4,15 @@ from typing import TYPE_CHECKING, Any, Literal
 from langgraph.constants import END
 from pydantic import BaseModel, Field
 
+from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
 from coldwind.core.utils.timestamp_util import get_formatted_timestamp
 from .hierarchical_agent_prompts import HierarchicalAgentPrompt
-from ...config import settings
 
 # Fixed imports - use relative imports instead of src.
 from ...tools.lggraph_tools.tool_assign import ToolAssign
 
-try:
-    from ...ui.diagnostics.debug_helpers import (
-        debug_info,
-        debug_warning,
-        debug_critical,
-        debug_error,
-    )
-except Exception:
-    # Fallback no-op loggers for environments where the diagnostics module
-    # may not be importable during static analysis or testing.
-    def debug_info(*args, **kwargs):
-        return None
+# Logging via ContextRegistry.get().get_logger()
 
-    def debug_warning(*args, **kwargs):
-        return None
-
-    def debug_critical(*args, **kwargs):
-        return None
-
-    def debug_error(*args, **kwargs):
-        return None
 
 
 from ...utils.argument_schema_util import get_tool_argument_schema
@@ -385,7 +366,7 @@ class AgentCoreHelpers:
         """
         Executes the virtual 'perform_synthesis' tool by calling an LLM.
         """
-        debug_info(
+        ContextRegistry.get().get_logger().log_info(
             "Internal Synthesis",
             f"Performing synthesis for task: {current_task.description}",
             metadata={
@@ -431,7 +412,7 @@ class AgentCoreHelpers:
             return True, synthesis_result
         except Exception as e:
             error_msg = f"Internal synthesis LLM call failed: {e}"
-            debug_error("Internal Synthesis", error_msg, metadata={"exception": str(e)})
+            ContextRegistry.get().get_logger().log_error("Internal Synthesis", error_msg, metadata={"exception": str(e)})
             return False, error_msg
 
     # ----------- these are tool list helpers -----------
@@ -475,7 +456,7 @@ class AgentCoreHelpers:
 
         except Exception as e:
             # print_log_message(f"Failed to get detailed tool context: {e}", "Tool Context")
-            debug_warning(
+            ContextRegistry.get().get_logger().log_warning(
                 "Tool Context",
                 f"Failed to get detailed tool context: {e}",
                 metadata={
@@ -552,8 +533,8 @@ class AgentCoreHelpers:
             return ["list_directory", "google_search", "write_file"]
 
         except Exception as e:
-            # Use module-level debug_warning (fallback defined earlier) instead of re-importing
-            debug_warning(
+            # Use module-level ContextRegistry.get().get_logger().log_warning (fallback defined earlier) instead of re-importing
+            ContextRegistry.get().get_logger().log_warning(
                 "Tool Recommender",
                 f"Tool recommendation failed: {e}",
                 metadata={
@@ -718,7 +699,7 @@ class AgentCoreHelpers:
             """Use LLM to intelligently repair the parameters of a failed task."""
             # Check if we have enough context to attempt repair
             if not task.failure_context or not task.failure_context.failed_parameters:
-                debug_warning(
+                ContextRegistry.get().get_logger().log_warning(
                     "Parameter Repair",
                     f"Task {task.task_id} has no failure context or failed parameters. Cannot attempt repair.",
                     metadata={
@@ -740,7 +721,7 @@ class AgentCoreHelpers:
             if error_type == "GoalValidationFailure":
                 validator_feedback = error_message
 
-            debug_info(
+            ContextRegistry.get().get_logger().log_info(
                 "Parameter Repair",
                 f"Attempting parameter repair for task {task.task_id} with {fail_count} failures",
                 metadata={
@@ -780,7 +761,7 @@ class AgentCoreHelpers:
                 )
 
                 if is_valid:
-                    debug_info(
+                    ContextRegistry.get().get_logger().log_info(
                         "Parameter Repair",
                         f"Successfully repaired parameters for task {task.task_id}",
                         metadata={
@@ -791,7 +772,7 @@ class AgentCoreHelpers:
                     )
                     return True, repaired_params
                 else:
-                    debug_warning(
+                    ContextRegistry.get().get_logger().log_warning(
                         "Parameter Repair",
                         f"LLM-suggested parameters failed validation: {error_msg}",
                         metadata={
@@ -803,7 +784,7 @@ class AgentCoreHelpers:
                     return False, {}
 
             except Exception as e:
-                debug_error(
+                ContextRegistry.get().get_logger().log_error(
                     "Parameter Repair",
                     f"Failed to repair parameters with LLM: {e}",
                     metadata={
@@ -819,7 +800,7 @@ class AgentCoreHelpers:
                 ]
 
                 if missing_keys:
-                    debug_warning(
+                    ContextRegistry.get().get_logger().log_warning(
                         "Parameter Repair",
                         f"Task {task.task_id} is missing required parameters: {missing_keys}. Attempting to add default values.",
                         metadata={
@@ -878,7 +859,7 @@ class AgentCoreHelpers:
                         )
                     return tasks if tasks else None
                 else:
-                    debug_warning(
+                    ContextRegistry.get().get_logger().log_warning(
                         "Task Conversion",
                         "LLM response is not a list of tasks.",
                         metadata={
@@ -888,7 +869,7 @@ class AgentCoreHelpers:
                     )
                     return None
             except Exception as e:
-                debug_error(
+                ContextRegistry.get().get_logger().log_error(
                     "Task Conversion",
                     f"Failed to convert decision to tasks with LLM: {e}",
                     metadata={
@@ -905,7 +886,7 @@ class AgentCoreHelpers:
             """Use LLM to intelligently find a safer, alternative tool to accomplish the task's goal."""
             # Check if we have enough context to attempt alternative tool selection
             if not task.failure_context or not task.failure_context.error_message:
-                debug_warning(
+                ContextRegistry.get().get_logger().log_warning(
                     "Alternative Tool",
                     f"Task {task.task_id} has no failure context or error message. Cannot find alternative tool.",
                     metadata={
@@ -926,7 +907,7 @@ class AgentCoreHelpers:
             if error_type == "GoalValidationFailure":
                 validator_feedback = error_message
 
-            debug_info(
+            ContextRegistry.get().get_logger().log_info(
                 "Alternative Tool",
                 f"Finding alternative tool for task {task.task_id} with {fail_count} failures",
                 metadata={
@@ -968,7 +949,7 @@ class AgentCoreHelpers:
                 if alternative_tool and alternative_tool in [
                     tool.name for tool in all_tools
                 ]:
-                    debug_info(
+                    ContextRegistry.get().get_logger().log_info(
                         "Alternative Tool",
                         f"Selected alternative tool '{alternative_tool}' for task {task.task_id}",
                         metadata={
@@ -982,7 +963,7 @@ class AgentCoreHelpers:
                     )
                     return alternative_tool
                 else:
-                    debug_warning(
+                    ContextRegistry.get().get_logger().log_warning(
                         "Alternative Tool",
                         f"LLM-suggested tool '{alternative_tool}' not found in available tools",
                         metadata={
@@ -994,7 +975,7 @@ class AgentCoreHelpers:
                     return None
 
             except Exception as e:
-                debug_error(
+                ContextRegistry.get().get_logger().log_error(
                     "Alternative Tool",
                     f"Failed to find alternative tool with LLM: {e}",
                     metadata={
@@ -1009,7 +990,7 @@ class AgentCoreHelpers:
                     "command not found" in error_message_lower
                     and task.tool_name == "run_shell_command"
                 ):
-                    debug_info(
+                    ContextRegistry.get().get_logger().log_info(
                         "Alternative Tool Finder",
                         f"Suggesting google_search for 'command not found' error.",
                         metadata={
@@ -1036,7 +1017,7 @@ class AgentCoreHelpers:
 
             # Validate we have enough context to make a decision
             if not task.failure_context:
-                debug_warning(
+                ContextRegistry.get().get_logger().log_warning(
                     "Strategy Decision",
                     f"Task {getattr(task, 'task_id', 'N/A')} has no failure context. Cannot decide strategy.",
                     metadata={
@@ -1059,7 +1040,7 @@ class AgentCoreHelpers:
             fail_count = task.failure_context.fail_count
             failed_parameters = task.failure_context.failed_parameters or {}
 
-            debug_info(
+            ContextRegistry.get().get_logger().log_info(
                 "Strategy Decision",
                 f"Deciding recovery strategy for task {getattr(task, 'task_id', 'N/A')} with {fail_count} failures",
                 metadata={
@@ -1186,7 +1167,7 @@ class AgentCoreHelpers:
                     strategy_result = {}
 
                 if recovery_strategy not in valid_strategies:
-                    debug_warning(
+                    ContextRegistry.get().get_logger().log_warning(
                         "Strategy Decision",
                         f"LLM suggested invalid strategy '{recovery_strategy}'. Falling back to PARAMETER_REPAIR.",
                         metadata={
@@ -1222,7 +1203,7 @@ class AgentCoreHelpers:
 
                     # # this is causing un intentional issues If LLM mentions multiple discovery tools/steps, force decomposition
                     # if discovery_tool_mentions >= 5:
-                    #     debug_info("Strategy Decision",
+                    #     ContextRegistry.get().get_logger().log_info("Strategy Decision",
                     #                f"LLM suggested multi-step discovery approach, forcing TASK_DECOMPOSITION for task {getattr(task, 'task_id', 'N/A')}",
                     #                metadata={"original_strategy": str(recovery_strategy), "next_steps": str(next_steps),
                     #                          "discovery_mentions": str(discovery_tool_mentions)})
@@ -1231,7 +1212,7 @@ class AgentCoreHelpers:
                     #     strategy_result[
                     #         "reasoning"] = f"Original: {strategy_result.get('reasoning', '')} | ENHANCED: Multi-step discovery approach detected, forcing decomposition to implement: {next_steps}"
 
-                debug_info(
+                ContextRegistry.get().get_logger().log_info(
                     "Strategy Decision",
                     f"Selected strategy '{recovery_strategy}' for task {getattr(task, 'task_id', 'N/A')}",
                     metadata={
@@ -1253,7 +1234,7 @@ class AgentCoreHelpers:
                 return strategy_result
 
             except Exception as e:
-                debug_error(
+                ContextRegistry.get().get_logger().log_error(
                     "Strategy Decision",
                     f"Failed to decide recovery strategy with LLM: {e}",
                     metadata={
@@ -1403,7 +1384,7 @@ class AgentCoreHelpers:
             """Execute tool and return (success, result)."""
             from ...tools.lggraph_tools.tool_response_manager import ToolResponseManager
 
-            debug_info(
+            ContextRegistry.get().get_logger().log_info(
                 "Tool Executor",
                 f"Executing tool: '{tool_name}' with parameters: {parameters}",
                 metadata={
@@ -1517,7 +1498,7 @@ class AgentCoreHelpers:
                             break
 
                 if is_logical_success:
-                    debug_info(
+                    ContextRegistry.get().get_logger().log_info(
                         "Tool Executor",
                         f"Tool '{tool_name}' executed successfully.",
                         metadata={
@@ -1532,7 +1513,7 @@ class AgentCoreHelpers:
                     )
                     return (True, last_response.content)
                 else:
-                    debug_warning(
+                    ContextRegistry.get().get_logger().log_warning(
                         "Tool Executor",
                         f"Tool '{tool_name}' executed but detected logical failure.",
                         metadata={
@@ -1548,7 +1529,7 @@ class AgentCoreHelpers:
                     )
                     return (False, logical_failure_message)
             except Exception as e:
-                debug_error(
+                ContextRegistry.get().get_logger().log_error(
                     "Tool Executor",
                     f"Exception during tool execution: {str(e)}",
                     metadata={
@@ -1597,7 +1578,7 @@ class AgentCoreHelpers:
                 # This will leave a zombie thread if the underlying tool call is stuck,
                 # but it will prevent the main workflow from hanging.
                 executor.shutdown(wait=False)
-                debug_error(
+                ContextRegistry.get().get_logger().log_error(
                     "Tool Executor",
                     f"Tool '{tool_name}' execution timed out after {timeout} seconds.",
                     metadata={
@@ -1610,7 +1591,7 @@ class AgentCoreHelpers:
             except Exception as e:
                 # Handle other exceptions during execution.
                 executor.shutdown(wait=True)
-                debug_error(
+                ContextRegistry.get().get_logger().log_error(
                     "Tool Executor",
                     f"Exception during tool execution: {str(e)}",
                     metadata={
@@ -1629,7 +1610,7 @@ class AgentCoreHelpers:
             task: TASK, spawn_reason: str | None = None
         ) -> dict:
             """Analyze if task is atomic or needs decomposition using tool schema awareness."""
-            debug_info(
+            ContextRegistry.get().get_logger().log_info(
                 "Complexity Analyzer",
                 f"Analyzing complexity for Task {task.task_id}: '{task.description}'",
                 metadata={
@@ -1683,7 +1664,7 @@ class AgentCoreHelpers:
                     "atomic_tool_name": task.tool_name if is_simple else None,
                 }
 
-            debug_info(
+            ContextRegistry.get().get_logger().log_info(
                 "Complexity Analyzer",
                 f"Complexity Analysis Result: {analysis_result}",
                 metadata={
@@ -1736,7 +1717,7 @@ class AgentGraphCore:
         """Creates high-level plan using tool pre-filtering and self-healing for efficiency."""
         AgentStatusUpdater.update_status("Initial Planner")
         goal = state.original_goal
-        debug_info(
+        ContextRegistry.get().get_logger().log_info(
             "--- NODE: Initial Planner ---",
             f"Decomposing goal: {goal}",
             metadata={
@@ -1751,7 +1732,7 @@ class AgentGraphCore:
         plan_is_valid = False
 
         for attempt in range(2):  # Try to generate a valid plan up to 2 times
-            debug_info(
+            ContextRegistry.get().get_logger().log_info(
                 "Initial Planner",
                 f"Planning attempt {attempt + 1}",
                 metadata={"attempt": attempt + 1},
@@ -1900,7 +1881,7 @@ class AgentGraphCore:
             if not has_invalid_tool:
                 plan_is_valid = True
                 validated_tasks = current_validated_tasks
-                debug_info(
+                ContextRegistry.get().get_logger().log_info(
                     "Initial Planner",
                     "Successfully generated a valid plan.",
                     metadata={"attempt": attempt + 1},
@@ -1912,7 +1893,7 @@ class AgentGraphCore:
                     error_feedback = f"You previously planned to use the tool '{invalid_tool_name}', which is not a valid tool. {validation_error_details}. Please only use tools from the provided list and ensure correct spelling and capitalization."
                 else:
                     error_feedback = f"You previously planned to use the tool '{invalid_tool_name}', which is not a valid tool. Please only use tools from the provided list and ensure correct spelling and capitalization."
-                debug_warning(
+                ContextRegistry.get().get_logger().log_warning(
                     "Initial Planner",
                     f"Invalid plan generated on attempt {attempt + 1}. Feedback: {error_feedback}",
                     metadata={"attempt": attempt + 1},
@@ -1961,7 +1942,7 @@ class AgentGraphCore:
 
                 # Log skip decisions for visibility
                 if initial_status == "skip":
-                    debug_info(
+                    ContextRegistry.get().get_logger().log_info(
                         "Initial Planner - Pre-Flight Skip",
                         f"Task {idx + 1} marked as SKIP (probability: {skip_probability}%): {item['description'][:60]}...",
                         metadata={
@@ -1998,7 +1979,7 @@ class AgentGraphCore:
             actual_tasks = []
 
         if not actual_tasks:
-            debug_error(
+            ContextRegistry.get().get_logger().log_error(
                 "Initial Planner",
                 "All planning attempts failed. Using final fallback task.",
                 metadata={},
@@ -2014,7 +1995,7 @@ class AgentGraphCore:
                 )
             )
 
-        debug_info(
+        ContextRegistry.get().get_logger().log_info(
             "Initial Planner",
             f"Final plan generated with {len(actual_tasks)} tasks.",
             metadata={
@@ -2046,7 +2027,7 @@ class AgentGraphCore:
         AgentStatusUpdater.update_status(
             "complexity_analysis", task_id=current_task_id, extra_info="Analyzing task"
         )
-        debug_info(
+        ContextRegistry.get().get_logger().log_info(
             "--- NODE: Classifier ---",
             "Deciding next action based on task status and failure history",
             metadata={"function name": "__subAGENT_classifier"},
@@ -2071,7 +2052,7 @@ class AgentGraphCore:
                     )
                 )
 
-            debug_info(
+            ContextRegistry.get().get_logger().log_info(
                 "Classifier - Skip Handler",
                 f"Task {current_task_id} was PRE-FLIGHT SKIPPED (prob: {skip_probability}%): {skip_reason}",
                 metadata={
@@ -2108,7 +2089,7 @@ class AgentGraphCore:
                 current_task, skipped_tasks
             )
             if should_skip:
-                debug_info(
+                ContextRegistry.get().get_logger().log_info(
                     "Classifier - Cascade Skip Handler",
                     f"Task {current_task_id} is being SKIPPED due to dependency on skipped tasks: {reason}",
                     metadata={
@@ -2156,7 +2137,7 @@ class AgentGraphCore:
                     task_id=current_task_id,
                     extra_info="FAILED: Exceeded retry limit",
                 )
-                debug_error(
+                ContextRegistry.get().get_logger().log_error(
                     "Classifier",
                     f"Task {current_task_id} has failed {current_task.failure_context.fail_count} times. Exceeded retry limit of 2 attempts. Marking as permanently failed.",
                     metadata={
@@ -2176,7 +2157,7 @@ class AgentGraphCore:
                 current_task.status = "skip"
 
         # print_log_message(f"Task ID: {current_task_id}, Persona: {persona}", "Classifier")
-        debug_info(
+        ContextRegistry.get().get_logger().log_info(
             "Classifier",
             f"Task ID: {current_task_id}, Persona: {persona}",
             metadata={
@@ -2193,7 +2174,7 @@ class AgentGraphCore:
     @classmethod
     def subAGENT_parameter_generator(cls, state: "WorkflowStateModel") -> dict:
         """🧠 PARAMETER GENERATOR: Generates and validates parameters using the Dual Context system."""
-        debug_info(
+        ContextRegistry.get().get_logger().log_info(
             "--- NODE: Parameter Generator ---",
             "Generating and validating parameters",
             metadata={"function name": "subAGENT_parameter_generator"},
@@ -2208,7 +2189,7 @@ class AgentGraphCore:
         if current_task:
             # 🔥 SKIP BYPASS: Skip parameter generation for skipped tasks
             if current_task.status == "skip":
-                debug_info(
+                ContextRegistry.get().get_logger().log_info(
                     "Parameter Generator - Skip Bypass",
                     "Task is skipped, bypassing parameter generation.",
                     metadata={
@@ -2228,7 +2209,7 @@ class AgentGraphCore:
                 and isinstance(current_task.execution_context.parameters, dict)
                 and current_task.execution_context.parameters
             ):
-                debug_info(
+                ContextRegistry.get().get_logger().log_info(
                     "Parameter Generator",
                     "Reusing existing parameters for pending task; skipping regeneration.",
                     metadata={
@@ -2328,7 +2309,7 @@ class AgentGraphCore:
                         for s in (current_task.failure_context.strategy_history or [])
                     ],
                 }
-                debug_info(
+                ContextRegistry.get().get_logger().log_info(
                     "Parameter Generator",
                     f"Including failure context for task {current_task_id}: {current_task.failure_context.error_type}",
                     metadata={
@@ -2389,7 +2370,7 @@ class AgentGraphCore:
                     tool_name=current_task.tool_name,
                     parameters=parameters,
                 )
-                debug_info(
+                ContextRegistry.get().get_logger().log_info(
                     "Parameter Generator",
                     f"Generated and validated parameters for task {current_task_id}",
                     metadata={
@@ -2412,7 +2393,7 @@ class AgentGraphCore:
                     error_type="ParameterValidationError",
                     failed_parameters=parameters,
                 )
-                debug_error(
+                ContextRegistry.get().get_logger().log_error(
                     "Parameter Generator",
                     f"Parameter validation failed for task {current_task_id}: {error_message}",
                     metadata={
@@ -2445,7 +2426,7 @@ class AgentGraphCore:
             return {}
         except Exception as e:
             # print_log_message(f"Failed to get schema for {tool_name}: {e}", "Tool Schema")
-            debug_error(
+            ContextRegistry.get().get_logger().log_error(
                 "Tool Schema",
                 f"Failed to get schema for {tool_name}: {e}",
                 metadata={"function name": "__get_tool_schema", "tool_name": tool_name},
@@ -2489,7 +2470,7 @@ class AgentGraphCore:
         The spawning integration here enables true hierarchical problem-solving
         where abstract goals are recursively refined into executable operations.
         """
-        debug_info(
+        ContextRegistry.get().get_logger().log_info(
             "--- NODE: Task Executor ---",
             "Executing or decomposing current task",
             metadata={"function name": "__subAGENT_task_executor"},
@@ -2502,7 +2483,7 @@ class AgentGraphCore:
         AgentStatusUpdater.update_status("task_execution", task_id=current_task_id)
 
         if not current_task:
-            debug_error(
+            ContextRegistry.get().get_logger().log_error(
                 "Task Executor",
                 f"Could not find current task with ID {current_task_id}",
                 metadata={
@@ -2514,7 +2495,7 @@ class AgentGraphCore:
 
         # 🔥 SKIP BYPASS: Tasks already marked as skip bypass execution entirely
         if current_task.status == "skip":
-            debug_info(
+            ContextRegistry.get().get_logger().log_info(
                 "Task Executor - Skip Bypass",
                 f"Task {current_task_id} is SKIPPED, bypassing execution",
                 metadata={
@@ -2534,7 +2515,7 @@ class AgentGraphCore:
 
         # --- VIRTUAL TOOL INTERCEPTION ---
         if current_task.tool_name == "perform_synthesis":
-            debug_info(
+            ContextRegistry.get().get_logger().log_info(
                 "Task Executor",
                 "Intercepted virtual tool 'perform_synthesis'.",
                 metadata={"task_id": current_task.task_id},
@@ -2592,7 +2573,7 @@ class AgentGraphCore:
                     failed_parameters=synthetic_failed_params,
                     strategy_history=[],
                 )
-                debug_info(
+                ContextRegistry.get().get_logger().log_info(
                     "SubAgent Spawner",
                     f"Injected synthetic failure_context into parent task {current_task.task_id}",
                     metadata={
@@ -2614,7 +2595,7 @@ class AgentGraphCore:
                     task_id=current_task_id,
                     extra_info="Decomposing complex task",
                 )
-                debug_info(
+                ContextRegistry.get().get_logger().log_info(
                     "Task Executor",
                     f"Task {current_task_id} is complex - triggering spawning",
                     metadata={
@@ -2686,7 +2667,7 @@ class AgentGraphCore:
             AgentStatusUpdater.update_status(
                 "task_execution", task_id=current_task_id, extra_info="Executing tool"
             )
-            debug_info(
+            ContextRegistry.get().get_logger().log_info(
                 "Task Executor",
                 f"Task {current_task_id} is atomic - executing directly",
                 metadata={
@@ -2699,7 +2680,7 @@ class AgentGraphCore:
             try:
                 if current_task.status != "in_progress":
                     current_task.status = "in_progress"
-                    debug_info(
+                    ContextRegistry.get().get_logger().log_info(
                         "Task Executor",
                         f"Marked Task {current_task_id} as in_progress",
                         metadata={
@@ -2740,7 +2721,7 @@ class AgentGraphCore:
                     )
 
                 # Add explicit debug when failures repeat to help root cause analysis
-                debug_error(
+                ContextRegistry.get().get_logger().log_error(
                     "Task Executor",
                     f"Task {current_task_id} execution failed (fail_count={current_task.failure_context.fail_count}): {result}",
                     metadata={
@@ -2756,7 +2737,7 @@ class AgentGraphCore:
                         task_id=current_task_id,
                         extra_info="failed: exceeded retries",
                     )
-                    debug_error(
+                    ContextRegistry.get().get_logger().log_error(
                         "Task Executor",
                         f"Task {current_task_id} has failed {current_task.failure_context.fail_count} times. Exceeded retry limit of 3.",
                         metadata={
@@ -2774,7 +2755,7 @@ class AgentGraphCore:
                     }
 
         except Exception as e:
-            debug_error(
+            ContextRegistry.get().get_logger().log_error(
                 "Task Executor",
                 f"Error during task execution: {e!s}",
                 metadata={
@@ -2824,7 +2805,7 @@ class AgentGraphCore:
     @classmethod
     def __subAGENT_context_synthesizer(cls, state: "WorkflowStateModel") -> dict:
         """Summarizes the result of a completed task for cleaner context passing."""
-        debug_info(
+        ContextRegistry.get().get_logger().log_info(
             "--- NODE: Context Synthesizer ---",
             "Summarizing task result for context bridge",
             metadata={"function name": "__subAGENT_context_synthesizer"},
@@ -2873,7 +2854,7 @@ class AgentGraphCore:
 
             if summary:
                 current_task.execution_context.analysis = summary
-                debug_info(
+                ContextRegistry.get().get_logger().log_info(
                     "Context Synthesizer",
                     f"Generated analysis for Task {current_task_id}: '{summary}'",
                     metadata={
@@ -2898,7 +2879,7 @@ class AgentGraphCore:
                 f"Task was skipped. Reason: {current_task.execution_context.result}"
             )
             current_task.execution_context.analysis = skip_summary
-            debug_info(
+            ContextRegistry.get().get_logger().log_info(
                 "Context Synthesizer - Skip Handler",
                 f"Generated analysis for SKIPPED Task {current_task_id}: '{skip_summary}'",
                 metadata={
@@ -2912,7 +2893,7 @@ class AgentGraphCore:
     @classmethod
     def __subAGENT_goal_validator(cls, state: "WorkflowStateModel") -> dict:
         """Validates if the task's goal was achieved based on the result and analysis."""
-        debug_info(
+        ContextRegistry.get().get_logger().log_info(
             "--- NODE: Goal Validator ---",
             "Validating task goal achievement",
             metadata={"function name": "__subAGENT_goal_validator"},
@@ -2923,7 +2904,7 @@ class AgentGraphCore:
 
         # 🔥 SKIP BYPASS: Skip goal validation for skipped tasks entirely.
         if current_task and current_task.status == "skip":
-            debug_info(
+            ContextRegistry.get().get_logger().log_info(
                 "Goal Validator - Skip Bypass",
                 f"Task {current_task_id} is SKIPPED, bypassing goal validation",
                 metadata={
@@ -2978,7 +2959,7 @@ class AgentGraphCore:
                 current_task.execution_context.goal_achieved = validation_result.get(
                     "goal_achieved", False
                 )
-                debug_info(
+                ContextRegistry.get().get_logger().log_info(
                     "Goal Validator",
                     f"Validation for Task {current_task_id}: Goal Achieved = {validation_result.get('goal_achieved')}, Reasoning: {validation_result.get('reasoning')}",
                     metadata={
@@ -3040,7 +3021,7 @@ class AgentGraphCore:
                         # Defensive: avoid raising from validator persistence
                         pass
             else:
-                debug_warning(
+                ContextRegistry.get().get_logger().log_warning(
                     "Goal Validator",
                     f"Invalid response from validation LLM for Task {current_task_id}. Defaulting to goal not achieved.",
                     metadata={
@@ -3087,7 +3068,7 @@ class AgentGraphCore:
         AgentStatusUpdater.update_status(
             "error_recovery", task_id=state.current_task_id
         )
-        debug_info(
+        ContextRegistry.get().get_logger().log_info(
             "--- NODE: Error Fallback ---",
             "Handling task failure with tiered recovery strategies",
             metadata={"function name": "__subAGENT_error_fallback"},
@@ -3424,7 +3405,7 @@ class AgentGraphCore:
                 current_task.status = "failed"
 
         except Exception as e:
-            debug_error(
+            ContextRegistry.get().get_logger().log_error(
                 "Error Fallback",
                 f"Error during LLM recovery processing: {e}",
                 metadata={
@@ -3465,7 +3446,7 @@ class AgentGraphCore:
         This is where the hierarchical magic happens - parent tasks are only
         considered complete when their spawned sub-tasks finish successfully.
         """
-        debug_info(
+        ContextRegistry.get().get_logger().log_info(
             "--- NODE: Task Planner ---",
             "Managing task progression and parent-child relationships",
             metadata={"function name": "__subAGENT_task_planner"},
@@ -3555,7 +3536,7 @@ class AgentGraphCore:
 
             next_task.required_context.pre_execution_context = accumulated_context
 
-            debug_info(
+            ContextRegistry.get().get_logger().log_info(
                 "Context Bridge",
                 f"Injected context from {len(completed_tasks)} completed tasks into Task {next_task_id}",
                 metadata={
@@ -3575,7 +3556,7 @@ class AgentGraphCore:
     def __subAGENT_finalizer(cls, state: "WorkflowStateModel") -> dict:
         """Generate final response consolidating all task results."""
         # print_log_message("--- NODE: Finalizer ---", "Finalizer")
-        debug_info(
+        ContextRegistry.get().get_logger().log_info(
             "--- NODE: Finalizer ---",
             "Generating final response consolidating all task results",
             metadata={"function name": "__subAGENT_finalizer"},
@@ -3589,7 +3570,7 @@ class AgentGraphCore:
         skipped_tasks = [t for t in tasks if t.status == "skip"]
 
         # Debug system_logging with skip statistics
-        debug_info(
+        ContextRegistry.get().get_logger().log_info(
             "Finalizer - Task Summary",
             f"Workflow completed: {len(completed_tasks)} completed, {len(skipped_tasks)} skipped, {len(failed_tasks)} failed",
             metadata={
@@ -3749,7 +3730,7 @@ class AgentGraphCore:
                 )
             else:
                 workflow_status = "COMPLETED"  # Full success - all tasks completed
-            debug_info(
+            ContextRegistry.get().get_logger().log_info(
                 "Finalizer",
                 "LLM produced parsable JSON. Returning parsed object as final_response.",
                 metadata={
@@ -3820,7 +3801,7 @@ class AgentGraphCore:
                     workflow_status = "ALL_SKIPPED"  # Nothing accomplished
                 else:
                     workflow_status = "COMPLETED"  # Full success
-                debug_info(
+                ContextRegistry.get().get_logger().log_info(
                     "Finalizer",
                     "Repaired final response successfully and returning as final_response.",
                     metadata={
@@ -3836,7 +3817,7 @@ class AgentGraphCore:
                     "executed_nodes": state.executed_nodes + ["subAGENT_finalizer"],
                 }
         except Exception as e:
-            debug_warning(
+            ContextRegistry.get().get_logger().log_warning(
                 "Finalizer",
                 f"JSON repair attempt failed: {e}",
                 metadata={"function name": "__subAGENT_finalizer", "exception": str(e)},
@@ -3854,7 +3835,7 @@ class AgentGraphCore:
         except Exception:
             final_text = str(raw)
 
-        debug_info(
+        ContextRegistry.get().get_logger().log_info(
             "Finalizer",
             f"Final Response (fallback text): {final_text}",
             metadata={
@@ -3887,7 +3868,7 @@ class AgentGraphCore:
                 "analysis": {"issues": "", "reason": ""},
             }
 
-        debug_info(
+        ContextRegistry.get().get_logger().log_info(
             "Finalizer",
             "Returning wrapped fallback final response as structured JSON schema",
             metadata={
@@ -3915,7 +3896,7 @@ class AgentGraphCore:
         This is a critical routing function that enables the retry loop.
         """
         # print_log_message("--- ROUTER: After Execution ---", "Router")
-        debug_info(
+        ContextRegistry.get().get_logger().log_info(
             "--- ROUTER: After Execution ---",
             "Routing after task execution based on task status",
             metadata={"function name": "__router_after_execution"},
@@ -3928,7 +3909,7 @@ class AgentGraphCore:
             # If the task failed, route back to the classifier to decide on a retry or fallback.
             # This creates the crucial "retry loop".
             # print_log_message(f"Task {current_task_id} failed. Routing to classifier for retry/fallback.", "Router")
-            debug_info(
+            ContextRegistry.get().get_logger().log_info(
                 "Router",
                 f"Task {current_task_id} failed. Routing to classifier for retry/fallback.",
                 metadata={
@@ -3944,7 +3925,7 @@ class AgentGraphCore:
         if not pending_tasks:
             # If no more pending tasks, it's time to finalize the workflow.
             # print_log_message("All tasks completed. Routing to finalizer.", "Router")
-            debug_info(
+            ContextRegistry.get().get_logger().log_info(
                 "Router",
                 "All tasks completed. Routing to finalizer.",
                 metadata={"function name": "__router_after_execution"},
@@ -3953,7 +3934,7 @@ class AgentGraphCore:
 
         # If there are more pending tasks, route to the planner to select the next one.
         # print_log_message("Task completed. Routing to task planner for next task.", "Router")
-        debug_info(
+        ContextRegistry.get().get_logger().log_info(
             "Router",
             "Task completed. Routing to task planner for next task.",
             metadata={"function name": "__router_after_execution"},
@@ -3966,7 +3947,7 @@ class AgentGraphCore:
     ) -> Literal["subAGENT_parameter_generator", "subAGENT_error_fallback"]:
         """Route to parameter generation or error fallback."""
         # print_log_message("--- ROUTER: Classifier ---", "Router")
-        debug_info(
+        ContextRegistry.get().get_logger().log_info(
             "--- ROUTER: Classifier ---",
             "Routing based on classifier decision",
             metadata={"function name": "__router_classifier"},
@@ -3981,7 +3962,7 @@ class AgentGraphCore:
     ) -> Literal["subAGENT_classifier", "subAGENT_finalizer"]:
         """Route from task planner to either classifier or finalizer."""
         # print_log_message("--- ROUTER: Task Planner ---", "Router")
-        debug_info(
+        ContextRegistry.get().get_logger().log_info(
             "--- ROUTER: Task Planner ---",
             "Routing based on task planner decision",
             metadata={"function name": "__router_task_planner"},
@@ -4133,7 +4114,7 @@ class Spawn_subAgent:
         cls, parent_task: TASK, reason: str, state: "WorkflowStateModel"
     ) -> dict:
         """Uses an LLM to analyze if a task is too complex and requires decomposition."""
-        debug_info(
+        ContextRegistry.get().get_logger().log_info(
             "--- SPAWNER: Analyzing Task for sub-agent spawning ---",
             f"Task ID: {parent_task.task_id}, Reason: {reason}",
             metadata={
@@ -4170,7 +4151,7 @@ class Spawn_subAgent:
             not isinstance(analysis_result, dict)
             or "requires_decomposition" not in analysis_result
         ):
-            debug_warning(
+            ContextRegistry.get().get_logger().log_warning(
                 "SubAgent Spawner",
                 "LLM failed to provide a valid spawn analysis. Defaulting to NO spawn.",
                 metadata={
@@ -4184,7 +4165,7 @@ class Spawn_subAgent:
                 "reasoning": "Fallback due to invalid LLM response.",
             }
 
-        debug_info(
+        ContextRegistry.get().get_logger().log_info(
             "SubAgent Spawner",
             f"Spawn Analysis Result: {analysis_result.get('reasoning')}",
             metadata={
@@ -4212,7 +4193,7 @@ class Spawn_subAgent:
         Enhanced with tool pre-filtering and context passing.
         FIX 2: Now implements discovery-first approach when parent task has failure context.
         """
-        debug_info(
+        ContextRegistry.get().get_logger().log_info(
             "--- SPAWNER: Decomposing Task into smaller tasks ---",
             f"Task ID: {parent_task.task_id}",
             metadata={
@@ -4247,7 +4228,7 @@ class Spawn_subAgent:
             )
         except Exception as e:
             # This is a critical internal error, not just a planning choice.
-            debug_error(
+            ContextRegistry.get().get_logger().log_error(
                 "SubAgent Spawner",
                 f"CRITICAL: Failed to generate sub-task prompt due to an internal error: {e}",
                 metadata={
@@ -4308,7 +4289,7 @@ class Spawn_subAgent:
         decomposed_tasks_data = ModelManager.convert_to_json(response.content)
 
         if not isinstance(decomposed_tasks_data, list):
-            debug_warning(
+            ContextRegistry.get().get_logger().log_warning(
                 "SubAgent Spawner",
                 "LLM failed to return a valid list for decomposition.",
                 metadata={
@@ -4325,7 +4306,7 @@ class Spawn_subAgent:
             ):
                 # FIX: Now recommended_tools is consistently list[str] for both depth cases
                 if item["tool_name"] not in recommended_tools:
-                    debug_warning(
+                    ContextRegistry.get().get_logger().log_warning(
                         "SubAgent Spawner",
                         f"Tool '{item['tool_name']}' not in recommended set. Skipping.",
                         metadata={
@@ -4368,7 +4349,7 @@ class Spawn_subAgent:
                     ),
                 )
 
-        debug_info(
+        ContextRegistry.get().get_logger().log_info(
             "SubAgent Spawner",
             f"Decomposed into {len(sub_tasks)} validated sub-tasks.",
             metadata={
@@ -4384,7 +4365,7 @@ class Spawn_subAgent:
         cls, parent_task: TASK, subtasks: list[TASK], state: "WorkflowStateModel"
     ) -> dict:
         """Injects the newly created sub-tasks into the main task list."""
-        debug_info(
+        ContextRegistry.get().get_logger().log_info(
             "--- SPAWNER: Injecting sub-tasks into the workflow ---",
             f"Parent Task ID: {parent_task.task_id}, Sub-tasks to inject: {len(subtasks)}",
             metadata={
@@ -4422,7 +4403,7 @@ class Spawn_subAgent:
                             else []
                         ),
                     )
-                debug_info(
+                ContextRegistry.get().get_logger().log_info(
                     "SubAgent Spawner",
                     f"Inherited failed_parameters from parent {parent_task.task_id} to subtask {subtask.task_id}",
                     metadata={
@@ -4435,7 +4416,7 @@ class Spawn_subAgent:
         try:
             current_task_index = current_tasks.index(parent_task)
         except ValueError:
-            debug_warning(
+            ContextRegistry.get().get_logger().log_warning(
                 "SubAgent Spawner",
                 f"Could not find parent task {parent_task.task_id} in state.",
                 metadata={
@@ -4461,7 +4442,7 @@ class Spawn_subAgent:
             )
 
             if new_signature in completed_task_signatures:
-                debug_warning(
+                ContextRegistry.get().get_logger().log_warning(
                     "SubAgent Spawner",
                     f"Skipping redundant sub-task {new_sub_task.task_id} ('{new_sub_task.description}') as it's semantically equivalent to a completed task.",
                     metadata={
@@ -4523,7 +4504,7 @@ class Spawn_subAgent:
                 failed_parameters=synthetic_failed_params,
                 strategy_history=[],
             )
-            debug_info(
+            ContextRegistry.get().get_logger().log_info(
                 "SubAgent Spawner",
                 f"Injected synthetic failure_context into parent task {parent_task.task_id}",
                 metadata={
@@ -4535,7 +4516,7 @@ class Spawn_subAgent:
 
         spawn_analysis = cls.analyze_spawn_requirement(parent_task, spawn_reason, state)
         if not spawn_analysis.get("should_spawn"):
-            debug_info(
+            ContextRegistry.get().get_logger().log_info(
                 "SubAgent Spawner",
                 f"Analysis decided not to spawn a sub-agent for task {parent_task.task_id}.",
                 metadata={
@@ -4548,7 +4529,7 @@ class Spawn_subAgent:
             parent_task, state, parent_context, recovery_plan
         )
         if not subtasks:
-            debug_warning(
+            ContextRegistry.get().get_logger().log_warning(
                 "SubAgent Spawner",
                 f"Decomposition failed for task {parent_task.task_id}.",
                 metadata={
@@ -4647,9 +4628,10 @@ class AgentStatusUpdater:
     def update_status(cls, category: str, task_id: int = None, extra_info: str = ""):
         """Update user status with funny quotes and request count info"""
         try:
-            from ...config import settings
-
-            eval_listener = settings.listeners.get("eval", None)
+            # The eval listener lives on the active context's listener slot
+            # (previously: settings.listeners). Accessed via the platform-neutral
+            # context interface so this module never imports settings directly.
+            eval_listener = ContextRegistry.get().get_listeners().get("eval", None)
             if eval_listener is None:
                 return
 
@@ -4689,7 +4671,7 @@ class AgentStatusUpdater:
 
         except Exception as e:
             # Fail silently - status updates shouldn't break the workflow
-            debug_warning(
+            ContextRegistry.get().get_logger().log_warning(
                 "Status Updater",
                 f"Failed to update status: {e}",
                 metadata={

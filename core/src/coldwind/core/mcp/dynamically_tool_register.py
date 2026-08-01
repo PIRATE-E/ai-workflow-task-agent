@@ -69,8 +69,9 @@ class DynamicToolRegister:
                 )
 
                 # log the tool registration
-                # settings.socket_con.send_error(f"[DEBUG] Registering tool: {tool_name} with description: {description}")
-                # settings.socket_con.send_error(f"[DEBUG] Tool arguments schema: {arguments}")
+                # MIGRATED (commented-out legacy code removed): the old
+                # `settings.socket_con.send_error(...)` debug lines are gone; socket
+                # logging is now routed through the desktop diagnostics layer.
 
                 # register the tool with its schema
                 DynamicToolRegister.tool_list.append(

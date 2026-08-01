@@ -1,9 +1,10 @@
+from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
 from coldwind.core.agents.agentic_orchestrator.agent_core_helpers import AgentCoreHelpers
 import uuid
 from coldwind.core.agents.agentic_orchestrator.pydantic_models import TASK, REQUIRED_CONTEXT, EXECUTION_CONTEXT, FAILURE_CONTEXT, subAgent_CONTEXT
 from coldwind.core.agents.agentic_orchestrator.hierarchical_agent_prompts import HierarchicalAgentPrompt
 from coldwind.core.utils.model_manager import ModelManager
-from coldwind.desktop.ui.diagnostics.debug_helpers import debug_info, debug_warning, debug_error
+
 from coldwind.core.utils.timestamp_util import get_formatted_timestamp
 
 
@@ -17,7 +18,7 @@ class Spawn_subAgent:
         cls, parent_task: TASK, reason: str, state: "WorkflowStateModel"
     ) -> dict:
         """Uses an LLM to analyze if a task is too complex and requires decomposition."""
-        debug_info(
+        ContextRegistry.get().get_logger().log_info(
             "--- SPAWNER: Analyzing Task for sub-agent spawning ---",
             f"Task ID: {parent_task.task_id}, Reason: {reason}",
             metadata={
@@ -54,7 +55,7 @@ class Spawn_subAgent:
             not isinstance(analysis_result, dict)
             or "requires_decomposition" not in analysis_result
         ):
-            debug_warning(
+            ContextRegistry.get().get_logger().log_warning(
                 "SubAgent Spawner",
                 "LLM failed to provide a valid spawn analysis. Defaulting to NO spawn.",
                 metadata={
@@ -68,7 +69,7 @@ class Spawn_subAgent:
                 "reasoning": "Fallback due to invalid LLM response.",
             }
 
-        debug_info(
+        ContextRegistry.get().get_logger().log_info(
             "SubAgent Spawner",
             f"Spawn Analysis Result: {analysis_result.get('reasoning')}",
             metadata={
@@ -96,7 +97,7 @@ class Spawn_subAgent:
         Enhanced with tool pre-filtering and context passing.
         FIX 2: Now implements discovery-first approach when parent task has failure context.
         """
-        debug_info(
+        ContextRegistry.get().get_logger().log_info(
             "--- SPAWNER: Decomposing Task into smaller tasks ---",
             f"Task ID: {parent_task.task_id}",
             metadata={
@@ -131,7 +132,7 @@ class Spawn_subAgent:
             )
         except Exception as e:
             # This is a critical internal error, not just a planning choice.
-            debug_error(
+            ContextRegistry.get().get_logger().log_error(
                 "SubAgent Spawner",
                 f"CRITICAL: Failed to generate sub-task prompt due to an internal error: {e}",
                 metadata={
@@ -192,7 +193,7 @@ class Spawn_subAgent:
         decomposed_tasks_data = ModelManager.convert_to_json(response.content)
 
         if not isinstance(decomposed_tasks_data, list):
-            debug_warning(
+            ContextRegistry.get().get_logger().log_warning(
                 "SubAgent Spawner",
                 "LLM failed to return a valid list for decomposition.",
                 metadata={
@@ -209,7 +210,7 @@ class Spawn_subAgent:
             ):
                 # FIX: Now recommended_tools is consistently list[str] for both depth cases
                 if item["tool_name"] not in recommended_tools:
-                    debug_warning(
+                    ContextRegistry.get().get_logger().log_warning(
                         "SubAgent Spawner",
                         f"Tool '{item['tool_name']}' not in recommended set. Skipping.",
                         metadata={
@@ -252,7 +253,7 @@ class Spawn_subAgent:
                     ),
                 )
 
-        debug_info(
+        ContextRegistry.get().get_logger().log_info(
             "SubAgent Spawner",
             f"Decomposed into {len(sub_tasks)} validated sub-tasks.",
             metadata={
@@ -268,7 +269,7 @@ class Spawn_subAgent:
         cls, parent_task: TASK, subtasks: list[TASK], state: "WorkflowStateModel"
     ) -> dict:
         """Injects the newly created sub-tasks into the main task list."""
-        debug_info(
+        ContextRegistry.get().get_logger().log_info(
             "--- SPAWNER: Injecting sub-tasks into the workflow ---",
             f"Parent Task ID: {parent_task.task_id}, Sub-tasks to inject: {len(subtasks)}",
             metadata={
@@ -306,7 +307,7 @@ class Spawn_subAgent:
                             else []
                         ),
                     )
-                debug_info(
+                ContextRegistry.get().get_logger().log_info(
                     "SubAgent Spawner",
                     f"Inherited failed_parameters from parent {parent_task.task_id} to subtask {subtask.task_id}",
                     metadata={
@@ -319,7 +320,7 @@ class Spawn_subAgent:
         try:
             current_task_index = current_tasks.index(parent_task)
         except ValueError:
-            debug_warning(
+            ContextRegistry.get().get_logger().log_warning(
                 "SubAgent Spawner",
                 f"Could not find parent task {parent_task.task_id} in state.",
                 metadata={
@@ -345,7 +346,7 @@ class Spawn_subAgent:
             )
 
             if new_signature in completed_task_signatures:
-                debug_warning(
+                ContextRegistry.get().get_logger().log_warning(
                     "SubAgent Spawner",
                     f"Skipping redundant sub-task {new_sub_task.task_id} ('{new_sub_task.description}') as it's semantically equivalent to a completed task.",
                     metadata={
@@ -407,7 +408,7 @@ class Spawn_subAgent:
                 failed_parameters=synthetic_failed_params,
                 strategy_history=[],
             )
-            debug_info(
+            ContextRegistry.get().get_logger().log_info(
                 "SubAgent Spawner",
                 f"Injected synthetic failure_context into parent task {parent_task.task_id}",
                 metadata={
@@ -419,7 +420,7 @@ class Spawn_subAgent:
 
         spawn_analysis = cls.analyze_spawn_requirement(parent_task, spawn_reason, state)
         if not spawn_analysis.get("should_spawn"):
-            debug_info(
+            ContextRegistry.get().get_logger().log_info(
                 "SubAgent Spawner",
                 f"Analysis decided not to spawn a sub-agent for task {parent_task.task_id}.",
                 metadata={
@@ -432,7 +433,7 @@ class Spawn_subAgent:
             parent_task, state, parent_context, recovery_plan
         )
         if not subtasks:
-            debug_warning(
+            ContextRegistry.get().get_logger().log_warning(
                 "SubAgent Spawner",
                 f"Decomposition failed for task {parent_task.task_id}.",
                 metadata={

@@ -66,11 +66,14 @@ def main():
 
         async def run_browser_agent():
             """Execute the browser agent and return the result."""
-            if settings.AIMessage is None and settings.HumanMessage is None:
-                from langchain_core.messages import AIMessage as LangChainAIMessage
-                from langchain_core.messages import HumanMessage as LangChainHumanMessage
-                settings.AIMessage = LangChainAIMessage
-                settings.HumanMessage = LangChainHumanMessage
+            # MIGRATED: the dead `settings.AIMessage = ...` / `settings.HumanMessage = ...`
+            # bootstrap block was removed. It was a legacy writer to the deprecated
+            # `settings.*` globals, AND it had no backing `settings` import in this
+            # subprocess file (would have raised NameError). browser_use ships its
+            # own message classes (browser_use.llm.messages), and the
+            # BrowserUseCompatibleLLM (events_drivers.py) imports langchain's
+            # HumanMessage/AIMessage inline at call sites — so this module has no
+            # need to publish langchain message classes onto any global.
 
             from coldwind.core.tools.lggraph_tools.tools.browser_tool.runner import Runner
             from coldwind.core.tools.lggraph_tools.tools.browser_tool.config import BrowserRequiredConfig

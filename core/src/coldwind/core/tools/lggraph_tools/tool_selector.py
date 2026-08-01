@@ -1,5 +1,6 @@
     if selection.tool_name and selection.tool_name.lower() != "none":
-        from coldwind.core.tools.lggraph_tools.tool_response_manager import (
+        from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
+from coldwind.core.tools.lggraph_tools.tool_response_manager import (
             ToolResponseManager,
         )
         for tool in tools:
@@ -10,10 +11,8 @@
                     
                     # ?? FIX: Validate parameters before tool execution
                     if not isinstance(parameters, dict):
-                        from coldwind.desktop.ui.diagnostics.debug_helpers import (
-                            debug_warning,
-                        )
-                        debug_warning(
+                        
+                        ContextRegistry.get().get_logger().log_warning(
                             heading="TOOL_SELECTOR � INVALID_PARAMETERS",
                             body=f"Parameters should be dict, got {type(parameters).__name__}",
                             metadata={
@@ -28,10 +27,8 @@
                     if 'tool_name' not in parameters:
                         parameters['tool_name'] = tool.name
                         
-                    from coldwind.desktop.ui.diagnostics.debug_helpers import (
-                        debug_info,
-                    )
-                    debug_info(
+                    
+                    ContextRegistry.get().get_logger().log_info(
                         heading="TOOL_SELECTOR � TOOL_EXECUTION",
                         body=f"Executing tool '{tool.name}' with validated parameters",
                         metadata={

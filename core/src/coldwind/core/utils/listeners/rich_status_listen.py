@@ -6,7 +6,8 @@ This module provides Rich.status integration with the event system.
 It automatically updates Rich.status display when variables change or status events occur.
 
 Usage:
-    from rich_status_listener import rich_status_listener
+    from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
+from rich_status_listener import rich_status_listener
 
     # Start Rich.status display
     rich_status_listener.start_status_display("🚀 System initializing...")
@@ -22,7 +23,7 @@ from weakref import WeakKeyDictionary
 from rich.console import Console
 from rich.status import Status
 
-from coldwind.desktop.ui.diagnostics.debug_helpers import debug_info
+
 from coldwind.core.utils.listeners.event_listener import EventListener
 
 
@@ -174,7 +175,7 @@ class RichStatusListener:
 
         # Register with event system automatically
         self._register_variable_listener()
-        debug_info(
+        ContextRegistry.get().get_logger().log_info(
             heading="RICH_STATUS_LISTENER • INIT",
             body="🎯 Rich Status Listener initialized!",
             metadata={"listener_id": id(self)},
@@ -261,7 +262,7 @@ class RichStatusListener:
             if self.status_is_active and self.current_status:
                 self.current_status.update(status_message)
             else:
-                debug_info(
+                ContextRegistry.get().get_logger().log_info(
                     heading="RICH_STATUS_LISTENER • STATUS_UPDATE",
                     body=f"Status context is not active, cannot update status. {status_message}",
                     metadata={"listener_id": id(self)},
@@ -283,7 +284,7 @@ class RichStatusListener:
                 )  # the status is now set to the context manager
                 self.current_status = self.status_context.__enter__()
                 self.status_is_active = True
-                debug_info(
+                ContextRegistry.get().get_logger().log_info(
                     heading="RICH_STATUS_LISTENER • STATUS_START",
                     body=f"Status started with message: {initial_message}",
                     metadata={"listener_id": id(self)},
@@ -301,7 +302,7 @@ class RichStatusListener:
                 )
                 self.event_history.append(start_event)
             else:
-                debug_info(
+                ContextRegistry.get().get_logger().log_info(
                     heading="RICH_STATUS_LISTENER • STATUS_START",
                     body=f"Status is already active of consol object {self.console}, cannot start again.",
                     metadata={"listener_id": id(self)},
@@ -326,13 +327,13 @@ class RichStatusListener:
                 RichStatusListener._listeners.pop(
                     self
                 )  # Remove this listener from the listeners dictionary
-                debug_info(
+                ContextRegistry.get().get_logger().log_info(
                     heading="RICH_STATUS_LISTENER • STATUS_STOP",
                     body=f"RichStatusListener refcount: {sys.getrefcount(RichStatusListener)}",
                     metadata={"listener_id": id(self)},
                 )
             else:
-                debug_info(
+                ContextRegistry.get().get_logger().log_info(
                     heading="RICH_STATUS_LISTENER • STATUS_STOP",
                     body=f"Status is not active, cannot stop. of console object {self.console}",
                     metadata={"listener_id": id(self)},
@@ -348,7 +349,7 @@ class RichStatusListener:
             self.processed_events = set(
                 list(self.processed_events)[-1000:]
             )  # Keep the last 1000 events
-            debug_info(
+            ContextRegistry.get().get_logger().log_info(
                 heading="RICH_STATUS_LISTENER • CLEANUP",
                 body="Processed events cleared to prevent memory leaks.",
                 metadata={"listener_id": id(self)},
@@ -356,7 +357,7 @@ class RichStatusListener:
 
         if len(self.event_history) > 1000:
             self.event_history = self.event_history[-1000:]
-            debug_info(
+            ContextRegistry.get().get_logger().log_info(
                 heading="RICH_STATUS_LISTENER • CLEANUP",
                 body="Event history cleared to prevent memory leaks.",
                 metadata={"listener_id": id(self)},
@@ -411,13 +412,13 @@ class RichStatusListener:
                     EventListener.EventType.VARIABLE_CHANGED, self._on_variable_changed
                 )
                 RichStatusListener._listeners.pop(self, None)
-                debug_info(
+                ContextRegistry.get().get_logger().log_info(
                     heading="RICH_STATUS_LISTENER • UNREGISTER",
                     body=f"Unregistered {self} from RichStatusListener.",
                     metadata={"listener_id": id(self)},
                 )
             else:
-                debug_info(
+                ContextRegistry.get().get_logger().log_info(
                     heading="RICH_STATUS_LISTENER • UNREGISTER",
                     body=f"{self} was not registered in RichStatusListener.",
                     metadata={"listener_id": id(self)},

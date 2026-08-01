@@ -1,4 +1,7 @@
-from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
+# MIGRATED: direct langchain import for AIMessage (response-construction wrapper).
+# Runtime context access (when needed) via ContextRegistry.get().get_settings().
+from langchain_core.messages import AIMessage
+
 from coldwind.core.tools.lggraph_tools.tools.mcp_integrated_tools import filesystem
 
 
@@ -23,9 +26,9 @@ class FileSystemWrapper:
         result = filesystem.file_system_tool(**kwargs)
 
         # Safe debug system_logging
-        from coldwind.desktop.ui.diagnostics.debug_helpers import debug_info
+        
 
-        debug_info(
+        ContextRegistry.get().get_logger().log_info(
             heading="MCP_WRAPPER • FILESYSTEM",
             body="MCP server result received",
             metadata={
@@ -35,7 +38,7 @@ class FileSystemWrapper:
         )
 
         action = kwargs.get("tool_name")  # This should match the action being performed
-        debug_info(
+        ContextRegistry.get().get_logger().log_info(
             heading="MCP_WRAPPER • ACTION",
             body=f"Action performed: {action}",
             metadata={"action": action, "kwargs_count": len(kwargs)},
@@ -55,7 +58,7 @@ class FileSystemWrapper:
             else:
                 content = f"✅ **{action} completed for:** {self.file_path}\n\nResult: {result}"
 
-            ToolResponseManager().set_response([settings.AIMessage(content=content)])
+            ToolResponseManager().set_response([AIMessage(content=content)])
         else:
             # Error handling with clean error message
             error_msg = result if result else "Unknown error occurred"
@@ -66,4 +69,4 @@ class FileSystemWrapper:
 
             content = f"❌ **Filesystem Operation Failed**\n\n**Action:** {action}\n**File:** {self.file_path}\n**Error:** {error_msg}"
 
-            ToolResponseManager().set_response([settings.AIMessage(content=content)])
+            ToolResponseManager().set_response([AIMessage(content=content)])

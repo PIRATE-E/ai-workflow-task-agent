@@ -13,6 +13,8 @@ import dotenv
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_core.documents import Document
+# MIGRATED: direct langchain import for HumanMessage (was settings.HumanMessage).
+from langchain_core.messages import HumanMessage
 
 # ✅ LOCAL IMPORTS (lightweight)
 from coldwind.core.RAG.RAG_FILES import neo4j_rag
@@ -42,7 +44,7 @@ def _get_user_input(prompt_text: str, default: str = "y") -> str:
 
 
 def load_pdf_document(
-    doc_path: str = settings.DEFAULT_RAG_EXAMPLE_FILE_PATH,
+    doc_path: str = ContextRegistry.get().get_settings().DEFAULT_RAG_EXAMPLE_FILE_PATH,
 ) -> list[Document]:
     """
     Loads a PDF document or Text file and returns its content as a list of Document objects.
@@ -425,9 +427,9 @@ def save_knowledge_graph_gemini_cli(file_path: str):
         )
         == "y"
     ):
-        with Path(settings.DEFAULT_RAG_FILES_HASH_TXT_PATH).open("w") as file:
+        with Path(ContextRegistry.get().get_settings().DEFAULT_RAG_FILES_HASH_TXT_PATH).open("w") as file:
             file.write("")
-        with Path(settings.DEFAULT_RAG_FILES_PROCESSED_TRIPLES_PATH).open("w") as file:
+        with Path(ContextRegistry.get().get_settings().DEFAULT_RAG_FILES_PROCESSED_TRIPLES_PATH).open("w") as file:
             file.write("[]")
 
         asyncio.run(
@@ -447,8 +449,7 @@ async def process_chunks_with_immediate_saving(
     print(f"📊 Chunks to process: {len(chunks_to_process)}")
     print(f"🔧 Using function: {function.__name__}")
     print(
-        f"⚡ Max concurrent tasks: {ContextRegistry.get().get_settings().semaphore_api if function == neo4j_rag.prompt_gemini_for_triples_api else ContextRegistry.get().get_settings().semaphore_cli}"
-    )
+        f"⚡ Max concurrent tasks: {ContextRegistry.get().get_settings().semaphore_limit_api if function == neo4j_rag.prompt_gemini_for_triples_api else ContextRegistry.get().get_settings().semaphore_limit_cli}"
     print("-" * 50)
 
     # Create semaphore with correct limit of 10
@@ -456,9 +457,9 @@ async def process_chunks_with_immediate_saving(
     active_task = 0
     # --------- FIXED: Enhanced semaphore with better resource management ---------
     semaphore = Semaphore(
-        ContextRegistry.get().get_settings().semaphore_cli
+        ContextRegistry.get().get_settings().semaphore_limit_cli
         if function == neo4j_rag.prompt_gemini_for_triples_cli
-        else ContextRegistry.get().get_settings().semaphore_api
+        else ContextRegistry.get().get_settings().semaphore_limit_api
     )  # Set limit based on function  # Reduced from 5 to 3 for better stability
 
     async def using_semaphore(chunk: Document):
@@ -482,8 +483,10 @@ async def process_chunks_with_immediate_saving(
 
                 return result
             except Exception as e:
-                if settings.socket_con:
-                    settings.socket_con.send_error(
+                # MIGRATED: settings.socket_con → ContextRegistry.get().get_socket_connection()
+                _socket_con = ContextRegistry.get().get_socket_connection()
+                if _socket_con is not None:
+                    _socket_con.send_error(
                         f"❌ Error processing chunk, active taskc count {active_task}: {e}"
                     )
                 else:
@@ -527,8 +530,10 @@ async def process_chunks_with_immediate_saving(
                         triples, hashlib.sha256(chunk.page_content.encode()).hexdigest()
                     )
                 except Exception as e:
-                    if settings.socket_con:
-                        settings.socket_con.send_error(
+                    # MIGRATED: settings.socket_con → ContextRegistry.get().get_socket_connection()
+                    _socket_con = ContextRegistry.get().get_socket_connection()
+                    if _socket_con is not None:
+                        _socket_con.send_error(
                             f"❌ Error saving triples: {e} chunk : {chunk.page_content[:20]}"
                         )
                     else:
@@ -559,8 +564,10 @@ async def process_chunks_with_immediate_saving(
                 try:
                     neo4j_rag.insert_triples([(subject, predicate, object_val)])
                 except Exception as e:
-                    if settings.socket_con:
-                        settings.socket_con.send_error(
+                    # MIGRATED: settings.socket_con → ContextRegistry.get().get_socket_connection()
+                    _socket_con = ContextRegistry.get().get_socket_connection()
+                    if _socket_con is not None:
+                        _socket_con.send_error(
                             f"❌ Error inserting triples to Neo4j:"
                             f" {e} \n subject: {subject}, predicate: {predicate}, object: {object_val}"
                         )
@@ -652,9 +659,10 @@ def save_knowledge_graph_gemini_api(filepath: str):
         )
         == "y"
     ):
-        with Path(settings.DEFAULT_RAG_FILES_HASH_TXT_PATH).open("w") as file:
+        # MIGRATED: settings.DEFAULT_RAG_FILES_* paths → get_settings()
+        with Path(ContextRegistry.get().get_settings().DEFAULT_RAG_FILES_HASH_TXT_PATH).open("w") as file:
             file.write("")
-        with Path(settings.DEFAULT_RAG_FILES_PROCESSED_TRIPLES_PATH).open("w") as file:
+        with Path(ContextRegistry.get().get_settings().DEFAULT_RAG_FILES_PROCESSED_TRIPLES_PATH).open("w") as file:
             file.write("[]")
 
         asyncio.run(
@@ -749,9 +757,9 @@ def save_knowledge_graph_open_ai(filepath: str):
         == "y"
     ):
         # Use async file operations
-        with Path(settings.DEFAULT_RAG_FILES_HASH_TXT_PATH).open("w") as file:
+        with Path(ContextRegistry.get().get_settings().DEFAULT_RAG_FILES_HASH_TXT_PATH).open("w") as file:
             file.write("")
-        with Path(settings.DEFAULT_RAG_FILES_PROCESSED_TRIPLES_PATH).open("w") as file:
+        with Path(ContextRegistry.get().get_settings().DEFAULT_RAG_FILES_PROCESSED_TRIPLES_PATH).open("w") as file:
             file.write("[]")
 
         asyncio.run(
@@ -777,12 +785,14 @@ def get_all_triples_from_file() -> list:
     Returns:
         list: A list of all triples.
     """
-    if not pathlib.Path(settings.DEFAULT_RAG_FILES_PROCESSED_TRIPLES_PATH).exists():
+    # MIGRATED: settings.DEFAULT_RAG_FILES_PROCESSED_TRIPLES_PATH → get_settings() resolved once
+    _processed_path = ContextRegistry.get().get_settings().DEFAULT_RAG_FILES_PROCESSED_TRIPLES_PATH
+    if not pathlib.Path(_processed_path).exists():
         raise FileNotFoundError(
             "Processed triples file not found. Please run the processing function first."
         )
 
-    with Path(settings.DEFAULT_RAG_FILES_PROCESSED_TRIPLES_PATH).open("r") as file:
+    with Path(_processed_path).open("r") as file:
         return json.load(file)
 
 
@@ -797,14 +807,18 @@ async def mark_triple_chunk(triples: list, chunk_hash: str):
     except ImportError as e:
         raise ImportError(f"aiofiles library required for async file operations: {e}")
 
+    # MIGRATED: settings.DEFAULT_RAG_FILES_* paths → get_settings() resolved once (_hash_path, _triples_path)
+    _hash_path = ContextRegistry.get().get_settings().DEFAULT_RAG_FILES_HASH_TXT_PATH
+    _triples_path = ContextRegistry.get().get_settings().DEFAULT_RAG_FILES_PROCESSED_TRIPLES_PATH
+
     # Async file append for hash
-    async with aiofiles.open(settings.DEFAULT_RAG_FILES_HASH_TXT_PATH, "a") as file:
+    async with aiofiles.open(_hash_path, "a") as file:
         await file.write(chunk_hash + "\n")
 
     # Async file operations for triples
-    if await aiofiles.os.path.exists(settings.DEFAULT_RAG_FILES_PROCESSED_TRIPLES_PATH):
+    if await aiofiles.os.path.exists(_triples_path):
         async with aiofiles.open(
-            settings.DEFAULT_RAG_FILES_PROCESSED_TRIPLES_PATH, "r"
+            _triples_path, "r"
         ) as file:
             content = await file.read()
             existing_triples = json.loads(content)
@@ -812,12 +826,12 @@ async def mark_triple_chunk(triples: list, chunk_hash: str):
         existing_triples.extend(triples)
 
         async with aiofiles.open(
-            settings.DEFAULT_RAG_FILES_PROCESSED_TRIPLES_PATH, "w"
+            _triples_path, "w"
         ) as file:
             await file.write(json.dumps(existing_triples, indent=4))
     else:
         async with aiofiles.open(
-            settings.DEFAULT_RAG_FILES_PROCESSED_TRIPLES_PATH, "w"
+            _triples_path, "w"
         ) as file:
             await file.write(json.dumps(triples, indent=4))
 
@@ -827,12 +841,14 @@ def get_processed_chunks() -> set:
     Retrieves a set of processed chunks from a txt file.
     :return: set: A set of processed chunk identifiers.
     """
-    if not pathlib.Path(settings.DEFAULT_RAG_FILES_HASH_TXT_PATH).exists():
+    # MIGRATED: settings.DEFAULT_RAG_FILES_HASH_TXT_PATH → get_settings() resolved once
+    _hash_path = ContextRegistry.get().get_settings().DEFAULT_RAG_FILES_HASH_TXT_PATH
+    if not pathlib.Path(_hash_path).exists():
         Path(
-            settings.DEFAULT_RAG_FILES_HASH_TXT_PATH
+            _hash_path
         ).open("w").close()  # Create the file if it doesn't exist
         # raise FileNotFoundError("Processed chunks file not found. Please run the processing function first.")
-    with Path(settings.DEFAULT_RAG_FILES_HASH_TXT_PATH).open("r") as file:
+    with Path(_hash_path).open("r") as file:
         return {line.strip() for line in file if line.strip()}
 
 
@@ -853,7 +869,8 @@ def text_rag_search_using_llm(query: str, chunks: list[Document]) -> dict:
         )
 
         llm = ModelManager(model=ContextRegistry.get().get_settings().gpt_model)
-        response = llm.invoke([settings.HumanMessage(content=system_prompt), prompt])
+        # MIGRATED: settings.HumanMessage → direct langchain HumanMessage import.
+        response = llm.invoke([HumanMessage(content=system_prompt), prompt])
         result = json.loads(response.content)
         if "answer" not in result or "source_chunks" not in result:
             raise ValueError(
@@ -861,8 +878,10 @@ def text_rag_search_using_llm(query: str, chunks: list[Document]) -> dict:
             )
         return result
     except Exception as e:
-        if settings.socket_con:
-            settings.socket_con.send_error(f"Error during RAG search: {e}")
+        # MIGRATED: settings.socket_con → ContextRegistry.get().get_socket_connection()
+        _socket_con = ContextRegistry.get().get_socket_connection()
+        if _socket_con is not None:
+            _socket_con.send_error(f"Error during RAG search: {e}")
         else:
             print(f"Error during RAG search: {e}")
         return {"answer": "An error occurred during the search.", "source_chunks": []}
@@ -871,9 +890,10 @@ def text_rag_search_using_llm(query: str, chunks: list[Document]) -> dict:
 async def _clear_rag_files_async():
     """Helper async function to clear RAG files"""
     import aiofiles
-    async with aiofiles.open(settings.DEFAULT_RAG_FILES_HASH_TXT_PATH, "w") as file:
+    # MIGRATED: settings.DEFAULT_RAG_FILES_* paths → get_settings().
+    async with aiofiles.open(ContextRegistry.get().get_settings().DEFAULT_RAG_FILES_HASH_TXT_PATH, "w") as file:
         await file.write("")
-    async with aiofiles.open(settings.DEFAULT_RAG_FILES_PROCESSED_TRIPLES_PATH, "w") as file:
+    async with aiofiles.open(ContextRegistry.get().get_settings().DEFAULT_RAG_FILES_PROCESSED_TRIPLES_PATH, "w") as file:
         await file.write("[]")
 
 

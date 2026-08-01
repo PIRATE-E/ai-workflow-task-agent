@@ -5,7 +5,7 @@ from coldwind.core.models.state import StateAccessor
 def route_message(state):
     """Determines the next node in the workflow based on the classified message type.
     """
-    console = settings.console
+    console = ContextRegistry.get().get_console()
     state_accessor = StateAccessor()
     console.print("\t\t[bold][green]----Node is router[/bold][/green]")
     # 🔄 Sync StateAccessor with current LangGraph state

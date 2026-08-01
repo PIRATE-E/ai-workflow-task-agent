@@ -2,7 +2,9 @@ import atexit
 import signal
 from typing import Callable, List
 
-# Socket connection now centralized in settings
+# Socket connection lives on the active RuntimeContextInterface — accessed via
+# ContextRegistry.get().get_socket_connection() (returns None until the
+# orchestrator wires it, so the existing truthy-guard pattern still works).
 from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
 
 
@@ -42,8 +44,9 @@ class ChatDestructor:
         This ensures models are stopped even during abrupt termination.
         """
         if cls.is_cleaned_registered:
-            if settings.socket_con:
-                settings.socket_con.send_error(
+            socket = ContextRegistry.get().get_socket_connection()
+            if socket:
+                socket.send_error(
                     "[LOG]Cleanup handlers already registered."
                 )
             return
@@ -67,8 +70,9 @@ class ChatDestructor:
             print(f"Could not register signal handler: {e}")
 
         cls.is_cleaned_registered = True
-        if settings.socket_con:
-            settings.socket_con.send_error(
+        socket = ContextRegistry.get().get_socket_connection()
+        if socket:
+            socket.send_error(
                 "[LOG]✅ Chat cleanup handlers registered successfully"
             )
 
@@ -77,8 +81,9 @@ class ChatDestructor:
         """
         Handle termination signals and ensure proper cleanup.
         """
-        if settings.socket_con:
-            settings.socket_con.send_error(
+        socket = ContextRegistry.get().get_socket_connection()
+        if socket:
+            socket.send_error(
                 f"🛑 Signal {signum} received, cleaning up models..."
             )
         cls.call_all_cleanup_functions()
@@ -94,10 +99,13 @@ class ChatDestructor:
 
     @classmethod
     def call_all_cleanup_functions(cls):
+        # Grab the socket once for the duration of cleanup — repeated reads would
+        # thrash the registry and the value is stable inside a single teardown.
+        socket = ContextRegistry.get().get_socket_connection()
         # Prevent double cleanup execution
         if cls._cleanup_executed:
-            if settings.socket_con:
-                settings.socket_con.send_error(
+            if socket:
+                socket.send_error(
                     "[LOG]Cleanup already executed, skipping."
                 )
             return
@@ -105,19 +113,19 @@ class ChatDestructor:
         cls._cleanup_executed = True  # Set flag to prevent re-execution
 
         if len(cls._all_functions) == 0:
-            if settings.socket_con:
-                settings.socket_con.send_error("[LOG]No cleanup functions registered.")
+            if socket:
+                socket.send_error("[LOG]No cleanup functions registered.")
             return
 
-        if settings.socket_con:
-            settings.socket_con.send_error("[LOG]🧹 Starting cleanup process...")
+        if socket:
+            socket.send_error("[LOG]🧹 Starting cleanup process...")
 
         terminated_count = 0
         for func in cls._all_functions:
             try:
                 if callable(func):
-                    if settings.socket_con:
-                        settings.socket_con.send_error(
+                    if socket:
+                        socket.send_error(
                             f"[LOG]Executing cleanup: {func.__name__}"
                         )
                     func()  # Call the cleanup function
@@ -126,13 +134,13 @@ class ChatDestructor:
                     print(f"[LOG]Function {func} is not callable, skipping.")
             except Exception as e:
                 error_msg = f"[LOG]Error during cleanup function {func.__name__ if hasattr(func, '__name__') else func}: {e}"
-                if settings.socket_con:
-                    settings.socket_con.send_error(error_msg)
+                if socket:
+                    socket.send_error(error_msg)
                 else:
                     print(error_msg)
 
-        if settings.socket_con:
-            settings.socket_con.send_error(
+        if socket:
+            socket.send_error(
                 f"[LOG]✅ Cleanup completed. {terminated_count} functions executed."
             )
         else:

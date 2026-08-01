@@ -122,7 +122,8 @@ class SessionManager:
         import aiofiles
         from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
         from pathlib import Path
-        session_file_path = Path(settings.BROWSER_USE_USER_PROFILE_PATH) / 'custom_sessions.json'
+        # MIGRATED: settings.BROWSER_USE_USER_PROFILE_PATH → get_settings().BROWSER_USE_USER_PROFILE_PATH
+        session_file_path = Path(ContextRegistry.get().get_settings().BROWSER_USE_USER_PROFILE_PATH) / 'custom_sessions.json'
         async with aiofiles.open(session_file_path, 'w', encoding='utf-8') as f:
             content = json.dumps(session_data, indent=2)
             await f.write(content)
@@ -156,7 +157,8 @@ class SessionManager:
         await wait_until_browser_ready()
         from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
         session_data = {}
-        session_file_path = Path(settings.BROWSER_USE_USER_PROFILE_PATH) / "custom_sessions.json"
+        # MIGRATED: settings.BROWSER_USE_USER_PROFILE_PATH → get_settings().BROWSER_USE_USER_PROFILE_PATH
+        session_file_path = Path(ContextRegistry.get().get_settings().BROWSER_USE_USER_PROFILE_PATH) / "custom_sessions.json"
         if not session_file_path.exists():
             print("[SUBPROCESS] No custom session file found, starting fresh.")
             return

@@ -25,6 +25,8 @@ from types import ModuleType
 from typing import Dict
 import sys
 
+from coldwind.core.utils import timestamp_util
+
 __all__ = [
     "debug_helpers",
     "debug_message_protocol",
@@ -32,6 +34,7 @@ __all__ = [
     "open_ai_integration",
     "model_manager",
     "socket_manager",
+    timestamp_util,
 ]
 
 _LAZY_MODULES: Dict[str, str] = {

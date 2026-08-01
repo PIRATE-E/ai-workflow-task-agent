@@ -1,6 +1,9 @@
 import inspect
+from dataclasses import dataclass
+from typing import Any
 
 from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
+from coldwind.core.runtime.runtime_obj_enum import CoreRunTimeObjects
 from coldwind.core.prompts.system_prompt_tool_selector import get_tool_selector_prompt
 from coldwind.core.tools.lggraph_tools.tool_assign import ToolAssign
 from coldwind.desktop.ui.print_message_style import print_message
@@ -21,7 +24,14 @@ class ToolSelection:
 
 def tool_selection_agent(state) -> dict:
     """Selects and invokes the most appropriate tool for the user's request, or returns a message if no tool is needed."""
-    console = settings.console
+    # Grab the runtime handles once — console, socket, and the langchain message
+    # bundle all live on the active RuntimeContextInterface now (no settings.*).
+    context = ContextRegistry.get()
+    console = context.get_console()
+    socket = context.get_socket_connection()
+    HumanMessage, AIMessage, _BaseMessage = context.get_service(
+        CoreRunTimeObjects.message_classes
+    )
     console.print("\t\t----[bold][green]Node is tool_agent[/bold][/green]")
 
     # Access state directly from LangGraph parameter (no sync needed)
@@ -40,8 +50,8 @@ def tool_selection_agent(state) -> dict:
         )
         if tools
         else (
-            settings.socket_con.send_error("[ERROR] No tools available for selection.")
-            if settings.socket_con
+            socket.send_error("[ERROR] No tools available for selection.")
+            if socket
             else print("[ERROR] No tools available for selection.")
         )
     )
@@ -77,8 +87,8 @@ If no tool is needed, use "none" as the tool_name and empty object {} for parame
         with console.status("[bold green]Thinking...[/bold green]", spinner="dots"):
             response = llm.invoke(
                 [
-                    settings.HumanMessage(content=enhanced_system_prompt),
-                    settings.HumanMessage(content=content),
+                    HumanMessage(content=enhanced_system_prompt),
+                    HumanMessage(content=content),
                 ],
             )
 
@@ -86,8 +96,8 @@ If no tool is needed, use "none" as the tool_name and empty object {} for parame
         selection_json = ModelManager.convert_to_json(response)
 
         # Create ToolSelection object from JSON
-        from dataclasses import dataclass
-        from typing import Any
+        # (dataclass + Any imported at module top — preemptively hoisted to fix
+        # the pre-existing NameError where @dataclass was referenced before import.)
 
         selection = ToolSelection(
             tool_name=selection_json.get("tool_name", "none"),
@@ -99,13 +109,13 @@ If no tool is needed, use "none" as the tool_name and empty object {} for parame
         print("Reasoning:", selection.reasoning)
         print("Parameters:", selection.parameters)
     except Exception as e:
-        if settings.socket_con:
-            settings.socket_con.send_error(f"[ERROR] Exception in tool_agent: {e}")
+        if socket:
+            socket.send_error(f"[ERROR] Exception in tool_agent: {e}")
         else:
             print(f"[ERROR] Exception in tool_agent: {e}")
         return {
             "messages": [
-                settings.AIMessage(content=f"Error processing tool selection: {e!s}"),
+                AIMessage(content=f"Error processing tool selection: {e!s}"),
             ],
         }
     parameters = selection.parameters
@@ -113,8 +123,8 @@ If no tool is needed, use "none" as the tool_name and empty object {} for parame
         try:
             parameters = ModelManager.convert_to_json(parameters)
         except Exception as e:
-            if settings.socket_con:
-                settings.socket_con.send_error(
+            if socket:
+                socket.send_error(
                     f"[ERROR] Could not parse parameters: {e}",
                 )
             else:
@@ -138,20 +148,20 @@ If no tool is needed, use "none" as the tool_name and empty object {} for parame
                     )  # Get the last response from the tool manager
                     # Print tool result in modern style
                     print_message(result, sender="tool")
-                    if settings.socket_con:
-                        settings.socket_con.send_error(
+                    if socket:
+                        socket.send_error(
                             f"[RESULT] Result from {tool.name}: {result}",
                         )
                     return {
                         "messages": [
-                            settings.AIMessage(
+                            AIMessage(
                                 content=f"Result from {tool.name}: {result}",
                             ),
                         ],
                     }
                 except Exception as e:
-                    if settings.socket_con:
-                        settings.socket_con.send_error(
+                    if socket:
+                        socket.send_error(
                             f"[ERROR] Error using tool {tool.name}: {e} function: {tool.func.__name__} {inspect.trace()}",
                         )
                     else:
@@ -160,20 +170,20 @@ If no tool is needed, use "none" as the tool_name and empty object {} for parame
                         )
                     return {
                         "messages": [
-                            settings.AIMessage(
+                            AIMessage(
                                 content=f"Error using {tool.name}: {e!s}",
                             ),
                         ],
                     }
-        if settings.socket_con:
-            settings.socket_con.send_error(
+        if socket:
+            socket.send_error(
                 f"[ERROR] Tool '{selection.tool_name}' not found.",
             )
         else:
             print(f"[ERROR] Tool '{selection.tool_name}' not found.")
         return {
             "messages": [
-                settings.AIMessage(content=f"Tool '{selection.tool_name}' not found."),
+                AIMessage(content=f"Tool '{selection.tool_name}' not found."),
             ],
         }
-    return {"messages": [settings.AIMessage(content="No tool was used.")]}
+    return {"messages": [AIMessage(content="No tool was used.")]}

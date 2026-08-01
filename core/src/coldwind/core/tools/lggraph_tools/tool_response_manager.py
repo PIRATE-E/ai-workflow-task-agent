@@ -7,12 +7,19 @@ description:
 from __future__ import annotations
 from typing import Optional, List, Union
 
-from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
+# Langchain message classes are imported directly — this module is the storage
+# manager that holds concrete langchain BaseMessage instances, so it needs the
+# real classes (for isinstance type-validation in set_response) at runtime.
+# Previously these were read off the deprecated `settings.*` globals; that
+# created a load-order trap (settings.HumanMessage started as None until
+# chat_initializer._set_core_classes ran). Importing from langchain_core is
+# both correct and decoupled from the runtime-context wiring.
+from langchain_core.messages import HumanMessage, AIMessage, BaseMessage
 
 
 class ToolResponseManager:
     instance = None
-    _tool_response: Optional[List[Union[settings.HumanMessage, settings.AIMessage]]] = (
+    _tool_response: Optional[List[Union[HumanMessage, AIMessage]]] = (
         None  # because the response always be human or AI message list
     )
 
@@ -37,7 +44,7 @@ class ToolResponseManager:
         return self._tool_response
 
     def set_response(
-        self, new_response: list[settings.HumanMessage | settings.AIMessage]
+        self, new_response: list[HumanMessage | AIMessage]
     ):
         """
         Set a new response for the tool.
@@ -52,7 +59,7 @@ class ToolResponseManager:
 
         # ✅ TYPE VALIDATION: Ensure all items are correct message types
         if not all(
-            isinstance(msg, (settings.HumanMessage, settings.AIMessage))
+            isinstance(msg, (HumanMessage, AIMessage))
             for msg in new_response
         ):
             raise TypeError("All messages must be HumanMessage or AIMessage instances")
@@ -62,7 +69,7 @@ class ToolResponseManager:
         else:
             self._tool_response = new_response
 
-    def set_response_base(self, new_message: list[settings.BaseMessage], type: int = 0):
+    def set_response_base(self, new_message: list[BaseMessage], type: int = 0):
         """
         Set a new response for the tool.
 
@@ -72,9 +79,9 @@ class ToolResponseManager:
         if self._tool_response is None:
             self._tool_response = []
         message_class = (
-            settings.HumanMessage
+            HumanMessage
             if type == 0
-            else settings.AIMessage
+            else AIMessage
             if type == 1
             else None
         )
@@ -98,7 +105,7 @@ class ToolResponseManager:
         """
         self._tool_response = None
 
-    def get_last_human_message(self) -> Optional[settings.HumanMessage]:
+    def get_last_human_message(self) -> Optional[HumanMessage]:
         """
         Get the last human message from the tool response.
 
@@ -106,14 +113,14 @@ class ToolResponseManager:
         """
         if self._tool_response:
             for msg in reversed(self._tool_response):
-                if isinstance(msg, settings.HumanMessage):
+                if isinstance(msg, HumanMessage):
                     return msg
                 else:
                     # If we encounter an AIMessage, we skip it
                     continue
         return None
 
-    def get_last_ai_message(self) -> Optional[settings.AIMessage]:
+    def get_last_ai_message(self) -> Optional[AIMessage]:
         """
         Get the last AI message from the tool response.
 
@@ -121,7 +128,7 @@ class ToolResponseManager:
         """
         if self._tool_response:
             for msg in reversed(self._tool_response):
-                if isinstance(msg, settings.AIMessage):
+                if isinstance(msg, AIMessage):
                     return msg
                 else:
                     # If we encounter a HumanMessage, we skip it

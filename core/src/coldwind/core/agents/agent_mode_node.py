@@ -24,11 +24,7 @@ from coldwind.core.agents.agentic_orchestrator import (
     AgentGraphCore,
 )
 from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
-# 🚀 Debug System
-from coldwind.desktop.ui.diagnostics.debug_helpers import (
-    debug_critical,
-    debug_info, debug_error,
-)
+from coldwind.core.runtime.runtime_obj_enum import CoreRunTimeObjects
 # 🎨 Rich Traceback Integration
 from coldwind.desktop.ui.diagnostics.rich_traceback_manager import (
     RichTracebackManager,
@@ -57,7 +53,7 @@ def normalize_utf8_text(text: str) -> str:
         
         return text
     except Exception as e:
-        debug_info("UTF8_NORMALIZATION", f"Failed to normalize text: {e}", metadata={
+        ContextRegistry.get().get_logger().log_info("UTF8_NORMALIZATION", f"Failed to normalize text: {e}", metadata={
             "original_length": len(text),
             "error_type": type(e).__name__
         })
@@ -109,14 +105,15 @@ def agent_node(state):
         except Exception:
             pass  # Ignore if reconfigure is not available
 
-        console = settings.console
+        context = ContextRegistry.get()
+        console = context.get_console()
         console.print("\t\t----Node is agent_node")
 
         # Access state directly from LangGraph parameter (no sync needed)
         messages = state.get("messages", [])
         last_message = messages[-1].content if messages else "No messages available"
 
-        debug_info(
+        ContextRegistry.get().get_logger().log_info(
             heading="AGENT_MODE • HIERARCHICAL_EXECUTION",
             body="Routing request to AgentGraphCore hierarchical system",
             metadata={
@@ -139,7 +136,7 @@ def agent_node(state):
         }
 
         # Build and execute hierarchical graph
-        debug_info(
+        ContextRegistry.get().get_logger().log_info(
             heading="AGENT_MODE • HIERARCHICAL_GRAPH_BUILD",
             body="Building AgentGraphCore workflow graph",
             metadata={
@@ -148,10 +145,11 @@ def agent_node(state):
             },
         )
         from coldwind.core.utils.listeners.rich_status_listen import RichStatusListener
-        rich_evaluation_listener = RichStatusListener(settings.console)
+        rich_evaluation_listener = RichStatusListener(context.get_console())
         rich_evaluation_listener.start_status('Evaluating workflow quality with simplified structure...',
                                               spinner='dots')
-        settings.listeners['eval'] = rich_evaluation_listener  # Register listener for evaluation status updates
+        # Register listener on the context's slot (previously: settings.listeners['eval'])
+        context.register_listener('eval', rich_evaluation_listener)
 
         # Execute the AgentGraphCore workflow
         # Ensure these are defined so they are available even if graph invocation fails
@@ -161,11 +159,11 @@ def agent_node(state):
 
         try:
             graph = AgentGraphCore.build_graph()
-            # Correct way to set recursion limit in LangGraph
-            final_state = graph.invoke(initial_state, config={"recursion_limit": settings.recursion_limit})
+            # Correct way to set recursion limit in LangGraph — read from CoreSettings
+            final_state = graph.invoke(initial_state, config={"recursion_limit": context.get_settings().recursion_limit})
 
             # Debug: Log the complete final_state structure
-            debug_info(
+            ContextRegistry.get().get_logger().log_info(
                 heading="AGENT_MODE • FINAL_STATE_DEBUG",
                 body="Complete final_state structure received from graph",
                 metadata={
@@ -182,7 +180,7 @@ def agent_node(state):
 
             # Use final_response from graph as-is. No local fallback extraction is performed.
 
-            debug_info(
+            ContextRegistry.get().get_logger().log_info(
                 heading="AGENT_MODE • HIERARCHICAL_COMPLETION",
                 body=f"Hierarchical workflow completed with status: {workflow_status}",
                 metadata={
@@ -195,7 +193,7 @@ def agent_node(state):
             )
 
         except Exception as workflow_error:
-            debug_error(
+            ContextRegistry.get().get_logger().log_error(
                 heading="AGENT_MODE • HIERARCHICAL_WORKFLOW_ERROR",
                 body=f"AgentGraphCore workflow failed: {workflow_error!s}",
                 metadata={
@@ -218,7 +216,7 @@ def agent_node(state):
         # Handle workflow failure: log critical info but do NOT overwrite the final_response provided by the LLM.
         if "workflow_status" in locals() and workflow_status != "COMPLETED":
             error_msg = f"Hierarchical workflow failed with status: {workflow_status}"
-            debug_critical(
+            ContextRegistry.get().get_logger().log_critical(
                 heading="AGENT_MODE • HIERARCHICAL_ERROR",
                 body=error_msg,
                 metadata={
@@ -257,7 +255,7 @@ def agent_node(state):
                 display_text = "No response generated from LLM."
 
         except Exception as e:
-            debug_error("AGENT_MODE • FINAL_RESPONSE_EXTRACTION_ERROR", f"Error during response extraction: {e}", metadata={
+            ContextRegistry.get().get_logger().log_error("AGENT_MODE • FINAL_RESPONSE_EXTRACTION_ERROR", f"Error during response extraction: {e}", metadata={
                 "raw_response": str(final_response),
                 "response_type": type(final_response).__name__,
                 "error_type": type(e).__name__
@@ -268,7 +266,7 @@ def agent_node(state):
         try:
             display_text = formated_final_response(display_text or "No response generated from workflow.")
         except Exception as format_error:
-            debug_info(
+            ContextRegistry.get().get_logger().log_info(
                 heading="AGENT_MODE • RESPONSE_FORMATTING_ERROR",
                 body=f"Failed to format display text: {format_error!s}",
                 metadata={
@@ -278,7 +276,7 @@ def agent_node(state):
             )
 
         # Log both the user-facing text and the raw normalized final_response for debugging
-        debug_info("AGENT_MODE • FINAL_RESPONSE_DELIVER", f"Delivering final response to user", metadata={
+        ContextRegistry.get().get_logger().log_info("AGENT_MODE • FINAL_RESPONSE_DELIVER", f"Delivering final response to user", metadata={
             "function name": "agent_node",
             "display_preview": (display_text or "")[:400],
             "raw_preview": (str(final_response) or "")[:400],
@@ -288,8 +286,13 @@ def agent_node(state):
         # Stop the rich status listener
         if 'rich_evaluation_listener' in locals():
             rich_evaluation_listener.stop_status_display()
+        # Unpack the langchain message bundle to construct the AIMessage return value
+        # (previously: settings.AIMessage — the legacy global is no longer set).
+        _HumanMessage, AIMessage, _BaseMessage = context.get_service(
+            CoreRunTimeObjects.message_classes
+        )
         # Return the user-facing message to the caller, but keep the raw final_response available if needed
-        return {"messages": [settings.AIMessage(content=display_text)], "final_response_raw": final_response}
+        return {"messages": [AIMessage(content=display_text)], "final_response_raw": final_response}
 
     except Exception as e:
         RichTracebackManager.handle_exception(
@@ -305,4 +308,12 @@ def agent_node(state):
         # Provide a fallback response in case of critical failure
         fallback_response = "I encountered an unexpected error while processing your request. Please try rephrasing or breaking down your request into smaller steps."
         print_message(fallback_response, "ai")
-        return {"messages": [settings.AIMessage(content=fallback_response)]}
+        # Unpack the message bundle for the fallback AIMessage (same channel as above).
+        try:
+            _H, AIMessage, _B = ContextRegistry.get().get_service(
+                CoreRunTimeObjects.message_classes
+            )
+        except Exception:
+            from langchain_core.messages import AIMessage as _FallbackAIMessage
+            AIMessage = _FallbackAIMessage
+        return {"messages": [AIMessage(content=fallback_response)]}

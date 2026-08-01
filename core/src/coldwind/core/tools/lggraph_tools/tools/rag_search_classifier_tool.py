@@ -13,7 +13,17 @@ import coldwind.core.prompts.rag_search_classifier_prompts
 from coldwind.core.RAG.RAG_FILES import neo4j_rag
 from coldwind.core.RAG.RAG_FILES import rag
 from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
-from coldwind.core.config.settings import console
+# MIGRATED: the legacy `settings` import is removed. Runtime objects are now
+# sourced via ContextRegistry:
+#   - HumanMessage → direct langchain_core import (this module constructs
+#     HumanMessage instances for LLM prompts, so it needs the real class).
+#   - socket_con → ContextRegistry.get().get_socket_connection() (None-safe;
+#     None means no socket registered, matching the old `if settings.socket_con:`
+#     guard semantics).
+#   - console → ContextRegistry.get().get_console().
+# Pure config values (gpt_model, DEFAULT_RAG_EXAMPLE_FILE_PATH,
+# enable_sound_notifications) are accessed via get_settings().<field>.
+from langchain_core.messages import HumanMessage
 from coldwind.core.models.state import StateAccessor  # Import the global state object
 from coldwind.core.tools.lggraph_tools.tool_response_manager import ToolResponseManager
 from coldwind.core.utils.model_manager import ModelManager
@@ -30,9 +40,9 @@ def retrieve_knowledge_graph(query: str) -> str:
     # Get actual relationship types from database
     relationship_types = neo4j_rag.get_all_relationship_types()
 
-    from coldwind.desktop.ui.diagnostics.debug_helpers import debug_info
+    
 
-    debug_info(
+    ContextRegistry.get().get_logger().log_info(
         heading="RAG_CLASSIFIER • CYPHER_GENERATION",
         body="Cypher query generation started",
         metadata={
@@ -44,9 +54,9 @@ def retrieve_knowledge_graph(query: str) -> str:
 
     # If no names available, return early
     if not names:
-        from coldwind.core.utils.debug_helpers import debug_error
+        
 
-        debug_error(
+        ContextRegistry.get().get_logger().log_error(
             heading="RAG_CLASSIFIER • NO_ENTITIES",
             body="No entity names available in knowledge graph",
             metadata={"error_type": "empty_knowledge_graph"},
@@ -70,17 +80,17 @@ def retrieve_knowledge_graph(query: str) -> str:
     )
 
     if not name_found and not relation_found:
-        from coldwind.core.utils.debug_helpers import debug_warning
+        
 
-        debug_warning(
+        ContextRegistry.get().get_logger().log_warning(
             heading="RAG_CLASSIFIER • NO_MATCHES",
             body=f"No matching entity names or relationship types found for query: '{query}'",
             metadata={"query": query, "query_tokens": query_tokens},
         )
 
-    from coldwind.core.utils.debug_helpers import debug_info
+    
 
-    debug_info(
+    ContextRegistry.get().get_logger().log_info(
         heading="RAG_CLASSIFIER • QUERY_ANALYSIS",
         body="Query token analysis completed",
         metadata={
@@ -113,8 +123,8 @@ def retrieve_knowledge_graph(query: str) -> str:
 }"""
 
             result = llm.invoke(
-                [settings.HumanMessage(content=SYSTEM_PROMPT_CYPHER_GENERATION)]
-                + [settings.HumanMessage(content=enhanced_prompt)]
+                [HumanMessage(content=SYSTEM_PROMPT_CYPHER_GENERATION)]
+                + [HumanMessage(content=enhanced_prompt)]
             )
             # ✅ FIX 1: Use correct method name
             ToolResponseManager().set_response_base([result])
@@ -123,8 +133,10 @@ def retrieve_knowledge_graph(query: str) -> str:
             json_result = ModelManager.convert_to_json(result)
             return json.dumps(json_result)  # Return as JSON string for compatibility
         except Exception as e:
-            if settings.socket_con:
-                settings.socket_con.send_error(
+            # MIGRATED: settings.socket_con → ContextRegistry.get().get_socket_connection()
+            _socket_con = ContextRegistry.get().get_socket_connection()
+            if _socket_con:
+                _socket_con.send_error(
                     f"[ERROR] Failed to invoke model {model_name}: {e}"
                 )
             return None
@@ -146,14 +158,18 @@ def retrieve_knowledge_graph(query: str) -> str:
         reasoning = cypher_result.get("reasoning", "")
 
     except json.JSONDecodeError as e:
-        if settings.socket_con:
-            settings.socket_con.send_error(
+        # MIGRATED: settings.socket_con → ContextRegistry.get().get_socket_connection()
+        _socket_con = ContextRegistry.get().get_socket_connection()
+        if _socket_con:
+            _socket_con.send_error(
                 f"[ERROR] Failed to parse JSON response: {e}"
             )
         return f"[ERROR] Invalid JSON response for query: {query}"
     except Exception as e:
-        if settings.socket_con:
-            settings.socket_con.send_error(
+        # MIGRATED: settings.socket_con → ContextRegistry.get().get_socket_connection()
+        _socket_con = ContextRegistry.get().get_socket_connection()
+        if _socket_con:
+            _socket_con.send_error(
                 f"[ERROR] Unexpected error processing response: {e}"
             )
         return f"[ERROR] Failed to process response for query: {query}"
@@ -161,9 +177,11 @@ def retrieve_knowledge_graph(query: str) -> str:
     if not final_cypher:
         return f"[ERROR] Failed to generate any valid cypher query for: {query}"
 
-    if settings.socket_con:
-        settings.socket_con.send_error(f"[LOG] FINAL CYPHER QUERY: {final_cypher}")
-        settings.socket_con.send_error(f"[LOG] REASONING: {reasoning}")
+    # MIGRATED: settings.socket_con → ContextRegistry.get().get_socket_connection()
+    _socket_con = ContextRegistry.get().get_socket_connection()
+    if _socket_con:
+        _socket_con.send_error(f"[LOG] FINAL CYPHER QUERY: {final_cypher}")
+        _socket_con.send_error(f"[LOG] REASONING: {reasoning}")
 
     # Execute the cypher query
     receive_triples = neo4j_rag.get_retrieve_triples(final_cypher)
@@ -175,8 +193,10 @@ def retrieve_knowledge_graph(query: str) -> str:
     triples_text = "\n".join(
         [neo4j_rag.extract_triple_text(triple) for triple in receive_triples]
     )
-    if settings.socket_con:
-        settings.socket_con.send_error(f"[LOG] TRIPLES TEXT: {triples_text}")
+    # MIGRATED: settings.socket_con → ContextRegistry.get().get_socket_connection()
+    _socket_con = ContextRegistry.get().get_socket_connection()
+    if _socket_con:
+        _socket_con.send_error(f"[LOG] TRIPLES TEXT: {triples_text}")
 
     # Create a comprehensive, user-friendly explanation prompt (HYBRID APPROACH)
     from coldwind.core.prompts.rag_search_classifier_prompts import Prompts
@@ -197,13 +217,15 @@ def retrieve_knowledge_graph(query: str) -> str:
         # No format specified - allows natural language output
     )
 
-    with console.status(
+    # MIGRATED: settings.console → ContextRegistry.get().get_console();
+    # settings.HumanMessage → direct langchain HumanMessage import.
+    with ContextRegistry.get().get_console().status(
         "[bold green]Generating explanation...[/bold green]", spinner="dots"
     ):
         explanation_result = explanation_llm.invoke(
             [
-                settings.HumanMessage(content=Prompts.get_system_prompt_classifier()),
-                settings.HumanMessage(content=explanation_prompt),
+                HumanMessage(content=Prompts.get_system_prompt_classifier()),
+                HumanMessage(content=explanation_prompt),
             ]
         )
 
@@ -230,8 +252,8 @@ def rag_search_classifier_tool(query: str) -> str:
         winsound.Beep(7200, 200)  # Play a sound to indicate the start of RAG search
     file_path = Prompt.ask(
         "Enter FILE PATH TO RAG SEARCH",
-        default=str(settings.DEFAULT_RAG_EXAMPLE_FILE_PATH),
-    )
+        # MIGRATED: settings.DEFAULT_RAG_EXAMPLE_FILE_PATH → get_settings().DEFAULT_RAG_EXAMPLE_FILE_PATH
+        default=str(ContextRegistry.get().get_settings().DEFAULT_RAG_EXAMPLE_FILE_PATH),
     system_prompt = """
     You are an intelligent RAG system selector that understands both user intent and document characteristics.
 
@@ -291,10 +313,12 @@ def rag_search_classifier_tool(query: str) -> str:
         temperature=0.7,
     )
     prompt_list = [
-        settings.HumanMessage(content=system_prompt),
-        settings.HumanMessage(content=prompt),
+        # MIGRATED: settings.HumanMessage → direct langchain HumanMessage import.
+        HumanMessage(content=system_prompt),
+        HumanMessage(content=prompt),
     ]
-    with console.status("[bold green]Thinking...[/bold green]", spinner="dots"):
+    # MIGRATED: settings.console → ContextRegistry.get().get_console().
+    with ContextRegistry.get().get_console().status("[bold green]Thinking...[/bold green]", spinner="dots"):
         llm_response = llm.invoke(prompt_list)
     print("\n\nLLM Response:", llm_response.content)
 

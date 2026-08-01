@@ -49,8 +49,10 @@ class McpConfigFile:
         from pathlib import Path
 
         if not hasattr(cls, "__config_path") or cls.__config_path is None:
-            cls.__config_path = settings.MCP_CONFIG.get(
-                "MCP_CONFIG_PATH"
+            # MIGRATED: settings.MCP_CONFIG.get('MCP_CONFIG_PATH') →
+            # ContextRegistry.get().get_settings().mcp_config.get('MCP_CONFIG_PATH')
+            cls.__config_path = (
+                ContextRegistry.get().get_settings().mcp_config_path
             )  # Default path if not set
         try:
             if not Path.exists(Path(cls.__config_path).resolve()):

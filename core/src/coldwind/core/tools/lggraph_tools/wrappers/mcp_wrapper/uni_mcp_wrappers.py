@@ -54,9 +54,9 @@ class UniversalMCPWrapper:
         # --- END OF LOGIC ---
 
         # Safe debug system_logging
-        from coldwind.desktop.ui.diagnostics.debug_helpers import debug_info
+        
 
-        debug_info(
+        ContextRegistry.get().get_logger().log_info(
             heading="MCP_WRAPPER • UNIVERSAL",
             body="MCP server result received",
             metadata={
@@ -66,11 +66,14 @@ class UniversalMCPWrapper:
         )
 
         # Handle the result and create appropriate AI message
+        # MIGRATED: direct langchain import for AIMessage (response-construction wrapper).
+        from langchain_core.messages import AIMessage
+
         if result and not str(result).startswith("Error:")  :
             content = f"✅ **Action '{self.action}' completed successfully.**\n\nResult: {final_content}"
-            ToolResponseManager().set_response([settings.AIMessage(content=content)])
+            ToolResponseManager().set_response([AIMessage(content=content)])
         else:
             error_msg = result if result else "Unknown error occurred"
             ToolResponseManager().set_response(
-                [settings.AIMessage(content=f"❌ **Error:** {error_msg}")]
+                [AIMessage(content=f"❌ **Error:** {error_msg}")]
             )

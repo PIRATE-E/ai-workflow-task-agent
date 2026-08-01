@@ -8,12 +8,14 @@ import threading
 from pathlib import Path
 
 # Add project root to Python path BEFORE other imports
-project_root = Path(__file__).parent.parent.parent
+project_root = Path.cwd()
 sys.path.insert(0, str(project_root))
 
 # Now import from src after path is set
 from coldwind.desktop.ui.rich_error_print import RichErrorPrint
 from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
+from coldwind.desktop.config.DesktopConfig import DesktopConfig
+from coldwind.core.runtime.DesktopContext import DesktopRunTimeContext
 
 # Windows-only import - conditional
 try:
@@ -34,7 +36,9 @@ class SocketCon:
 
     def send_error(self, error_message: str, close_socket: bool = False):
         if "\n" not in error_message:
-            error_message += "\n"  # Ensure message ends with newline easy to parse in the receiver
+            error_message += (
+                "\n"  # Ensure message ends with newline easy to parse in the receiver
+            )
         with self._lock:
             try:
                 #     check whether the socket is connected
@@ -69,8 +73,7 @@ class SocketCon:
         try:
             # Use getsockopt to check socket state without sending data
             # This works for both unidirectional and bidirectional connections
-            error = self.client_socket.getsockopt(
-                socket.SOL_SOCKET, socket.SO_ERROR)
+            error = self.client_socket.getsockopt(socket.SOL_SOCKET, socket.SO_ERROR)
             if error:
                 return False
 
@@ -103,7 +106,10 @@ def signal_handler(signum, frame):
 
 def cleanup_lock_file():
     """Remove lock file on exit"""
-    lock_file = settings.BASE_DIR / "basic_logs" / "server.lock"
+    # MIGRATED: settings.project_root → ContextRegistry.get().get_settings().BASE_DIR
+    lock_file = (
+        ContextRegistry.get().get_settings().project_root / "basic_logs" / "server.lock"
+    )
     try:
         if Path(lock_file).exists():
             Path(lock_file).unlink()
@@ -114,7 +120,10 @@ def cleanup_lock_file():
 
 def create_lock_file():
     """Create lock file to prevent multiple instances"""
-    lock_file = settings.BASE_DIR / "basic_logs" / "server.lock"
+    # MIGRATED: settings.project_root → ContextRegistry.get().get_settings().BASE_DIR
+    lock_file = (
+        ContextRegistry.get().get_settings().project_root / "basic_logs" / "server.lock"
+    )
     # Check if another instance is already running
     if Path(lock_file).exists():
         try:
@@ -125,8 +134,7 @@ def create_lock_file():
             try:
                 # This doesn't kill, just checks if process exists
                 os.kill(pid, 0)
-                print(
-                    f"Another server instance is already running (PID: {pid})")
+                print(f"Another server instance is already running (PID: {pid})")
                 return False
             except OSError:
                 # Process doesn't exist, remove stale lock file
@@ -154,7 +162,12 @@ def create_lock_file():
 
 def write_to_file(text: str, mode="a"):
     """Write text to a file in the basic_logs directory"""
-    file_path = settings.BASE_DIR / "basic_logs" / "error_log.txt"
+    # MIGRATED: settings.project_root → ContextRegistry.get().get_settings().BASE_DIR
+    file_path = (
+        ContextRegistry.get().get_settings().project_root
+        / "basic_logs"
+        / "error_log.txt"
+    )
     w_lock = threading.Lock()  # Use a lock to prevent concurrent writes
     with w_lock:
         try:
@@ -198,6 +211,10 @@ def new_logger_write(text: str):
 
 if __name__ == "__main__":
     # Check for existing instance and create lock file
+    #
+    desktop_settings = DesktopConfig(project_root=project_root)
+    ContextRegistry.register(DesktopRunTimeContext(desktop_settings))
+
     if not create_lock_file():
         print("Exiting: Another server instance is already running")
         sys.exit(1)
@@ -229,7 +246,18 @@ if __name__ == "__main__":
             log_time=True,  # Add timestamps to logs
             log_path=False,
         )  # Don't show file paths in logs  # Initialize rich console for system_logging
-        settings.debug_console = console  # Set debug console for the application
+        # MIGRATED: settings.debug_console = console → ContextRegistry.get().set_debug_console(console).
+        # NOTE: error_transfer.py runs as a __main__ subprocess; a DesktopRunTimeContext
+        # is normally only registered by the main orchestrator. When run standalone,
+        # this registry write must be best-effort (the slot is only read later by the
+        # same process). We attempt the registry write and fall back to None if no
+        # context is registered yet (the subprocess sets up its own console below).
+        try:
+            ContextRegistry.get().set_debug_console(console)
+        except Exception:
+            # No context registered in this subprocess yet — the console object is
+            # still locally available via `console` and `print_error` below.
+            pass
         print_error = RichErrorPrint(console)  # Initialize rich error printing
     except Exception as e:
         print(f"Error initializing console: {e}", flush=True, file=sys.stderr)
@@ -279,7 +307,7 @@ if __name__ == "__main__":
                         if isinstance(received_error, str):
                             # Split by newline to handle multiple messages sent together
                             # TCP may concatenate multiple sends into one recv()
-                            messages = received_error.split('\n')
+                            messages = received_error.split("\n")
 
                             for single_message in messages:
                                 single_message = single_message.strip()
@@ -297,7 +325,12 @@ if __name__ == "__main__":
                         else:
                             print_error.print_rich(received_error)
                         # Sound notification - properly protected
-                        if ContextRegistry.get().get_settings().enable_sound_notifications and winsound is not None:
+                        if (
+                            ContextRegistry.get()
+                            .get_settings()
+                            .enable_sound_notifications
+                            and winsound is not None
+                        ):
                             try:
                                 winsound.Beep(7933, 500)
                             except AttributeError as beep_error:
@@ -312,8 +345,7 @@ if __name__ == "__main__":
             except socket.timeout:
                 # Check got_killed flag on timeout and continue if not killed
                 if SocketCon.got_killed:
-                    print_error.print_rich(
-                        "Server shutdown requested, exiting...")
+                    print_error.print_rich("Server shutdown requested, exiting...")
                     break
                 continue  # Continue listening if not killed
             except Exception as e:

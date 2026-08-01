@@ -1,3 +1,5 @@
+from langchain_core.messages import AIMessage
+
 from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
 
 
@@ -30,7 +32,7 @@ class RagSearchClassifierWrapper:
                     print(f"[WARNING] RAG tool returned error: {result}")
 
                 # Create AIMessage with the string result
-                ai_message = settings.AIMessage(content=result)
+                ai_message = AIMessage(content=result)
                 ToolResponseManager().set_response([ai_message])
             else:
                 # Handle None or empty result
@@ -38,7 +40,7 @@ class RagSearchClassifierWrapper:
                     f"[ERROR] RAG search returned no results for query: '{self.query}'"
                 )
                 print(f"[ERROR] Empty result from RAG tool for query: '{self.query}'")
-                ai_message = settings.AIMessage(content=error_message)
+                ai_message = AIMessage(content=error_message)
                 ToolResponseManager().set_response([ai_message])
 
         except Exception as e:
@@ -55,7 +57,7 @@ class RagSearchClassifierWrapper:
                 show_locals=True,
             )
 
-            ai_message = settings.AIMessage(
+            ai_message = AIMessage(
                 content=f"[ERROR] An error occurred while executing the RAG search: {str(e)} full traceback: {error_details}"
             )
             ToolResponseManager().set_response([ai_message])

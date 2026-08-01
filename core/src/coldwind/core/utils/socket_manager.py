@@ -5,18 +5,18 @@ import sys
 import time
 import pathlib
 
-# Handle imports - works both as module and standalone script
-try:
-    # Try relative import first (when run as module)
-    from .error_transfer import SocketCon
-except ImportError:
-    # If relative import fails, try absolute import (when run as script)
-    try:
-        from error_transfer import SocketCon
-    except ImportError:
-        # Last resort: add current directory to path and import
-        sys.path.append(pathlib.Path(__file__).resolve().parent)
-        from error_transfer import SocketCon
+# # Handle imports - works both as module and standalone script (disabled legacy error_transfer)
+# try:
+#     # Try relative import first (when run as module)
+#     from .error_transfer import SocketCon
+# except ImportError:
+#     # If relative import fails, try absolute import (when run as script)
+#     try:
+#         from error_transfer import SocketCon
+#     except ImportError:
+#         # Last resort: add current directory to path and import
+#         sys.path.append(pathlib.Path(__file__).resolve().parent)
+#         from error_transfer import SocketCon
 
 # Import settings - handle case where it might not be available
 from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
