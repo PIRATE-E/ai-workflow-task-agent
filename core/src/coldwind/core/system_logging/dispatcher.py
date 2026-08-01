@@ -1,8 +1,10 @@
 import json
+from typing import List
 
+from coldwind.core.system_logging.handlers.handler_base import Handler
 from coldwind.core.system_logging.router import Router
 from coldwind.core.system_logging.on_time_registry import OnTimeRegistry
-from coldwind.core.system_logging.protocol import LogEntry
+from coldwind.core.system_logging.debug_protocol import LogEntry
 from coldwind.core.utils.timestamp_util import get_formatted_timestamp
 
 
@@ -11,10 +13,13 @@ class Dispatcher:
         """Base class for dispatcher-related exceptions."""
 
         def __init__(self, message: str = ""):
-            full_message = f"Dispatcher error: {message}" if message else "Dispatcher error"
+            full_message = (
+                f"Dispatcher error: {message}" if message else "Dispatcher error"
+            )
             super().__init__(full_message)
             self.message = message
 
+    ## legacy code now the  system_logging has moved to front of the debug window means into the core and the logs are not being transfered to the debug panel
     @classmethod
     def dispatch(cls, message: str) -> None:
         """Dispatch the log entry to appropriate handlers registered in the OnTimeRegistry.
@@ -43,6 +48,24 @@ class Dispatcher:
         for handler in router.get_appropriate_handlers():
             handler.handle(log_entry)
 
+    @classmethod
+    def dispatch_v2(cls, log_entry: LogEntry):
+        """
+        TODO:- name would be going to change when migration would be completed of the debug and logging
+        send the log entry to the router from the core defined public api's debug_*
+        """
+        registry = OnTimeRegistry()
+        try:
+            handlers: List[Handler] = registry.get_all_handlers()
+        except OnTimeRegistry.RegistryError:
+            # No Handlers registered yet -
+            return
+        router = Router(log_entry, handlers)
+        log_entry = router.get_LOG_TYPE(False)
+
+        for handler in router.get_appropriate_handlers():
+            handler.handle(log_entry)
+
     @staticmethod
     def _convert_str_log_entry(message: str) -> LogEntry:
         """
@@ -60,7 +83,7 @@ class Dispatcher:
         metadata = data[metadata]
 
         """
-        from .protocol import LogLevel, LogCategory
+        from .debug_protocol import LogLevel, LogCategory
 
         try:
             json_data = json.loads(message)
@@ -70,8 +93,8 @@ class Dispatcher:
         try:
 
             # Convert string values to enums
-            log_type_str = json_data['LOG_TYPE']
-            log_level_str = json_data['LEVEL']
+            log_type_str = json_data["LOG_TYPE"]
+            log_level_str = json_data["LEVEL"]
 
             # Handle both enum values and enum objects
             if isinstance(log_type_str, str):
@@ -87,17 +110,17 @@ class Dispatcher:
             log_entry = LogEntry(
                 LOG_TYPE=log_type,
                 LOG_LEVEL=log_level,
-                MESSAGE=json_data['MESSAGE'],
-                TIME_STAMP=json_data['TIME_STAMP'],
-                METADATA=json_data.get('METADATA', {})
+                MESSAGE=json_data["MESSAGE"],
+                TIME_STAMP=json_data["TIME_STAMP"],
+                METADATA=json_data.get("METADATA", {}),
             )
         except (KeyError, ValueError) as e:
             ## fallback log_entry with minimal data
             log_entry = LogEntry(
                 LOG_TYPE=LogCategory.OTHER,
                 LOG_LEVEL=LogLevel.ERROR,
-                MESSAGE=str(json_data.get('MESSAGE', message)),
+                MESSAGE=str(json_data.get("MESSAGE", message)),
                 TIME_STAMP=get_formatted_timestamp(),
-                METADATA=json_data.get('METADATA', {})
+                METADATA=json_data.get("METADATA", {}),
             )
         return log_entry

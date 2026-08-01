@@ -34,7 +34,9 @@ from typing import Any, Dict, Optional
 
 from rich.console import Console
 
-from coldwind.core.config import settings
+# MIGRATED: settings.socket_con removed; socket now sourced via
+# ContextRegistry.get().get_socket_connection() (returns None when no socket is registered).
+from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
 from coldwind.desktop.ui.diagnostics.debug_message_protocol import DebugMessageSender, LogLevel
 
 _console = Console(stderr=True, highlight=False)
@@ -43,9 +45,8 @@ _lock = threading.RLock()
 
 def _get_debug_sender() -> DebugMessageSender:
     """Get debug message sender - always returns a sender (with or without socket)"""
-    socket_con = None
-    if hasattr(settings, "socket_con") and settings.socket_con:
-        socket_con = settings.socket_con
+    # MIGRATED: settings.socket_con → ContextRegistry.get().get_socket_connection() (None-safe).
+    socket_con = ContextRegistry.get().get_socket_connection()
     return DebugMessageSender(socket_con)
 
 

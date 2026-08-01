@@ -6,7 +6,7 @@ defines the interface for log formatters in a structured system_logging system.
 from abc import ABC, abstractmethod
 from typing import Any
 
-from .protocol import LogEntry
+from .debug_protocol import LogEntry
 
 #=========================================
 # Define the OutPutFormater interface

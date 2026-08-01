@@ -376,13 +376,21 @@ class RichTracebackManager:
                         },
                     )
                 except Exception:
-                    # Ultimate fallback - route to debug console via socket if available
+                    # Ultimate fallback - route to debug console via the runtime
+                    # context's socket slot if one is registered. Routed through
+                    # ContextRegistry.get().get_socket_connection() (was a lazy
+                    # `settings.socket_con` read guarded by hasattr). NOTE: this
+                    # module importing ContextRegistry from coldwind.core is fine for
+                    # the socket lookup, but the surrounding `debug_helpers` import
+                    # in this file remains a Core→Desktop leak tracked in AGENTS.md
+                    # (Known Architectural Debt) — flag, do not fix here.
                     try:
-                        from coldwind.core.config import settings
+                        from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
 
-                        if hasattr(settings, "socket_con") and settings.socket_con:
+                        socket_con = ContextRegistry.get().get_socket_connection()
+                        if socket_con:
                             fallback_msg = f"🚨 ERROR #{cls._error_count}: {error_category} in {context} - {str(exception)}"
-                            settings.socket_con.send_error(fallback_msg)
+                            socket_con.send_error(fallback_msg)
                         else:
                             # Only print to console if absolutely no other option
                             pass  # Suppress console output to prevent user window spam
