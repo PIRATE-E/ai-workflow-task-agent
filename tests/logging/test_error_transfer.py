@@ -6,9 +6,9 @@ Tests:
 - Error message parsing
 - Log file creation
 """
+
 import pytest
 import json
-import os
 
 
 class TestErrorTransfer:
@@ -17,11 +17,13 @@ class TestErrorTransfer:
     def test_new_logger_write_importable(self):
         """new_logger_write should be importable."""
         from coldwind.core.utils.error_transfer import new_logger_write
+
         assert new_logger_write is not None
 
     def test_new_logger_write_callable(self):
         """new_logger_write should be callable."""
         from coldwind.core.utils.error_transfer import new_logger_write
+
         assert callable(new_logger_write)
 
     def test_new_logger_write_with_valid_message(self, tmp_path, monkeypatch):
@@ -31,17 +33,19 @@ class TestErrorTransfer:
         # Change to temp directory to avoid polluting project
         monkeypatch.chdir(tmp_path)
 
-        message = json.dumps({
-            "obj_type": "str",
-            "data_type": "DebugMessage",
-            "timestamp": "2026-01-31T10:00:00.000000",
-            "data": {
-                "heading": "TEST",
-                "body": "Test message",
-                "level": "INFO",
-                "metadata": {}
+        message = json.dumps(
+            {
+                "obj_type": "str",
+                "data_type": "DebugMessage",
+                "timestamp": "2026-01-31T10:00:00.000000",
+                "data": {
+                    "heading": "TEST",
+                    "body": "Test message",
+                    "level": "INFO",
+                    "metadata": {},
+                },
             }
-        })
+        )
 
         try:
             new_logger_write(message)
@@ -66,5 +70,5 @@ class TestErrorTransfer:
             pass  # Any graceful handling is acceptable
 
 
-if __name__ == '__main__':
-    pytest.main([__file__, '-v'])
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])

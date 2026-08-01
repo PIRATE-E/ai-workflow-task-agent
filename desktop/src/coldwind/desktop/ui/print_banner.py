@@ -2,7 +2,8 @@ from rich.align import Align
 from rich.panel import Panel
 from rich.text import Text
 
-from coldwind.core.config import settings
+# MIGRATED: settings.console → ContextRegistry.get().get_console().
+from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
 
 
 def print_banner():
@@ -23,7 +24,8 @@ SP                 SP          SP   SP                SP                 SP     
 Y                  Y           Y    Y                 Y                  Y                 Y    Y          Y                               Y         
 
     """
-    console = settings.console
+    # MIGRATED: settings.console → ContextRegistry.get().get_console()
+    console = ContextRegistry.get().get_console()
     console.print(
         Align.center(
             Panel.fit(

@@ -1,5 +1,5 @@
 
-from coldwind.core.config import settings
+from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
 
 from coldwind.desktop.slash_commands.protocol import SlashCommand, CommandOption, CommandResult
 from coldwind.core.utils.listeners.exit_listener import ExitListener
@@ -32,8 +32,9 @@ def exit_handler(command : SlashCommand, options : CommandOption) -> CommandResu
     """
 
     try:
-        # ✅ Use the standardized ticket system
-        exit_listener : ExitListener = settings.listeners['exit']
+        # ✅ Use the standardized ticket system — read the exit listener from the
+        # active runtime context's listener dict (was settings.listeners['exit']).
+        exit_listener : ExitListener = ContextRegistry.get().get_listeners()['exit']
         exit_listener.emit_exit_ticket(
             source_class=type(command),
             source_name="/exit_command"
