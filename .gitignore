@@ -167,7 +167,7 @@ lggraphOLD_MAIN.py
 .kiro
 copilot_instructions
 AI_llm.sln
-reports
+# reports
 .crush
 QWEN.md
 .gemini
