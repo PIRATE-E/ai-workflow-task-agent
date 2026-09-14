@@ -6,6 +6,20 @@ This file provides guidance to WARP (warp.dev) when working with code in this re
 
 Brevity constraints apply **ONLY to chat text output**. Tool calls and file writes are unrestricted.
 
+## 👥 Team Modes
+
+This project runs in **two interaction modes**. The mode controls *how* the AI communicates; it never changes *what* the architecture/convention rules below require.
+
+| Mode | How it's triggered | Communication style |
+|---|---|---|
+| **Engineer** (default) | The default for all sessions in this repo | Direct, fast, code-forward. No metaphors, no 1-concept-per-reply pacing, no response skeleton. Assume expert familiarity with the codebase. Brevity rules and Warp Visual Formatting still apply. |
+| **Tutor** (on demand) | User says something like "teach me", "explain like I'm learning", "walk me through", "tutor me on X", or explicitly invokes the `learning-tutor` skill | Full learning protocol from `.agents/skills/learning-tutor/SKILL.md`: metaphor-first, plain English before code, 1 concept per reply, labeled blockquote, ❓ Questions pause, Beginner-First depth. |
+
+**Rules:**
+- Mode only changes when the user explicitly switches it. Do not guess.
+- `learning-tutor` fires automatically on question/explanation prompts per its own description; in those replies follow the tutor protocol fully. Toggling to Tutor mode keeps it on for sustained teaching sessions.
+- Safety warnings stay immediate and unstyled in BOTH modes.
+
 ## 🔴 Always-On Rules
 
 - **Code changes → verbose comments**: When modifying code, explain WHAT changed and WHY inside the file.
@@ -37,7 +51,7 @@ Brevity constraints apply **ONLY to chat text output**. Tool calls and file writ
 
 ### ✨ Rich Visuals & ASCII Art (when they add value, not for decoration)
 
-- **Prefer Mermaid diagrams** for flows, sequences, dependencies, and state — they render inline in Warp !!
+- **Prefer Mermaid diagrams** for structural flows, sequences, and dependencies — they render inline in Warp. **Exception:** step-by-step *teaching traces* (tutor mode, Learning Protocol) use ASCII art in fenced ```text blocks, per the `learning-tutor` skill.
 - **Use ASCII art / box drawings** for short structural sketches when a diagram is overkill (e.g., a quick tree, a call-stack sketch, a side-by-side comparison). Keep ASCII art inside a fenced ` ```text ` block so it aligns correctly in the dark UI.
 - **Character/emoji accents** are allowed as section markers (see the allowed emoji list above) but must never decorative-spam the prose. Characters do not replace explanation.
 - **Readability over flair:** ASCII art must use standard box-drawing characters only where they help alignment (`├──`, `│`, `└──`, `─`, `│`). Do NOT draw big logo banners in ASCII — they eat vertical space and add no information.
@@ -53,6 +67,25 @@ For any response ~400 words or longer, open with a `>` blockquote TL;DR box (1�
 - Safety warnings stay plain and immediate even if ugly.
 - Real code, real file paths, real command output are never paraphrased or prettified at the cost of accuracy.
 - Citation XML at the end of a response is never wrapped in a visual block.
+
+## ⚙️ Development Protocol
+
+For any non-trivial change (new feature, refactor, migration step), work in this order. Each step is a checkpoint, not a suggestion.
+
+1. **Phase 0 — Impact Gate:** Before writing any code, identify what the change touches. Query the memory graph for related entities (roadmaps, decisions, insights under `ai-workflow-task-agent`). If the change conflicts with an existing decision or depends on an unfinished roadmap step, surface that FIRST — do not silently proceed.
+2. **Phase 1 — Map Current State:** State the current phase the change belongs to (e.g., "Logging Rewrite Phase 1", "API Server roadmap — blocked by AgentGraphCore"). Know what is done vs. pending before acting.
+3. **Phase 2 — Execute:** Make the change following the Code Change Protocol (STOP → Analyze → Discuss → Approve → Implement). Respect the Architectural Invariants at all times.
+4. **Phase 3 — Validate:** Run the relevant tests/lint commands from the Commands section. Update the affected roadmap/status entities in the memory graph and any related docs in `reports/`.
+
+## 🔧 Failure & Debug Protocol
+
+When something breaks or behaves unexpectedly, follow this exact order. Never jump to fixing before diagnosing.
+
+1. **Trace the exact path:** Identify the full call path where the failure occurs (entry point → which module → which function). Quote the real file and line.
+2. **Reproduce minimally:** Create or identify the smallest input/command that reproduces the failure.
+3. **Isolate root cause:** State what the code *was doing* vs. *what it should do*. Explain WHY it fails, not just WHERE. Use Python internals comparisons when helpful (e.g., "this fails the same way CPython's GIL would block two threads on one object").
+4. **Log the pattern:** Record the bug, root cause, and fix in the memory graph (a `status` or `insight` entity under the project). Failed approaches get logged too — they prevent re-trying them later.
+5. **Fix last:** Only now implement the fix. If the fix touches an invariant or a decision entity, note that explicitly.
 
 ## 📦 Project Identity
 
@@ -170,6 +203,14 @@ Required session pattern:
 1. **Session start:** load project context from memory before doing anything else.
 2. **While working:** log meaningful findings, decisions, and outcomes to memory.
 3. **Session end / before compaction:** preserve key outcomes to memory.
+
+## 📊 Roadmap & Current State
+
+Roadmaps and per-phase status live in the **memory graph**, not inline here — inline snapshots rot every phase.
+
+- Query the `Roadmap: *` entities under `ai-workflow-task-agent` for long-term initiatives (API Server, AgentGraphCore refactor, Browser UX, RAG simplification, Prompts consolidation, Security hygiene).
+- Query `status`/`insight`/`decision` entities for the current phase's state (e.g., Logging Rewrite Phase 1 progress, open blockers, verified percentages).
+- Update these entities as work completes. Do not create an inline "Current Status" section here — it will go stale.
 
 ## 🧩 Skills Rule (Warp-Native, Auto-Discovered)
 
