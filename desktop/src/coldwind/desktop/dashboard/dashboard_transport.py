@@ -97,6 +97,10 @@ class SocketManager:
 
             try:
                 self.client_socket, client_address = self.server_socket.accept()
+                # WHAT: Reset client_socket timeout to None (infinite/blocking).
+                # WHY: Sockets returned by accept() inherit server_socket's 5s timeout.
+                #      Clearing it prevents idle pauses between logs from raising socket.timeout.
+                self.client_socket.settimeout(None)
                 self.connection_alive = True
             except OSError:
                 self.connection_alive = False
@@ -107,26 +111,58 @@ class SocketManager:
 
         def recieve_raw_log(self, queue_ptr):
             """
-            *** LIFO queue ptr required to insert the message we got from the client ~!!
+            Receive raw log stream from client, split on newlines, and push to queue.
             """
-            ##NOTE: only raw message would be taken from here, no debugging printing here
             config = SocketManager.ServerConfig()
-            while self.client_socket and self.connection_alive:
-                data = self.client_socket.recv(config.BAND_WIDTH)
-                try:
-                    if not data:
-                        # graceful disconnect
+            # WHAT: Move try...finally outside the while loop and buffer incoming chunks by newline (\n).
+            # WHY: In the previous code, the finally block was placed INSIDE the while loop, causing
+            #      self.client_socket.close() to execute at the end of iteration 1. Iteration 2
+            #      then attempted recv() on the closed socket descriptor, raising:
+            #      OSError: [Errno 9] Bad file descriptor
+            #      Placing finally outside ensures the connection stays alive across all incoming messages,
+            #      and splitting by newline handles TCP stream coalescing cleanly.
+            try:
+                buffer = ""
+                while self.client_socket and self.connection_alive:
+                    try:
+                        data = self.client_socket.recv(config.BAND_WIDTH)
+                    except (socket.timeout, BlockingIOError):
+                        continue
+                    except (ConnectionResetError, BrokenPipeError, OSError):
                         self.connection_alive = False
                         break
-                    queue_ptr.append(data.decode())
-                except socket.timeout:
-                    raise
-                except ConnectionRefusedError:
-                    raise
-                finally:
-                    self.client_socket.close()
-                    if self.server_socket:
+
+                    if not data:
+                        # Graceful disconnect from client
+                        self.connection_alive = False
+                        break
+
+                    buffer += data.decode("utf-8", errors="replace")
+                    while "\n" in buffer:
+                        line, buffer = buffer.split("\n", 1)
+                        line = line.strip()
+                        if line:
+                            # WHAT: Support both callable handlers (e.g. Printer.process_log) and collections.
+                            # WHY: Allows passing a processing callback directly to render logs on arrival,
+                            #      while maintaining compatibility if an appendable deque or list is passed.
+                            if callable(queue_ptr):
+                                queue_ptr(line)
+                            elif hasattr(queue_ptr, "append"):
+                                queue_ptr.append(line)
+            except Exception as e:
+                print(f"Error in recieve_raw_log: {e}", file=sys.stderr)
+            finally:
+                self.connection_alive = False
+                if self.client_socket:
+                    try:
+                        self.client_socket.close()
+                    except Exception:
+                        pass
+                if self.server_socket:
+                    try:
                         self.server_socket.close()
+                    except Exception:
+                        pass
 
     #
     # TODO:- Dashboard related code like ensure socket connection is open. Reopen after accidental closing
@@ -237,10 +273,32 @@ class DesktopDashboardManager(DashboardManager):
             )
         else:
 
-            # Enhanced terminal commands with proper working directory and UV
+            # Enhanced terminal commands with proper working directory, title, and UV
             cwder = Path.cwd()
             runner_server_path = Path(__file__).absolute().parent / "runner_server.py"
             terminals = [
+                # WHAT: konsole prioritized as top terminal emulator.
+                # WHY: Matches the tested legacy launch configuration from socket_manager.py.
+                [
+                    "konsole",
+                    "--hold",
+                    "-e",
+                    "bash",
+                    "-c",
+                    f"cd '{cwder}' && uv run python '{runner_server_path}'; echo 'Log server ended. Press Enter to close...'; read",
+                ],
+                # kitty as secondary modern terminal option
+                [
+                    "kitty",
+                    "--title",
+                    "Cold Wind Debug Dashboard",
+                    "--directory",
+                    str(cwder),
+                    "--hold",
+                    "bash",
+                    "-c",
+                    f"uv run python '{runner_server_path}'; echo 'Log server ended. Press Enter to close...'; read",
+                ],
                 # qterminal with bash wrapper for persistence
                 [
                     "qterminal",
@@ -266,15 +324,6 @@ class DesktopDashboardManager(DashboardManager):
                     "-c",
                     f"cd '{cwder}' && uv run python '{runner_server_path}'",
                 ],
-                # konsole with hold flag
-                [
-                    "konsole",
-                    "--hold",
-                    "-e",
-                    "bash",
-                    "-c",
-                    f"cd '{cwder}' && uv run python '{runner_server_path}'",
-                ],
                 # tmux as persistent fallback
                 [
                     "tmux",
@@ -286,6 +335,7 @@ class DesktopDashboardManager(DashboardManager):
                 ],
             ]
 
+            cmd = terminals[0]
             for active_terminal in terminals:
                 if (
                     subprocess.run(
@@ -296,7 +346,17 @@ class DesktopDashboardManager(DashboardManager):
                     cmd = active_terminal
                     break
 
-            cls.server_process = subprocess.Popen(cmd)
+            # WHAT: Launch with start_new_session=True, stdout=DEVNULL, and stderr=DEVNULL.
+            # WHY: In POSIX, start_new_session=True invokes setsid(), detaching the new terminal
+            #      window from the parent agent's process group and controlling TTY. Redirecting
+            #      stdout/stderr prevents Qt and GLFW warning logs (e.g. qt.qpa.services portal errors)
+            #      from bleeding into and polluting the parent agent's console.
+            cls.server_process = subprocess.Popen(
+                cmd,
+                start_new_session=True,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
 
         # TODO: this is causing issue because the server got spawned but the actual runner script didnt make to actually ran up to listen and accept
         # so if we call this immediately that connect to the port but the issue is server is not listening to port for now (1-2 seconds cold start up cost)
@@ -304,18 +364,19 @@ class DesktopDashboardManager(DashboardManager):
         # client_manager.connect_to_server()
 
     @classmethod
-    @abstractmethod
     @override
     def send_to_dashboard(cls, log_entry: LogEntry, **kwargs):
         if cls.server_process and cls.server_process.poll() is None:
             # server process is alive
             client_manager = SocketManager.ClientSocketManager()
             if client_manager.is_connected_status():
-                # connection is alive
-                # converting the log_entry to the payload (by Defualt enums are not serialise-able for the json )
-                payload_log_entry = asdict(log_entry)
-                print(payload_log_entry)
-                data = json.dumps(asdict(log_entry), indent=2).encode()
+                # =============================================================
+                # WHAT: Use log_entry.to_json() with newline framing instead of asdict + json.dumps.
+                # WHY: LogEntry contains LogCategory and LogLevel Enums which cannot be serialized
+                #      by raw json.dumps(asdict(log_entry)). to_json() correctly extracts enum .value
+                #      strings. Adding a newline delimiter (\n) ensures safe stream framing over TCP.
+                # =============================================================
+                data = (log_entry.to_json() + "\n").encode("utf-8")
                 client_manager.send_message(data)
                 return
 

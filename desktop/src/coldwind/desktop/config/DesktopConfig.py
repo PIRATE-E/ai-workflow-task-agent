@@ -21,6 +21,13 @@ class DesktopConfig(CoreSettinngs):
     browser_use_log_file: str = "browser.txt"
 
     # ── Desktop Path Settings ──
+    # WHAT: Explicitly declare project_root as a Path field on DesktopConfig.
+    # WHY: Handlers and cleanup routines (such as TextHandler at
+    # core/system_logging/handlers/handler_base.py:112 and error_transfer.py:111)
+    # query `ContextRegistry.get().get_settings().project_root`. Without this field
+    # declared and populated, accessing the property raises:
+    # AttributeError: 'DesktopConfig' object has no attribute 'project_root'
+    project_root: Path
     png_file_path: Path
     browser_use_user_profile_path: str
     mcp_config_path: Path
@@ -39,6 +46,11 @@ class DesktopConfig(CoreSettinngs):
             raise ValueError("project_root cannot be None")
         if not project_root.exists():
             raise ValueError(f"project_root path does not exist: {project_root}")
+
+        # WHAT: Pass project_root into kwargs.
+        # WHY: Pydantic BaseSettings consumes kwargs to initialize and validate fields.
+        # Storing project_root here guarantees that `self.project_root` exists on the instance.
+        kwargs["project_root"] = project_root
 
         # Calculate dynamic absolute paths based on project_root
         kwargs["png_file_path"] = project_root / "basic_logs" / "graph.png"

@@ -26,6 +26,9 @@ class DashBoardHandler(Handler):
         if not DashBoardHandler._started:
             DesktopDashboardManager.start_dashboard()
             DashBoardHandler._started = True
-            sleep(3)
+            # WHAT: Pause for 1 second before connecting.
+            # WHY: runner_server.py is lightweight (only rich and socket); with uv pre-syncing
+            #      dependencies, 1 second is more than enough for the subprocess to bind port 59700.
+            sleep(1)
             SocketManager.ClientSocketManager().connect_to_server()
         DesktopDashboardManager.send_to_dashboard(log_entry)
