@@ -263,8 +263,16 @@ class AgentGraphCore:
             #     # Defensive: never fail planning because of enforcement
             #     pass
 
-            # Get skip threshold from settings (default 70)
-            skip_threshold = getattr(settings, "SKIP_THRESHOLD", 70)
+            # ARCHITECTURAL FIX: Direct typed configuration access from active runtime context.
+            # WHAT CHANGED: Replaced legacy `getattr(settings, "SKIP_THRESHOLD", 70)` with
+            # direct attribute access `ContextRegistry.get().get_settings().skip_threshold`.
+            # WHY:
+            # 1. Resolves `NameError: name 'settings' is not defined` caused by the decommissioning
+            #    of the monolithic `settings.py` module during Phase 1 monorepo restructuring.
+            # 2. Avoids slow dynamic reflection (`getattr`) by reading directly from the typed Pydantic model (`CoreSettinngs`).
+            # 3. Preserves the Layering Invariant (Core accesses runtime settings through ContextRegistry).
+            runtime_settings = ContextRegistry.get().get_settings()
+            skip_threshold = runtime_settings.skip_threshold
 
             actual_tasks = []
             for idx, item in enumerate(filtered_tasks):

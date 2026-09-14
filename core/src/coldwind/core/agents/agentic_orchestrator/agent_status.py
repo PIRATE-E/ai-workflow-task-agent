@@ -111,9 +111,11 @@ class AgentStatusUpdater:
 
         except Exception as e:
             # Fail silently - status updates shouldn't break the workflow
-            debug_warning(
-                "Status Updater",
-                f"Failed to update status: {e}",
+            # WHAT: Replaced undefined standalone debug_warning with ContextRegistry.get().get_logger().log_warning.
+            # WHY: Adheres to the modern DebugLoggerInterface and avoids NameError during exception handling.
+            ContextRegistry.get().get_logger().log_warning(
+                heading="Status Updater",
+                body=f"Failed to update status: {e}",
                 metadata={
                     "category": category,
                     "task_id": task_id,

@@ -17,12 +17,12 @@ class CoreSettinngs(BaseSettings):
     socket_port: int = 5390
 
     # ── Model Configuration ──
-    default_model: str = "nvidia/llama-3.3-nemotron-super-49b-v1"
+    default_model: str = "nvidia/nemotron-3-ultra-550b-a55b"
     cypher_model: str = "deepseek-r1:8b"
     classifier_model: str = "llama3.1:8b"
     gpt_model: str = "openai/gpt-oss-120b"
     kimi_model: str = "moonshotai/kimi-k2.6"
-    api_default_api_model: str = "moonshotai/kimi-k2.6"
+    api_default_api_model: str = "moonshotai/kimi-k3"
 
     # ── API Configuration ──
     openai_api_key: str = "your_openai_api_key_here"
