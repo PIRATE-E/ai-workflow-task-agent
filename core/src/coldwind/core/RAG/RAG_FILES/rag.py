@@ -447,9 +447,12 @@ async def process_chunks_with_immediate_saving(
     """
     print("\n🚀 CHUNK PROCESSING STARTED")
     print(f"📊 Chunks to process: {len(chunks_to_process)}")
-    print(f"🔧 Using function: {function.__name__}")
+    # WHAT: Added closing parenthesis to the print() call.
+    # WHY: The print() call opened on line 451 was missing its closing parenthesis,
+    #      causing a SyntaxError that prevented rag.py, neo4j_rag.py, and sheets_rag.py from importing.
     print(
         f"⚡ Max concurrent tasks: {ContextRegistry.get().get_settings().semaphore_limit_api if function == neo4j_rag.prompt_gemini_for_triples_api else ContextRegistry.get().get_settings().semaphore_limit_cli}"
+    )
     print("-" * 50)
 
     # Create semaphore with correct limit of 10

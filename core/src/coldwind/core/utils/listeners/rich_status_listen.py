@@ -25,6 +25,10 @@ from rich.status import Status
 
 
 from coldwind.core.utils.listeners.event_listener import EventListener
+# WHAT: Explicitly imported ContextRegistry.
+# WHY: The import was previously trapped inside the module docstring (line 9),
+#      raising NameError: name 'ContextRegistry' is not defined when __init__ executed.
+from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
 
 
 class RichStatusListener:

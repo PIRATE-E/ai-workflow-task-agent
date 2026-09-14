@@ -1,4 +1,4 @@
-﻿import asyncio
+import asyncio
 import gc
 import json
 import threading
@@ -173,17 +173,17 @@ class OpenAIIntegration:
         
 
         if prompt:
-            debug_api_call(
-                api_name="OpenAI",
-                operation="sync_call_with_prompt",
-                status="started",
+            # WHAT: Replaced undefined debug_api_call with standard ContextRegistry logger.
+            # WHY: debug_api_call was a legacy helper from debug_helpers that was removed.
+            ContextRegistry.get().get_logger().log_info(
+                "OPENAI • API_CALL",
+                "OpenAI sync call with prompt started",
                 metadata={"prompt_preview": prompt, "has_messages": bool(messages)},
             )
         if messages:
-            debug_api_call(
-                api_name="OpenAI",
-                operation="sync_call_with_messages",
-                status="started",
+            ContextRegistry.get().get_logger().log_info(
+                "OPENAI • API_CALL",
+                "OpenAI sync call with messages started",
                 metadata={"message_count": len(messages), "has_prompt": bool(prompt)},
             )
 
@@ -224,10 +224,9 @@ class OpenAIIntegration:
                 # Enhanced response system_logging
                 
 
-                debug_api_call(
-                    api_name="OpenAI",
-                    operation="api_call_completed",
-                    status="completed",
+                ContextRegistry.get().get_logger().log_info(
+                    "OPENAI • API_CALL_COMPLETED",
+                    "OpenAI API call completed successfully",
                     metadata={
                         "stream_mode": stream,
                         "request_count": OpenAIIntegration.requests_count,
@@ -355,17 +354,15 @@ class OpenAIIntegration:
         
 
         if prompt:
-            debug_api_call(
-                api_name="OpenAI",
-                operation="async_call_with_prompt",
-                status="started",
+            ContextRegistry.get().get_logger().log_info(
+                "OPENAI • ASYNC_API_CALL",
+                "OpenAI async call with prompt started",
                 metadata={"has_messages": bool(messages)},
             )
         if messages:
-            debug_api_call(
-                api_name="OpenAI",
-                operation="async_call_with_messages",
-                status="started",
+            ContextRegistry.get().get_logger().log_info(
+                "OPENAI • ASYNC_API_CALL",
+                "OpenAI async call with messages started",
                 metadata={"message_count": len(messages), "has_prompt": bool(prompt)},
             )
 

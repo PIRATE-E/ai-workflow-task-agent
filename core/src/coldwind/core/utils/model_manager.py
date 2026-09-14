@@ -78,6 +78,7 @@ class ModelManager(ChatOllama):
         ModelManager.api_model_list = [
             _settings.gpt_model,
             _settings.kimi_model,
+            _settings.api_default_api_model,
         ]
 
     def __new__(cls, *args: Any, **kwargs: Any) -> "ModelManager":
@@ -201,7 +202,7 @@ class ModelManager(ChatOllama):
         # OpenAI Integration Cleanup
         if cls._openai_integration is not None:
             try:
-                ContextRegistry.get().get_logger().ContextRegistry.get().get_logger().log_info(
+                ContextRegistry.get().get_logger().log_info(
                     "MODEL_MANAGER • CLEANUP",
                     "Cleaning up OpenAI integration",
                     {"cleanup_type": "openai_integration"},
@@ -209,7 +210,7 @@ class ModelManager(ChatOllama):
                 OpenAIIntegration.cleanup()
                 cls._openai_integration = None
                 cls._is_openai_mode = False
-                ContextRegistry.get().get_logger().ContextRegistry.get().get_logger().log_info(
+                ContextRegistry.get().get_logger().log_info(
                     "MODEL_MANAGER • CLEANUP_SUCCESS",
                     "OpenAI integration cleanup completed",
                     {"cleanup_type": "openai_integration", "status": "completed"},
@@ -220,7 +221,7 @@ class ModelManager(ChatOllama):
                     context="OpenAI Integration Cleanup",
                     extra_context={"integration_status": "cleanup_failed"},
                 )
-                ContextRegistry.get().get_logger().ContextRegistry.get().get_logger().log_error(
+                ContextRegistry.get().get_logger().log_error(
                     "MODEL_MANAGER • CLEANUP_ERROR",
                     f"Error during OpenAI integration cleanup: {openai_cleanup_error}",
                     {
@@ -231,14 +232,14 @@ class ModelManager(ChatOllama):
         # Ollama Model Cleanup
         if cls.current_model:
             try:
-                ContextRegistry.get().get_logger().ContextRegistry.get().get_logger().log_info(
+                ContextRegistry.get().get_logger().log_info(
                     "MODEL_MANAGER • MODEL_CLEANUP",
                     f"Cleaning up model: {cls.current_model}",
                     {"cleanup_type": "model", "model_name": cls.current_model},
                 )
                 cls._stop_model()
                 cls.current_model = None
-                ContextRegistry.get().get_logger().ContextRegistry.get().get_logger().log_info(
+                ContextRegistry.get().get_logger().log_info(
                     "MODEL_MANAGER • MODEL_CLEANUP_SUCCESS",
                     "Model cleanup completed",
                     {"cleanup_type": "model", "status": "completed"},
@@ -249,7 +250,7 @@ class ModelManager(ChatOllama):
                     context="Ollama Model Cleanup",
                     extra_context={"current_model": cls.current_model},
                 )
-                ContextRegistry.get().get_logger().ContextRegistry.get().get_logger().log_error(
+                ContextRegistry.get().get_logger().log_error(
                     "MODEL_MANAGER • MODEL_CLEANUP_ERROR",
                     f"Error during model cleanup: {model_cleanup_error}",
                     {
@@ -285,7 +286,7 @@ class ModelManager(ChatOllama):
             raise ValueError(
                 f"Model {model_name} is not available. Available models: {ModelManager.model_list}"
             )
-        ContextRegistry.get().get_logger().ContextRegistry.get().get_logger().log_info(
+        ContextRegistry.get().get_logger().log_info(
             "MODEL_MANAGER • MODEL_LOADING",
             f"Loading model {model_name}",
             {
@@ -296,7 +297,7 @@ class ModelManager(ChatOllama):
         )
         if ModelManager.current_model is not None:
             if ModelManager.current_model == model_name:
-                ContextRegistry.get().get_logger().ContextRegistry.get().get_logger().log_info(
+                ContextRegistry.get().get_logger().log_info(
                     "MODEL_MANAGER • MODEL_ALREADY_LOADED",
                     f"Model {model_name} is already loaded",
                     {"model": model_name, "status": "already_loaded"},
@@ -304,14 +305,14 @@ class ModelManager(ChatOllama):
             else:
                 ModelManager._stop_model()
                 ModelManager.current_model = model_name
-                ContextRegistry.get().get_logger().ContextRegistry.get().get_logger().log_info(
+                ContextRegistry.get().get_logger().log_info(
                     "MODEL_MANAGER • MODEL_SWITCHED",
                     f"Switched to model {model_name}",
                     {"model": model_name, "status": "switched"},
                 )
         else:
             ModelManager.current_model = model_name
-            ContextRegistry.get().get_logger().ContextRegistry.get().get_logger().log_info(
+            ContextRegistry.get().get_logger().log_info(
                 "MODEL_MANAGER • MODEL_LOADED",
                 f"Model {model_name} loaded successfully",
                 {"model": model_name, "status": "loaded"},
@@ -323,7 +324,7 @@ class ModelManager(ChatOllama):
         Stops the currently running model using the Ollama CLI.
         """
         if cls.current_model:
-            ContextRegistry.get().get_logger().ContextRegistry.get().get_logger().log_info(
+            ContextRegistry.get().get_logger().log_info(
                 "MODEL_MANAGER • MODEL_STOPPING",
                 f"Stopping model: {cls.current_model}",
                 {"model": cls.current_model, "action": "stopping"},
@@ -457,7 +458,7 @@ class ModelManager(ChatOllama):
         """
         # Handle already parsed objects (most common case for async responses)
         if isinstance(response, (dict, list)):
-            ContextRegistry.get().get_logger().ContextRegistry.get().get_logger().log_info(
+            ContextRegistry.get().get_logger().log_info(
                 "MODEL_MANAGER • JSON_CONVERSION",
                 "Response already parsed as JSON",
                 {
@@ -475,7 +476,7 @@ class ModelManager(ChatOllama):
 
         # Handle empty or None responses
         if not content or content.strip() == "":
-            ContextRegistry.get().get_logger().ContextRegistry.get().get_logger().log_warning(
+            ContextRegistry.get().get_logger().log_warning(
                 "MODEL_MANAGER • JSON_CONVERSION_EMPTY",
                 "Empty response detected, returning fallback",
                 {
@@ -488,7 +489,7 @@ class ModelManager(ChatOllama):
         # Try 1: Direct JSON parsing (highest priority)
         try:
             parsed = json.loads(content)
-            ContextRegistry.get().get_logger().ContextRegistry.get().get_logger().log_info(
+            ContextRegistry.get().get_logger().log_info(
                 "MODEL_MANAGER • JSON_CONVERSION_DIRECT",
                 "Direct JSON parsing successful",
                 {
@@ -508,7 +509,7 @@ class ModelManager(ChatOllama):
         if markdown_match:
             try:
                 parsed = json.loads(markdown_match.group(1))
-                ContextRegistry.get().get_logger().ContextRegistry.get().get_logger().log_info(
+                ContextRegistry.get().get_logger().log_info(
                     "MODEL_MANAGER • JSON_CONVERSION_MARKDOWN",
                     "JSON extracted from markdown code block",
                     {
@@ -567,7 +568,7 @@ class ModelManager(ChatOllama):
             json_objects.sort(key=lambda x: 0 if x[0] == "object" else 1)
             json_type, parsed_json = json_objects[0]
 
-            ContextRegistry.get().get_logger().ContextRegistry.get().get_logger().log_info(
+            ContextRegistry.get().get_logger().log_info(
                 "MODEL_MANAGER • JSON_CONVERSION_EXTRACTED",
                 f"JSON {json_type} extracted via pattern matching",
                 {
@@ -580,7 +581,7 @@ class ModelManager(ChatOllama):
             return parsed_json
 
         # Fallback: wrap content with enhanced error information
-        ContextRegistry.get().get_logger().ContextRegistry.get().get_logger().log_warning(
+        ContextRegistry.get().get_logger().log_warning(
             "MODEL_MANAGER • JSON_CONVERSION_FAILED",
             "All JSON parsing methods failed, returning content fallback",
             {

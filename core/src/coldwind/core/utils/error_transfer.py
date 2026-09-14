@@ -14,8 +14,9 @@ sys.path.insert(0, str(project_root))
 # Now import from src after path is set
 from coldwind.desktop.ui.rich_error_print import RichErrorPrint
 from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
-from coldwind.desktop.config.DesktopConfig import DesktopConfig
-from coldwind.core.runtime.DesktopContext import DesktopRunTimeContext
+# WHAT: Correct import path from coldwind.core to coldwind.desktop for DesktopRunTimeContext.
+# WHY: DesktopRunTimeContext is implemented in desktop.runtime, not core.runtime.
+from coldwind.desktop.runtime.DesktopContext import DesktopRunTimeContext
 
 # Windows-only import - conditional
 try:
