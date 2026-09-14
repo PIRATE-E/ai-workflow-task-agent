@@ -250,10 +250,15 @@ def rag_search_classifier_tool(query: str) -> str:
     """
     if ContextRegistry.get().get_settings().enable_sound_notifications and winsound:
         winsound.Beep(7200, 200)  # Play a sound to indicate the start of RAG search
+
+    # WHAT: Added missing closing parenthesis to Prompt.ask() call.
+    # WHY: The function call was missing its closing parenthesis, raising a
+    #      SyntaxError that prevented rag_search_classifier_tool from importing.
     file_path = Prompt.ask(
         "Enter FILE PATH TO RAG SEARCH",
         # MIGRATED: settings.DEFAULT_RAG_EXAMPLE_FILE_PATH → get_settings().DEFAULT_RAG_EXAMPLE_FILE_PATH
         default=str(ContextRegistry.get().get_settings().DEFAULT_RAG_EXAMPLE_FILE_PATH),
+    )
     system_prompt = """
     You are an intelligent RAG system selector that understands both user intent and document characteristics.
 

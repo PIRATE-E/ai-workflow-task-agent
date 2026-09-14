@@ -6,7 +6,9 @@ from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
 from coldwind.core.runtime.runtime_obj_enum import CoreRunTimeObjects
 from coldwind.core.prompts.system_prompt_tool_selector import get_tool_selector_prompt
 from coldwind.core.tools.lggraph_tools.tool_assign import ToolAssign
-from coldwind.desktop.ui.print_message_style import print_message
+# WHAT: Removed `from coldwind.desktop.ui.print_message_style import print_message`.
+# WHY: Violates layering direction ('Desktop imports Core; Core NEVER imports Desktop').
+#      Message display is now routed through context.get_message_display() interface.
 from coldwind.core.utils.argument_schema_util import get_tool_argument_schema
 from coldwind.core.utils.model_manager import ModelManager
 
@@ -24,11 +26,11 @@ class ToolSelection:
 
 def tool_selection_agent(state) -> dict:
     """Selects and invokes the most appropriate tool for the user's request, or returns a message if no tool is needed."""
-    # Grab the runtime handles once — console, socket, and the langchain message
+    # Grab the runtime handles once — console, logger, and the langchain message
     # bundle all live on the active RuntimeContextInterface now (no settings.*).
     context = ContextRegistry.get()
     console = context.get_console()
-    socket = context.get_socket_connection()
+    logger = context.get_logger()
     HumanMessage, AIMessage, _BaseMessage = context.get_service(
         CoreRunTimeObjects.message_classes
     )
@@ -41,20 +43,19 @@ def tool_selection_agent(state) -> dict:
     history = messages
     tools = ToolAssign.get_tools_list()
 
-    tools_context = (
-        "\n\n".join(
+    if not tools:
+        logger.log_error(
+            heading="TOOL_SELECTOR - NO_TOOLS",
+            body="No tools available for selection.",
+        )
+        tools_context = "No tools available."
+    else:
+        tools_context = "\n\n".join(
             [
                 f"Tool: {tool.name}\nDescription: {tool.description}\nParameters: {get_tool_argument_schema(tool)}"
                 for tool in tools
             ],
         )
-        if tools
-        else (
-            socket.send_error("[ERROR] No tools available for selection.")
-            if socket
-            else print("[ERROR] No tools available for selection.")
-        )
-    )
 
     # Use the centralized tool selector prompt
     system_prompt = get_tool_selector_prompt(
@@ -72,22 +73,10 @@ def tool_selection_agent(state) -> dict:
             top_p=1.0,  # Focus on most likely tokens for better accuracy
         )
 
-        # Add JSON format instruction to system prompt
-        enhanced_system_prompt = system_prompt + """
-
-**IMPORTANT:** Respond with valid JSON in this exact format:
-{
-    "tool_name": "selected_tool_name_or_none",
-    "reasoning": "Your reasoning for this selection",
-    "parameters": {"param1": "value1", "param2": "value2"}
-}
-
-If no tool is needed, use "none" as the tool_name and empty object {} for parameters."""
-
         with console.status("[bold green]Thinking...[/bold green]", spinner="dots"):
             response = llm.invoke(
                 [
-                    HumanMessage(content=enhanced_system_prompt),
+                    HumanMessage(content=system_prompt),
                     HumanMessage(content=content),
                 ],
             )
@@ -109,10 +98,11 @@ If no tool is needed, use "none" as the tool_name and empty object {} for parame
         print("Reasoning:", selection.reasoning)
         print("Parameters:", selection.parameters)
     except Exception as e:
-        if socket:
-            socket.send_error(f"[ERROR] Exception in tool_agent: {e}")
-        else:
-            print(f"[ERROR] Exception in tool_agent: {e}")
+        logger.log_error(
+            heading="TOOL_SELECTOR - LLM_ERROR",
+            body=f"Exception during tool selection: {e}",
+            metadata={"error": str(e)},
+        )
         return {
             "messages": [
                 AIMessage(content=f"Error processing tool selection: {e!s}"),
@@ -123,67 +113,20 @@ If no tool is needed, use "none" as the tool_name and empty object {} for parame
         try:
             parameters = ModelManager.convert_to_json(parameters)
         except Exception as e:
-            if socket:
-                socket.send_error(
-                    f"[ERROR] Could not parse parameters: {e}",
-                )
-            else:
-                print(f"[ERROR] Could not parse parameters: {e}")
-    #     -------- tool selection and parameter handling --------
-    # ( this is still in development, so it may not work as expected )
-    if selection.tool_name and selection.tool_name.lower() != "none":
-        from coldwind.core.tools.lggraph_tools.tool_response_manager import (
-            ToolResponseManager,
-        )
-
-        for tool in tools:
-            if tool.name.lower() == selection.tool_name.lower():
-                try:
-                    parameters.update(
-                        {"tool_name": tool.name},
-                    )  # Ensure tool_name is included in parameters
-                    tool.invoke(parameters)
-                    result = (
-                        ToolResponseManager().get_response()[-1].content
-                    )  # Get the last response from the tool manager
-                    # Print tool result in modern style
-                    print_message(result, sender="tool")
-                    if socket:
-                        socket.send_error(
-                            f"[RESULT] Result from {tool.name}: {result}",
-                        )
-                    return {
-                        "messages": [
-                            AIMessage(
-                                content=f"Result from {tool.name}: {result}",
-                            ),
-                        ],
-                    }
-                except Exception as e:
-                    if socket:
-                        socket.send_error(
-                            f"[ERROR] Error using tool {tool.name}: {e} function: {tool.func.__name__} {inspect.trace()}",
-                        )
-                    else:
-                        print(
-                            f"[ERROR] Error using tool {tool.name}: {e} function: {tool.func.__name__}",
-                        )
-                    return {
-                        "messages": [
-                            AIMessage(
-                                content=f"Error using {tool.name}: {e!s}",
-                            ),
-                        ],
-                    }
-        if socket:
-            socket.send_error(
-                f"[ERROR] Tool '{selection.tool_name}' not found.",
+            logger.log_error(
+                heading="TOOL_SELECTOR - PARAM_PARSE_ERROR",
+                body=f"Could not parse parameters: {e}",
+                metadata={"raw_parameters": parameters, "error": str(e)},
             )
-        else:
-            print(f"[ERROR] Tool '{selection.tool_name}' not found.")
-        return {
-            "messages": [
-                AIMessage(content=f"Tool '{selection.tool_name}' not found."),
-            ],
-        }
-    return {"messages": [AIMessage(content="No tool was used.")]}
+            parameters = {}
+
+    # WHAT: Delegate execution to execute_selected_tool in core/tools/lggraph_tools/tool_selector.py
+    # WHY: Separates agent decision logic from validated tool parameter handling and invocation,
+    #      while keeping both modules decoupled from desktop UI rendering.
+    from coldwind.core.tools.lggraph_tools.tool_selector import execute_selected_tool
+
+    return execute_selected_tool(
+        selection=selection,
+        tools=tools,
+        parameters=parameters,
+    )

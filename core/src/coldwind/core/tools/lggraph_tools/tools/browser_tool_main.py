@@ -26,9 +26,10 @@ if __package__ is None:
 from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
 
 
-# Import Runner and config for event-driven execution
-from coldwind.core.tools.lggraph_tools.tools.browser_tool.runner import Runner
-from coldwind.core.tools.lggraph_tools.tools.browser_tool.config import BrowserRequiredConfig
+# WHAT: Removed unused imports of Runner and BrowserRequiredConfig.
+# WHY: browser_tool/__init__.py imports BrowserHandler from this module for backward compatibility.
+#      Importing browser_tool.runner here caused a circular import cycle where both modules
+#      attempted to load each other simultaneously before initialization completed.
 
 
 class BrowserHandler:

@@ -119,7 +119,23 @@ User: "what is machine learning?"
 """
 
 
-def get_tool_selector_prompt(tools_context: str, history: list, content: str) -> str:
+TOOL_SELECTOR_JSON_FORMAT_INSTRUCTION = """
+**IMPORTANT:** Respond with valid JSON in this exact format:
+{
+    "tool_name": "selected_tool_name_or_none",
+    "reasoning": "Your reasoning for this selection",
+    "parameters": {"param1": "value1", "param2": "value2"}
+}
+
+If no tool is needed, use "none" as the tool_name and empty object {} for parameters."""
+
+
+def get_tool_selector_prompt(
+    tools_context: str,
+    history: list,
+    content: str,
+    include_json_instruction: bool = True,
+) -> str:
     """
     Get the formatted tool selector prompt with dynamic content.
 
@@ -127,10 +143,14 @@ def get_tool_selector_prompt(tools_context: str, history: list, content: str) ->
         tools_context: Available tools and their schemas
         history: Conversation history
         content: Current user message
+        include_json_instruction: Whether to append the JSON response format instructions
 
     Returns:
         Formatted system prompt for tool selection
     """
-    return SYSTEM_PROMPT_TOOL_SELECTOR.format(
+    prompt = SYSTEM_PROMPT_TOOL_SELECTOR.format(
         tools_context=tools_context, history=history, content=content
     )
+    if include_json_instruction:
+        prompt = f"{prompt}\n\n{TOOL_SELECTOR_JSON_FORMAT_INSTRUCTION}"
+    return prompt
