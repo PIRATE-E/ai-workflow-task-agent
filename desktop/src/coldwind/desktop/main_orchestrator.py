@@ -15,7 +15,6 @@ from coldwind.core.system_logging import OnTimeRegistry
 from coldwind.core.tools.lggraph_tools.tools.browser_tool import BrowserHandler
 from coldwind.core.utils.argument_schema_util import get_tool_argument_schema
 from coldwind.core.utils.model_manager import ModelManager
-# from coldwind.core.utils.socket_manager import SocketManager
 from coldwind.desktop.config.DesktopConfig import DesktopConfig
 from coldwind.desktop.dashboard.dashboard_handler import DashBoardHandler
 from coldwind.desktop.runtime.DesktopContext import DesktopRunTimeContext
@@ -149,7 +148,6 @@ def boot():
         handler_registry.register(DashBoardHandler())
         # load the settins using the run time context
         destructor = ChatDestructor()
-        # destructor.add_destroyer_function(SocketManager.cleanup)
         destructor.add_destroyer_function(ModelManager.cleanup_all_models)
         destructor.add_destroyer_function(MCP_Manager.cleanup)
         destructor.add_destroyer_function(BrowserHandler.clear_all_processes)

@@ -10,10 +10,20 @@ class ContextRegistry:
     — callers should not be expected to guard for it.
     """
 
+    # -------------------------------------------------------------------------
+    # Class-level state for process-wide runtime context.
+    # WHAT CHANGED: Initialized _instance and _active_context directly on the class body.
+    # WHY: activate_context and get are classmethods called directly as
+    # ContextRegistry.activate_context(ctx) during boot without calling ContextRegistry().
+    # Without class-level initialization, accessing cls._active_context raised
+    # AttributeError when called prior to any __new__ invocation.
+    # -------------------------------------------------------------------------
+    _instance: Any = None
+    _active_context: Any = None
+
     def __new__(cls) -> "ContextRegistry":
-        if not hasattr(cls, "_instance"):
+        if cls._instance is None:
             cls._instance = super().__new__(cls)
-            cls._active_context = None  # run time master context interface is returned
         return cls._instance
 
     @classmethod

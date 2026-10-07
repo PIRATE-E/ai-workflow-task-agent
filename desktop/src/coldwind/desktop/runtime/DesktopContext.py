@@ -110,6 +110,7 @@ class DesktopCommandParser(CommandParserInterface):
     def __init__(self):
         self._input_handler = InputHandler()
         self._executionar = ExecutionAr()
+        self.register_default_commands()
 
     def get_user_input(self, prompt_text: str = "> ") -> str:
         return self._input_handler.get_user_input(prompt_text=prompt_text)
@@ -118,6 +119,33 @@ class DesktopCommandParser(CommandParserInterface):
         # Convert the raw text into a parsed slash command, then execute it
         slash_cmd = ParseCommand.get_command(raw_input)
         return self._executionar.execute(slash_cmd)
+
+    def register_default_commands(self) -> None:
+        """
+        WHAT: Register default desktop slash commands into OnRunTimeRegistry.
+        WHY: Moves desktop slash command registration out of core chat_initializer.py,
+        preserving the Layering Invariant ('Desktop imports Core; Core NEVER imports Desktop').
+        """
+        from coldwind.desktop.slash_commands.commands.clear import register_clear_command
+        from coldwind.desktop.slash_commands.commands.help import register_help_command
+        from coldwind.desktop.slash_commands.commands.exit import register_exit_command
+        from coldwind.desktop.slash_commands.commands.core_slashs.agent import register_agent_command
+        from coldwind.desktop.slash_commands.commands.core_slashs.chat_llm import register_chat_llm_command
+        from coldwind.desktop.slash_commands.commands.core_slashs.use_tool import register_slash_command_use_tool
+
+        for reg_fn in (
+            register_clear_command,
+            register_help_command,
+            register_agent_command,
+            register_exit_command,
+            register_chat_llm_command,
+            register_slash_command_use_tool,
+        ):
+            try:
+                reg_fn()
+            except Exception:
+                pass
+
 
 
 #### NOTE:-this is the main runtine context that we would be gonna access using the get method on the context registry !!

@@ -20,9 +20,9 @@ Classes:
 Dependencies:
     - subprocess: Process management for MCP server spawning
     - json: JSON-RPC message serialization/deserialization
-    - coldwind.core.config.settings: Configuration for MCP servers and timeouts
+    - coldwind.core.config.coreSettings: Configuration for MCP servers and timeouts
     - coldwind.core.mcp.dynamically_tool_register: Dynamic tool registration system
-    - coldwind.desktop.ui.diagnostics: Logging and error tracking
+    - coldwind.core.interfaces.exception_interface: Logging and error tracking
 
 Notes:
     MCP servers communicate via stdio using JSON-RPC 2.0 protocol. Each server
@@ -50,11 +50,22 @@ from coldwind.core.mcp.mcp_register_structure import (
 # ✅ Structured Debug Helpers
 
 
-# 🎨 Rich Traceback Integration
-from coldwind.desktop.ui.diagnostics.rich_traceback_manager import (
-    RichTracebackManager,
-    rich_exception_handler,
-)
+# WHAT: Route exception handling through core exception_interface contract.
+# WHY: Eliminates illegal Core -> Desktop import, preserving the Layering Invariant.
+from coldwind.core.interfaces.exception_interface import rich_exception_handler
+
+
+class _CoreExceptionHandlerAdapter:
+    """Adapter routing legacy RichTracebackManager calls to the active runtime error handler."""
+    @staticmethod
+    def handle_exception(error: Exception, context: str = "", extra_context: Optional[dict[str, Any]] = None) -> None:
+        try:
+            ContextRegistry.get().get_error_handler().handle_exception(error, context, extra_context)
+        except Exception:
+            pass
+
+
+RichTracebackManager = _CoreExceptionHandlerAdapter
 import pathlib
 
 

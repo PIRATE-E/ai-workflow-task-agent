@@ -18,19 +18,22 @@ from langchain_ollama import ChatOllama
 from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
 from coldwind.core.utils.open_ai_integration import OpenAIIntegration
 
-# 🎨 Rich Traceback Integration (updated path after refactor)
-try:  # Lazy-resilient import in case path shifts
-    from coldwind.desktop.ui.diagnostics.rich_traceback_manager import (
-        RichTracebackManager,
-        rich_exception_handler,
-        safe_execute,
-    )
-except ImportError:  # Fallback (older path compatibility)
-    from coldwind.desktop.ui.diagnostics import rich_traceback_manager as _rtm  # type: ignore
+# WHAT: Route exception handling through core exception_interface contract.
+# WHY: Eliminates illegal Core -> Desktop import, preserving the Layering Invariant.
+from coldwind.core.interfaces.exception_interface import rich_exception_handler
 
-    RichTracebackManager = _rtm.RichTracebackManager  # type: ignore
-    rich_exception_handler = _rtm.rich_exception_handler  # type: ignore
-    safe_execute = getattr(_rtm, "safe_execute", lambda f, *a, **k: f(*a, **k))  # type: ignore
+
+class _CoreExceptionHandlerAdapter:
+    """Adapter routing legacy RichTracebackManager calls to the active runtime error handler."""
+    @staticmethod
+    def handle_exception(error: Exception, context: str = "", extra_context: Optional[dict[str, Any]] = None) -> None:
+        try:
+            ContextRegistry.get().get_error_handler().handle_exception(error, context, extra_context)
+        except Exception:
+            pass
+
+
+RichTracebackManager = _CoreExceptionHandlerAdapter
 
 # 🔧 COMPLETELY ISOLATED DEBUG LOGGING - NO IMPORTS, NO DEPENDENCIES
 # (Replaced by ContextRegistry.get().get_logger().debug_helpers unified system_logging)

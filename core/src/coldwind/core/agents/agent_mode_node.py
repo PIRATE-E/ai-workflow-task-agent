@@ -25,11 +25,9 @@ from coldwind.core.agents.agentic_orchestrator import (
 )
 from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
 from coldwind.core.runtime.runtime_obj_enum import CoreRunTimeObjects
-# 🎨 Rich Traceback Integration
-from coldwind.desktop.ui.diagnostics.rich_traceback_manager import (
-    RichTracebackManager,
-    rich_exception_handler,
-)
+# WHAT: Route exception handling through core exception_interface contract.
+# WHY: Eliminates illegal Core -> Desktop import, preserving the Layering Invariant.
+from coldwind.core.interfaces.exception_interface import rich_exception_handler
 
 
 def normalize_utf8_text(text: str) -> str:
@@ -90,7 +88,9 @@ def formated_final_response(create_display_response: str) -> str:
 
 @rich_exception_handler("Agent Node Processing")
 def agent_node(state):
-    from coldwind.desktop.ui.print_message_style import print_message
+    # WHAT: Route print_message through core ui_interface contract.
+    # WHY: Eliminates illegal Core -> Desktop import, preserving the Layering Invariant.
+    from coldwind.core.interfaces.ui_interface import print_message
 
     """
     Agent node that handles messages requiring agent-like behavior using the new AgentGraphCore system.

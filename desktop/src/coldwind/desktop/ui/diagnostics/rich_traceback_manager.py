@@ -95,13 +95,15 @@ class RichTracebackManager:
 
         cls._initialized = True
 
-        # Route initialization log to debug console
+        # Route initialization log to debug logging system
         try:
-            from coldwind.desktop.ui.diagnostics.debug_helpers import debug_info
+            # WHAT: Use modern system_logging debug_info instead of legacy debug_helpers.
+            # WHY: Decouples rich_traceback_manager from decommissioned debug_helpers module.
+            from coldwind.core.system_logging.debug_protocol import debug_info
 
             debug_info(
                 heading="SYSTEM • RICH_TRACEBACK",
-                body="Rich Traceback Manager initialized for main process (display via debug console)",
+                body="Rich Traceback Manager initialized for main process",
                 metadata={
                     "process_type": "main",
                     "show_locals": show_locals,
@@ -109,7 +111,6 @@ class RichTracebackManager:
                 },
             )
         except Exception:
-            # Fallback only if debug_helpers not available during early initialization
             pass
 
     @classmethod
@@ -164,9 +165,9 @@ class RichTracebackManager:
 
         cls._initialized = True
 
-        # Route debug process initialization log to debug console
+        # Route debug process initialization log to debug logging system
         try:
-            from coldwind.desktop.ui.diagnostics.debug_helpers import debug_info
+            from coldwind.core.system_logging.debug_protocol import debug_info
 
             debug_info(
                 heading="SYSTEM • RICH_TRACEBACK",
@@ -179,7 +180,6 @@ class RichTracebackManager:
                 },
             )
         except Exception:
-            # Fallback only if debug_helpers not available during early initialization
             pass
 
     @classmethod
@@ -196,7 +196,7 @@ class RichTracebackManager:
         if issubclass(exc_type, UnicodeDecodeError):
             # These are usually from Sentry SDK subprocess monitoring
             # Log to debug console but don't crash the application
-            from coldwind.desktop.ui.diagnostics.debug_helpers import debug_warning
+            from coldwind.core.system_logging.debug_protocol import debug_warning
 
             debug_warning(
                 heading="SYSTEM • UNICODE_ERROR",
@@ -208,7 +208,7 @@ class RichTracebackManager:
         # ✅ Handle thread exceptions gracefully
         if "Thread-" in str(exc_traceback) or "_readerthread" in str(exc_traceback):
             # These are background thread errors, usually from Sentry monitoring
-            from coldwind.desktop.ui.diagnostics.debug_helpers import debug_warning
+            from coldwind.core.system_logging.debug_protocol import debug_warning
 
             debug_warning(
                 heading="SYSTEM • THREAD_ERROR",
@@ -251,8 +251,8 @@ class RichTracebackManager:
         # Re-entrancy guard to prevent infinite recursion
         if getattr(cls, "_handling_exception", False):
             try:
-                # Route recursion fallback to debug console
-                from coldwind.desktop.ui.diagnostics.debug_helpers import debug_warning
+                # Route recursion fallback to debug logging system
+                from coldwind.core.system_logging.debug_protocol import debug_warning
 
                 debug_warning(
                     heading="SYSTEM • RECURSION_GUARD",
@@ -343,7 +343,7 @@ class RichTracebackManager:
             # TODO currently we are not sending the panel to the debug window instead we are printing the error (this could be changed later)
             # Use simple print instead of panel sending
             try:
-                from coldwind.desktop.ui.diagnostics.debug_helpers import debug_error
+                from coldwind.core.system_logging.debug_protocol import debug_error
 
                 # Print error content directly instead of sending panel
                 error_content = f"🚨 {error_category}: {str(exception)}\n\nContext: {context_text}\n\nTraceback:\n{traceback.format_exc()}"
@@ -363,7 +363,7 @@ class RichTracebackManager:
             except Exception as debug_error_exception:
                 # Fallback to structured debug message if rich panel fails
                 try:
-                    from coldwind.desktop.ui.diagnostics.debug_helpers import debug_error
+                    from coldwind.core.system_logging.debug_protocol import debug_error
 
                     debug_error(
                         heading="RICH_TRACEBACK • ERROR",
@@ -501,14 +501,18 @@ class RichTracebackManager:
                 f"(threshold: {threshold:.2f}s, exceeded by: {duration - threshold:.2f}s)"
             )
 
-            from coldwind.desktop.ui.diagnostics.debug_helpers import debug_performance_warning
+            from coldwind.core.system_logging.debug_protocol import debug_warning
 
-            debug_performance_warning(
-                operation="error_handling",
-                duration=duration,
-                threshold=threshold,
-                context="rich_traceback_manager",
-                metadata={"warning_type": "performance_threshold_exceeded"},
+            debug_warning(
+                heading="PERFORMANCE • WARNING",
+                body=f"Performance Warning: {operation} took {duration:.2f}s (threshold: {threshold:.2f}s)",
+                metadata={
+                    "operation": operation,
+                    "duration": duration,
+                    "threshold": threshold,
+                    "context": "rich_traceback_manager",
+                    "warning_type": "performance_threshold_exceeded",
+                },
             )
             # No fallback to prevent user window spam
 
@@ -539,7 +543,7 @@ class RichTracebackManager:
         cls._error_count = 0
         cls._error_categories.clear()
 
-        from coldwind.desktop.ui.diagnostics.debug_helpers import debug_info
+        from coldwind.core.system_logging.debug_protocol import debug_info
 
         debug_info(
             heading="SYSTEM • STATISTICS",

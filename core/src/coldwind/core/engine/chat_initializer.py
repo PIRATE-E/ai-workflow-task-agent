@@ -26,7 +26,7 @@ Dependencies:
     - coldwind.core.mcp.manager: MCP server lifecycle
     - coldwind.core.tools: Core tool implementations
     - coldwind.core.models.state: State management
-    - coldwind.desktop.ui.chatInputHandler: Modern CLI input
+    - coldwind.core.interfaces.ui_interface: CommandParserInterface and MessageDisplayInterface
 
 Notes:
     This class handles the complete initialization sequence:
@@ -60,32 +60,34 @@ from rich import prompt as rich_prompt  # Renamed to avoid conflict
 from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
 from coldwind.core.runtime.runtime_obj_enum import CoreRunTimeObjects
 
-# Legacy `settings` import retained ONLY for the PNG_FILE_PATH path constant until
-# it migrates to DesktopConfig.png_file_path (separate path-migration pass). No
-# runtime objects (console, message classes, socket_con, listeners, neo4j_driver)
-# are read from or written to `settings` anymore in this module — all of them
-# route through ContextRegistry.get() and CoreRunTimeObjects.
-from coldwind.core.config import settings
-from coldwind.core.config.settings import PNG_FILE_PATH
+# WHAT: Removed legacy `from coldwind.core.config import settings` and `PNG_FILE_PATH`.
+# WHY: Ghost settings.py is decommissioned. Runtime settings now route through
+# ContextRegistry.get().get_settings() adhering to the Layering Invariant.
 from coldwind.core.mcp.load_config import McpConfigFile
 from coldwind.core.mcp.manager import MCP_Manager
 from coldwind.core.models.state import StateAccessor, State
 
 
-# 🎨 Rich Traceback Integration
-from coldwind.desktop.ui.diagnostics.rich_traceback_manager import (
-    RichTracebackManager,
-    rich_exception_handler,
-)
-from coldwind.desktop.ui.print_message_style import print_message
-# from coldwind.core.utils.socket_manager import SocketManager
+# WHAT: Route diagnostics and message display through core interface contracts.
+# WHY: Eliminates illegal Core -> Desktop imports, preserving the Layering Invariant.
+from coldwind.core.interfaces.exception_interface import rich_exception_handler
+from coldwind.core.interfaces.ui_interface import print_message
+
+
+class _CoreExceptionHandlerAdapter:
+    """Adapter routing legacy RichTracebackManager calls to the active runtime error handler."""
+    @staticmethod
+    def handle_exception(error: Exception, context: str = "", extra_context: Optional[dict[str, Any]] = None) -> None:
+        try:
+            ContextRegistry.get().get_error_handler().handle_exception(error, context, extra_context)
+        except Exception:
+            pass
+
+
+RichTracebackManager = _CoreExceptionHandlerAdapter
 
 from coldwind.core.utils.listeners.exit_listener import ExitListener
 
-# mcp.md servers integration
-
-# Modern CLI input handler
-from coldwind.desktop.ui.chatInputHandler import InputHandler
 
 
 class ChatInitializer:
@@ -219,9 +221,6 @@ class ChatInitializer:
 
             self.ToolResponseManager = ToolResponseManager()
 
-            # Socket connection lives on the context's slot (disabled legacy auto-spawn).
-            # context.set_socket_connection(SocketManager.get_socket_con())
-
             # register the exit listener on the context's listener slot
             exit_listener = ExitListener()
             context.register_listener("exit", exit_listener)
@@ -292,7 +291,9 @@ class ChatInitializer:
             raise ValueError(
                 "Graph is not initialized. Please compile the graph first."
             )
-        path = PNG_FILE_PATH
+        # WHAT: Retrieve png_file_path dynamically from ContextRegistry settings.
+        # WHY: Decouples graph image generation from legacy settings.py global constant.
+        path = ContextRegistry.get().get_settings().png_file_path
         with Path(path).open("wb") as f:
             f.write(self.graph.get_graph().draw_mermaid_png())
         if self.os == "Linux":
@@ -655,7 +656,12 @@ class ChatInitializer:
             #     "[bold cyan]You[/bold cyan]", default="", show_default=False
             # )
 
-            user_input = InputHandler().get_user_input()
+            # WHAT: Retrieve user input through active CommandParser service.
+            # WHY: Preserves Layering Invariant by decoupling from desktop InputHandler.
+            try:
+                user_input = context.get_command_parser().get_user_input()
+            except Exception:
+                user_input = input("you ➜ ")
 
             if user_input.lower() == "exit" or context.is_exiting():
                 self.console.print("[bold red]Exiting the chat...[/bold red]")
@@ -761,53 +767,21 @@ class ChatInitializer:
         )
 
     def _register_slash_commands(self):
-        """Register core slash commands like /help, /clear, /agent"""
-        from coldwind.desktop.slash_commands.commands.clear import (
-            register_clear_command,
-        )
-        from coldwind.desktop.slash_commands.commands.help import register_help_command
-        from coldwind.desktop.slash_commands.commands.exit import register_exit_command
+        """Register platform slash commands via the active CommandParser service."""
+        # WHAT: Delegate slash command registration to the active CommandParser service.
+        # WHY: Preserves Layering Invariant by keeping desktop slash command modules out of core.
+        try:
+            command_parser = ContextRegistry.get().get_command_parser()
+            if hasattr(command_parser, "register_default_commands"):
+                command_parser.register_default_commands()
 
-        # core/routing slash commands
-        from coldwind.desktop.slash_commands.commands.core_slashs.agent import (
-            register_agent_command,
-        )
-        from coldwind.desktop.slash_commands.commands.core_slashs.chat_llm import (
-            register_chat_llm_command,
-        )
-        from coldwind.desktop.slash_commands.commands.core_slashs.use_tool import (
-            register_slash_command_use_tool,
-        )
-
-        async def register_commands():
-            ##### this is the place which register the all slash commands #####
-            tasks = [
-                asyncio.to_thread(register_clear_command),
-                asyncio.to_thread(register_help_command),
-                asyncio.to_thread(register_agent_command),
-                asyncio.to_thread(register_exit_command),
-                asyncio.to_thread(register_chat_llm_command),
-                asyncio.to_thread(register_slash_command_use_tool),
-            ]
-            await asyncio.gather(*tasks)
-
-        def run_async_init():
-            try:
-                loop = asyncio.get_event_loop()
-            except RuntimeError:
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-            loop.run_until_complete(register_commands())
-
-        init_thread = threading.Thread(target=run_async_init)
-        init_thread.start()
-        init_thread.join()  # Wait for completion
-
-        ContextRegistry.get().get_logger().log_info(
-            heading="Slash Commands Registered",
-            body="Core slash commands registered successfully.",
-            metadata={},
-        )
+            ContextRegistry.get().get_logger().log_info(
+                heading="Slash Commands Registered",
+                body="Platform slash commands registered successfully.",
+                metadata={},
+            )
+        except Exception:
+            pass
 
     def _register_logging_handlers(self):
         """Register logging handlers for the chat application."""

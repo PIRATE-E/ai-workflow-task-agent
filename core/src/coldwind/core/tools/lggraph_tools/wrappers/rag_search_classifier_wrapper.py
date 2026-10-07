@@ -44,18 +44,20 @@ class RagSearchClassifierWrapper:
                 ToolResponseManager().set_response([ai_message])
 
         except Exception as e:
-            # ✅ ENHANCED ERROR CATCHING WITH STACK TRACE
+            # WHAT: Route exception through ContextRegistry error handler.
+            # WHY: Preserves Layering Invariant by eliminating direct desktop import.
             import traceback
-            from coldwind.desktop.ui.diagnostics.rich_traceback_manager import RichTracebackManager
+            from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
 
             error_details = traceback.format_exc()
-            RichTracebackManager.handle_exception(
-                exception=e,
-                context="RAG Search Classifier Wrapper Execution",
-                exc_type=ValueError,
-                exc_traceback=error_details,
-                show_locals=True,
-            )
+            try:
+                ContextRegistry.get().get_error_handler().handle_exception(
+                    e,
+                    context="RAG Search Classifier Wrapper Execution",
+                    extra_context={"traceback": error_details},
+                )
+            except Exception:
+                pass
 
             ai_message = AIMessage(
                 content=f"[ERROR] An error occurred while executing the RAG search: {str(e)} full traceback: {error_details}"

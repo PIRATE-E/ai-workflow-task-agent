@@ -153,7 +153,7 @@ class PlatformRuntimeContextInterface(ABC):
 
     @abstractmethod
     def set_socket_connection(self, conn: Any) -> None:
-        """Fill the socket slot post-construction (e.g. SocketManager.get_socket_con())."""
+        """Fill the socket slot post-construction."""
         pass
 
     @abstractmethod

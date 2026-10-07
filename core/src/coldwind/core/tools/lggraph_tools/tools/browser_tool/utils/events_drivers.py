@@ -859,10 +859,15 @@ class TeardownDriver(Handler):
     # No huge_error - cleanup should be best-effort
 
     def __init__(self, runner_instance: 'Runner'):
-        from coldwind.core.config.settings import BROWSER_USE_TIMEOUT
+        # WHAT: Retrieve browser_use_timeout from ContextRegistry instead of legacy settings.py.
+        # WHY: Decouples browser driver teardown from ghost settings.py module.
+        from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
+        browser_timeout = getattr(
+            ContextRegistry.get().get_settings(), "browser_use_timeout", 1300
+        )
         self.runner = runner_instance
         print("[DRIVER] Starting teardown... waiting for monitor system to actually tell us its decision ", flush=True)
-        self.runner.monitor_thread and self.runner.monitor_thread.join(timeout=BROWSER_USE_TIMEOUT)
+        self.runner.monitor_thread and self.runner.monitor_thread.join(timeout=browser_timeout)
         self.runner.monitor_thread.is_alive() and print("[DRIVER] Monitor thread is still alive after timeout, proceeding with teardown.", flush=True)
 
     async def __emit_kill_browser_event(self):

@@ -5,8 +5,6 @@ from coldwind.core.models.state import StateAccessor
 from coldwind.core.tools.lggraph_tools.tool_assign import ToolAssign
 
 from coldwind.core.utils.model_manager import ModelManager
-from coldwind.desktop.slash_commands.parser import ParseCommand
-from coldwind.desktop.slash_commands.executionar import ExecutionAr
 
 
 def classify_message_type(state) -> dict:
@@ -27,13 +25,13 @@ def classify_message_type(state) -> dict:
 
     # upcoming feature to override the classification with explicit user commands
     if content.lower().startswith('/'):
-        # send it to parser then executor
+        # WHAT: Execute slash command via active runtime CommandParser.
+        # WHY: Preserves Layering Invariant by decoupling Core from desktop slash command packages.
         result = None
         try:
-            slash_command = ParseCommand.get_command(content)
-            executor = ExecutionAr()
-            result = executor.execute(slash_command)
-            if result.success:
+            command_parser = ContextRegistry.get().get_command_parser()
+            result = command_parser.parse_and_execute(content)
+            if result and getattr(result, "success", False):
                 console.print(f"[u][red]Slash command executed:[/u][/red] {content}")
             else:
                 console.print(f"[u][red]Slash command execution failed:[/u][/red] {result.message}")
@@ -45,17 +43,27 @@ def classify_message_type(state) -> dict:
             console.print(f"[u][red]Error processing slash command:[/u][/red] {e}")
             message = HumanMessage(content=f"Error processing slash command: {e}")
             state["messages"].append(message)
-        finally:
-            if result and result.success and result.data and isinstance(result.data, dict) and "message_type" in result.data:
-                return result.data # this could be agent or tool or llm based on the command executed
-            else:
-                # if the slash command is non routing command like /help or /clear or any other command that does not change the flow we can default to llm
-                # add the message of slash-command from the executionar into the messages as well so the llm can see the result of the command executed
-                message = HumanMessage(content=f"user executed this slash command: {content}. Result: {result.message if result else 'No result available.'}" if result else f"Invalid or non-routing slash command executed: {content}")
-                state["messages"].append(message)
-                console.print("[u][red]Defaulting to LLM response for non-routing slash command.[/u][/red]")
+        # -------------------------------------------------------------------------
+        # WHAT CHANGED: Moved return logic out of `finally:` to after the try-except.
+        # WHY: Returning from inside a `finally` block swallows active exceptions
+        # and triggers Python's SyntaxWarning: 'return' in a 'finally' block.
+        # -------------------------------------------------------------------------
+        if result and result.success and result.data and isinstance(result.data, dict) and "message_type" in result.data:
+            return result.data  # this could be agent or tool or llm based on the command executed
+        else:
+            # if the slash command is non routing command like /help or /clear or any other command that does not change the flow we can default to llm
+            # add the message of slash-command from the executionar into the messages as well so the llm can see the result of the command executed
+            message = HumanMessage(
+                content=(
+                    f"user executed this slash command: {content}. Result: {result.message if result else 'No result available.'}"
+                    if result
+                    else f"Invalid or non-routing slash command executed: {content}"
+                )
+            )
+            state["messages"].append(message)
+            console.print("[u][red]Defaulting to LLM response for non-routing slash command.[/u][/red]")
 
-                return {"message_type": "llm"}
+            return {"message_type": "llm"}
 
     # Build history from state messages directly
     history_parts = []

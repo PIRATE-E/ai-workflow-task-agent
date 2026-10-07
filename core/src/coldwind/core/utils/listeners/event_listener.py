@@ -6,23 +6,18 @@ from typing import Any, Dict, List, Callable
 
 from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
 
-# 🔧 Structured diagnostics
-try:
-    from coldwind.desktop.ui.diagnostics.rich_traceback_manager import RichTracebackManager
-except ImportError:  # Fallback minimal stubs if diagnostics not yet loaded
+# WHAT: Route diagnostics through core context interfaces instead of desktop package.
+# WHY: Preserves the Layering Invariant ('Core NEVER imports Desktop').
+class _CoreExceptionHandlerAdapter:
+    @staticmethod
+    def handle_exception(error: Exception, context: str = "", extra_context=None) -> None:
+        try:
+            ContextRegistry.get().get_error_handler().handle_exception(error, context, extra_context)
+        except Exception:
+            pass
 
-    def debug_error(heading: str, body: str, metadata=None):
-        ContextRegistry.get().get_logger().log_error(heading, body, metadata)
 
-    def debug_info(heading: str, body: str, metadata=None):
-        ContextRegistry.get().get_logger().log_info(heading, body, metadata)
-
-    class RichTracebackManager:  # type: ignore
-        @staticmethod
-        def handle_exception(e, context: str = "", extra_context=None):
-            import traceback
-
-            print(f"[TRACEBACK] {context}: {e}\n{traceback.format_exc()}")
+RichTracebackManager = _CoreExceptionHandlerAdapter
 
 
 class EventListener:

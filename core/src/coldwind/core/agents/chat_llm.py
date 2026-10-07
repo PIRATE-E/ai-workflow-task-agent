@@ -2,7 +2,9 @@ from langchain_core.messages import AIMessage, HumanMessage
 
 from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
 from coldwind.core.tools.lggraph_tools.tool_assign import ToolAssign
-from coldwind.desktop.ui.print_message_style import print_message
+# WHAT: Route print_message through core ui_interface contract.
+# WHY: Eliminates illegal Core -> Desktop import, preserving the Layering Invariant.
+from coldwind.core.interfaces.ui_interface import print_message
 from coldwind.core.utils.model_manager import ModelManager
 
 

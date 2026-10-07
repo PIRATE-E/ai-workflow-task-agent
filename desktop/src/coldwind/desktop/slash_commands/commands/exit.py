@@ -50,7 +50,9 @@ def exit_handler(command : SlashCommand, options : CommandOption) -> CommandResu
         )
 
     except Exception as e:
-        from coldwind.desktop.ui.diagnostics.debug_helpers import debug_error
+        # WHAT: Import debug_error from core system_logging debug_protocol.
+        # WHY: Decouples exit handler from legacy desktop/ui/diagnostics/debug_helpers.py.
+        from coldwind.core.system_logging.debug_protocol import debug_error
         debug_error(
             f"Error in exit_handler: {str(e)}",
             body="An error occurred while trying to emit exit ticket.",

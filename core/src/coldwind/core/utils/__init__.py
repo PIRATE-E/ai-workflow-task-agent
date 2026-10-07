@@ -1,21 +1,13 @@
-"""Unified utils package initializer.
+"""Unified utils package initializer for ColdWind core.
 
 Provides a stable, minimal public API and defers heavy imports until
 first attribute access to reduce circular import risk and startup cost.
 
-Public API (lazy for heavy modules):
-    debug_helpers
-    debug_message_protocol
-    rich_traceback_manager
+Public API:
     open_ai_integration (lazy)
     model_manager (lazy)
-    socket_manager (lazy)
-
-Backward Compatibility:
-    Older code may attempt: `import coldwind.core.utils.debug_message_protocol` or
-    `import coldwind.core.utils.debug_helpers`. We register lightweight aliases in
-    sys.modules so those imports succeed without reintroducing the old
-    heavy eager import pattern.
+    timestamp_util
+    argument_schema_util
 """
 
 from __future__ import annotations
@@ -23,57 +15,29 @@ from __future__ import annotations
 from importlib import import_module
 from types import ModuleType
 from typing import Dict
-import sys
 
+# WHAT: Explicitly expose core-only utility modules without platform monkey-patching.
+# WHY: Invariant: "Core NEVER imports Desktop". Removed former monkey-patching of
+# `coldwind.desktop.ui.diagnostics.*` into `sys.modules["coldwind.core.utils.*"]`
+# and removed legacy `socket_manager` which moved to desktop dashboard transport.
 from coldwind.core.utils import timestamp_util
+from coldwind.core.utils import argument_schema_util
 
 __all__ = [
-    "debug_helpers",
-    "debug_message_protocol",
-    "rich_traceback_manager",
     "open_ai_integration",
     "model_manager",
-    "socket_manager",
-    timestamp_util,
+    "timestamp_util",
+    "argument_schema_util",
 ]
 
 _LAZY_MODULES: Dict[str, str] = {
     "open_ai_integration": "coldwind.core.utils.open_ai_integration",
     "model_manager": "coldwind.core.utils.model_manager",
-    "socket_manager": "coldwind.core.utils.socket_manager",
-}
-
-# Lightweight eager imports (small & safe):
-try:  # debug helpers
-    debug_helpers = import_module("coldwind.desktop.ui.diagnostics.debug_helpers")  # type: ignore
-except Exception:  # pragma: no cover
-    debug_helpers = None  # type: ignore
-
-try:  # message protocol
-    debug_message_protocol = import_module("coldwind.desktop.ui.diagnostics.debug_message_protocol")  # type: ignore
-except Exception:  # pragma: no cover
-    debug_message_protocol = None  # type: ignore
-
-try:  # traceback manager
-    rich_traceback_manager = import_module("coldwind.desktop.ui.diagnostics.rich_traceback_manager")  # type: ignore
-except Exception:  # pragma: no cover
-    rich_traceback_manager = None  # type: ignore
-
-# Register backward-compatible aliases ONLY if available
-if debug_message_protocol is not None:
-    sys.modules.setdefault("coldwind.core.utils.debug_message_protocol", debug_message_protocol)  # type: ignore
-if debug_helpers is not None:
-    sys.modules.setdefault("coldwind.core.utils.debug_helpers", debug_helpers)  # type: ignore
-
-_LEGACY_ATTRIBUTE_MAP = {
-    # future: "old_name": "new_name"
 }
 
 
 def __getattr__(name: str) -> ModuleType:  # noqa: D401
     """Lazily load registered heavy utility submodules."""
-    if name in _LEGACY_ATTRIBUTE_MAP:
-        name = _LEGACY_ATTRIBUTE_MAP[name]
     if name in _LAZY_MODULES:
         path = _LAZY_MODULES[name]
         try:
@@ -87,3 +51,4 @@ def __getattr__(name: str) -> ModuleType:  # noqa: D401
 
 def __dir__():  # pragma: no cover
     return sorted(set(__all__ + [k for k in globals().keys() if not k.startswith("_")]))
+
