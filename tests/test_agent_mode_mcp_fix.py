@@ -37,9 +37,9 @@ async def test_mcp_server_startup():
     print("🔄 Testing MCP Server Startup...")
 
     try:
-        from src.mcp.manager import MCP_Manager
-        from src.mcp.load_config import load_mcp_configs
-        from src.tools.lggraph_tools.wrappers.mcp_wrapper.uni_mcp_wrappers import (
+        from coldwind.core.mcp.manager import MCP_Manager
+        from coldwind.core.mcp.load_config import load_mcp_configs
+        from coldwind.core.tools.lggraph_tools.wrappers.mcp_wrapper.uni_mcp_wrappers import (
             UniversalMCPWrapper,
         )
 
@@ -91,7 +91,7 @@ def test_tool_server_mapping():
     print("\n🗺️ Testing Tool-to-Server Mapping...")
 
     try:
-        from src.tools.lggraph_tools.tools.mcp_integrated_tools.universal import (
+        from coldwind.core.tools.lggraph_tools.tools.mcp_integrated_tools.universal import (
             universal_tool,
         )
 
@@ -161,8 +161,8 @@ async def test_agent_mode_simulation():
     print("\n🤖 Testing Agent Mode Simulation...")
 
     try:
-        from src.agents.agent_mode_node import Agent
-        from src.config import settings
+        from coldwind.core.agents.agent_mode_node import Agent
+        from coldwind.core.config import settings
 
         # Initialize settings if needed
         if not hasattr(settings, "listeners"):
@@ -229,7 +229,7 @@ async def test_individual_mcp_tools():
     print("\n🔧 Testing Individual MCP Tools...")
 
     try:
-        from src.tools.lggraph_tools.tools.mcp_integrated_tools.universal import (
+        from coldwind.core.tools.lggraph_tools.tools.mcp_integrated_tools.universal import (
             universal_tool,
         )
 

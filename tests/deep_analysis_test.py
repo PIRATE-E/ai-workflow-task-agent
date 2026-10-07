@@ -26,7 +26,7 @@ def test_openai_basic_functionality():
     print("?? Testing OpenAI Integration Basic Functionality...")
 
     try:
-        from src.utils.open_ai_integration import OpenAIIntegration
+        from coldwind.core.utils.open_ai_integration import OpenAIIntegration
 
         # Test initialization
         print("   1. Testing initialization...")
@@ -70,7 +70,7 @@ def test_openai_live_api():
     print("\n?? Testing Live API Call...")
 
     try:
-        from src.utils.open_ai_integration import OpenAIIntegration
+        from coldwind.core.utils.open_ai_integration import OpenAIIntegration
 
         integration = OpenAIIntegration()
 
@@ -118,7 +118,7 @@ def test_openai_error_scenarios():
     print("\n?? Testing Error Scenarios...")
 
     try:
-        from src.utils.open_ai_integration import OpenAIIntegration
+        from coldwind.core.utils.open_ai_integration import OpenAIIntegration
 
         # Reset state for clean testing
         OpenAIIntegration._failure_count = 0
@@ -180,7 +180,7 @@ def test_mcp_integration():
 
     try:
         # Test the universal tool that was causing problems
-        from src.tools.lggraph_tools.tools.mcp_integrated_tools.universal import (
+        from coldwind.core.tools.lggraph_tools.tools.mcp_integrated_tools.universal import (
             universal_tool,
         )
 
@@ -241,14 +241,14 @@ def test_agent_mode():
 
     try:
         # Test agent mode initialization without actually running it
-        from src.agents.agent_mode_node import Agent
+        from coldwind.core.agents.agent_mode_node import Agent
 
         print("   1. Testing agent import...")
         print("   ? Agent class imported successfully")
 
         # Initialize RichTracebackManager first
         try:
-            from src.ui.diagnostics.rich_traceback_manager import RichTracebackManager
+            from coldwind.desktop.ui.diagnostics.rich_traceback_manager import RichTracebackManager
 
             RichTracebackManager.initialize()
             print("   ? RichTracebackManager initialized")
@@ -285,7 +285,7 @@ def check_system_health():
         print("   1. Checking critical imports...")
 
         try:
-            from src.utils.open_ai_integration import OpenAIIntegration
+            from coldwind.core.utils.open_ai_integration import OpenAIIntegration
 
             print("      ? OpenAI Integration import successful")
         except ImportError as e:
@@ -293,7 +293,7 @@ def check_system_health():
             return False
 
         try:
-            from src.mcp.manager import MCP_Manager
+            from coldwind.core.mcp.manager import MCP_Manager
 
             print("      ? MCP Manager import successful")
         except ImportError as e:
@@ -301,7 +301,7 @@ def check_system_health():
             return False
 
         try:
-            from src.tools.lggraph_tools.tools.mcp_integrated_tools.universal import (
+            from coldwind.core.tools.lggraph_tools.tools.mcp_integrated_tools.universal import (
                 universal_tool,
             )
 
@@ -314,7 +314,7 @@ def check_system_health():
         print("   2. Checking configuration...")
 
         try:
-            from src.config.settings import OPEN_AI_API_KEY, OPENAI_TIMEOUT
+            from coldwind.core.config.settings import OPEN_AI_API_KEY, OPENAI_TIMEOUT
 
             if OPEN_AI_API_KEY:
                 print("      ? OpenAI API key configured")
@@ -330,7 +330,7 @@ def check_system_health():
         print("   3. Checking debug helpers...")
 
         try:
-            from src.ui.diagnostics.debug_helpers import (
+            from coldwind.desktop.ui.diagnostics.debug_helpers import (
                 debug_info,
                 debug_error,
                 debug_warning,

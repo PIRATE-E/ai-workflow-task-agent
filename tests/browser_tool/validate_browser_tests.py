@@ -57,7 +57,7 @@ print("\n3️⃣ Checking for legacy imports...")
 legacy_imports = [
     "browser_use_tool",
     "BrowserHandler",
-    "from src.tools.lggraph_tools.tools.browser_tool import"
+    "from coldwind.core.tools.lggraph_tools.tools.browser_tool import"
 ]
 
 new_test_files = list(test_dir.rglob("test_*.py"))
@@ -80,21 +80,21 @@ print("\n4️⃣ Testing imports...")
 sys.path.insert(0, str(project_root))
 
 try:
-    from src.tools.lggraph_tools.tools.browser_tool.Handler import Handler, HandlerEnums
+    from coldwind.core.tools.lggraph_tools.tools.browser_tool.Handler import Handler, HandlerEnums
     print("   ✅ Handler imported")
 except ImportError as e:
     print(f"   ❌ Handler import failed: {e}")
     sys.exit(1)
 
 try:
-    from src.tools.lggraph_tools.tools.browser_tool.runner import Runner
+    from coldwind.core.tools.lggraph_tools.tools.browser_tool.runner import Runner
     print("   ✅ Runner imported")
 except ImportError as e:
     print(f"   ❌ Runner import failed: {e}")
     sys.exit(1)
 
 try:
-    from src.tools.lggraph_tools.tools.browser_tool.config import BrowserRequiredConfig
+    from coldwind.core.tools.lggraph_tools.tools.browser_tool.config import BrowserRequiredConfig
     print("   ✅ BrowserRequiredConfig imported")
 except ImportError as e:
     print(f"   ❌ BrowserRequiredConfig import failed: {e}")
@@ -103,7 +103,7 @@ except ImportError as e:
 # Step 5: Check driver registration
 print("\n5️⃣ Checking driver registration...")
 try:
-    from src.tools.lggraph_tools.tools.browser_tool.utils import events_drivers
+    from coldwind.core.tools.lggraph_tools.tools.browser_tool.utils import events_drivers
 
     registered_count = sum(1 for v in Handler.enum_driver_map.values() if v is not None)
     total_enums = len(HandlerEnums)

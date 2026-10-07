@@ -22,11 +22,11 @@ from unittest.mock import Mock, patch
 if project_root not in sys.path:
 
 try:
-    from src.agents.agentic_orchestrator.AgentGraphCore import (
+    from coldwind.core.agents.agentic_orchestrator.AgentGraphCore import (
         AgentGraphCore, TASK, REQUIRED_CONTEXT, EXECUTION_CONTEXT, 
         MAIN_STATE, AgentState
     )
-    from src.models.state import State
+    from coldwind.core.models.state import State
     MODULES_AVAILABLE = True
 except ImportError as e:
     print(f"Import error: {e}")

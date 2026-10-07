@@ -19,7 +19,7 @@ print("=" * 70)
 # Step 1: Import Handler
 print("\n1️⃣ Importing Handler...")
 try:
-    from src.tools.lggraph_tools.tools.browser_tool.Handler import Handler, HandlerEnums
+    from coldwind.core.tools.lggraph_tools.tools.browser_tool.Handler import Handler, HandlerEnums
     print("   ✅ Handler imported")
 except Exception as e:
     print(f"   ❌ Failed to import Handler: {e}")
@@ -36,7 +36,7 @@ for enum_member, driver_class in Handler.enum_driver_map.items():
 # Step 3: Import drivers
 print("\n3️⃣ Importing drivers...")
 try:
-    from src.tools.lggraph_tools.tools.browser_tool.utils import events_drivers
+    from coldwind.core.tools.lggraph_tools.tools.browser_tool.utils import events_drivers
     print("   ✅ events_drivers imported")
 except Exception as e:
     print(f"   ❌ Failed to import events_drivers: {e}")
@@ -53,8 +53,8 @@ for enum_member, driver_class in Handler.enum_driver_map.items():
 
 # Step 5: Test get() method
 print("\n5️⃣ Testing Handler.get()...")
-from src.tools.lggraph_tools.tools.browser_tool.config import BrowserRequiredConfig
-from src.tools.lggraph_tools.tools.browser_tool.runner import Runner
+from coldwind.core.tools.lggraph_tools.tools.browser_tool.config import BrowserRequiredConfig
+from coldwind.core.tools.lggraph_tools.tools.browser_tool.runner import Runner
 
 config = BrowserRequiredConfig(query="test", file_path=Path("test.json"))
 runner = Runner(config)

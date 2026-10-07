@@ -26,7 +26,7 @@ def test_tool_mapping():
 
     try:
         # Import the universal tool function
-        from src.tools.lggraph_tools.tools.mcp_integrated_tools.universal import (
+        from coldwind.core.tools.lggraph_tools.tools.mcp_integrated_tools.universal import (
             universal_tool,
         )
 
@@ -105,7 +105,7 @@ def test_openai_fix():
     print("\n🔧 Testing OpenAI NoneType Fix...")
 
     try:
-        from src.utils.open_ai_integration import OpenAIIntegration
+        from coldwind.core.utils.open_ai_integration import OpenAIIntegration
 
         print("📋 Testing None completion handling...")
 

@@ -17,17 +17,17 @@ import time
 
 try:
     # Import hierarchical agent system
-    from src.agents.agentic_orchestrator.AgentGraphCore import (
+    from coldwind.core.agents.agentic_orchestrator.AgentGraphCore import (
         AgentGraphCore, TASK, REQUIRED_CONTEXT, EXECUTION_CONTEXT, MAIN_STATE
     )
     
     # Import chat initializer to properly set up tools
-    from src.core.chat_initializer import ChatInitializer
+    from coldwind.core.engine.chat_initializer import ChatInitializer
     
     # Import supporting systems
-    from src.tools.lggraph_tools.tool_assign import ToolAssign
-    from src.models.state import State
-    from src.config import settings
+    from coldwind.core.tools.lggraph_tools.tool_assign import ToolAssign
+    from coldwind.core.models.state import State
+    from coldwind.core.config import settings
     
     MODULES_AVAILABLE = True
     print("? All modules imported successfully")
@@ -113,7 +113,7 @@ class WorkingHierarchicalIntegration:
         
         try:
             # Create proper AgentState with all required fields
-            from src.models.state import State
+            from coldwind.core.models.state import State
             
             # Create a proper State object
             state_obj = State(messages=[], message_type=None)

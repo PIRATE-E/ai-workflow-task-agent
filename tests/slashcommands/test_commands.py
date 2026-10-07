@@ -17,10 +17,10 @@ import os
 
 # Add the project root to Python path
 
-from src.slash_commands.commands.clear import register_clear_command
-from src.slash_commands.commands.help import register_help_command
-from src.slash_commands.commands.core_slashs.agent import register_agent_command
-from src.slash_commands.on_run_time_register import OnRunTimeRegistry
+from coldwind.desktop.slash_commands.commands.clear import register_clear_command
+from coldwind.desktop.slash_commands.commands.help import register_help_command
+from coldwind.desktop.slash_commands.commands.core_slashs.agent import register_agent_command
+from coldwind.desktop.slash_commands.on_run_time_register import OnRunTimeRegistry
 
 
 def test_registration():

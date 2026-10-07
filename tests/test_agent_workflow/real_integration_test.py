@@ -19,18 +19,18 @@ import time
 
 try:
     # Import hierarchical agent system
-    from src.agents.agentic_orchestrator.AgentGraphCore import (
+    from coldwind.core.agents.agentic_orchestrator.AgentGraphCore import (
         AgentGraphCore, TASK, REQUIRED_CONTEXT, EXECUTION_CONTEXT, 
         MAIN_STATE, AgentState
     )
     
     # Import agent execution system
-    from src.agents.agent_mode_node import agent_node, Agent
+    from coldwind.core.agents.agent_mode_node import agent_node, Agent
     
     # Import supporting systems
-    from src.models.state import State, StateAccessor
-    from src.tools.lggraph_tools.tool_assign import ToolAssign
-    from src.config import settings
+    from coldwind.core.models.state import State, StateAccessor
+    from coldwind.core.tools.lggraph_tools.tool_assign import ToolAssign
+    from coldwind.core.config import settings
     
     MODULES_AVAILABLE = True
     print(" All modules imported successfully")
@@ -170,7 +170,7 @@ class HierarchicalAgentIntegration:
             agent_state = self.create_real_state_for_agent_node(user_goal)
             
             print(f"Executing {len(agent_exe_array)} tasks with real tools...")
-            from src.tools.lggraph_tools.tool_response_manager import ToolResponseManager
+            from coldwind.core.tools.lggraph_tools.tool_response_manager import ToolResponseManager
             # Clear any previous responses
             ToolResponseManager().clear_response()
             

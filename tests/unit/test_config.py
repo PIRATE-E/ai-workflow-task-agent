@@ -16,18 +16,18 @@ class TestSettings:
 
     def test_settings_importable(self):
         """Settings module should be importable."""
-        from src.config import settings
+        from coldwind.core.config import settings
         assert settings is not None
 
     def test_settings_has_default_model(self):
         """Settings should have DEFAULT_MODEL defined."""
-        from src.config import settings
+        from coldwind.core.config import settings
         assert hasattr(settings, 'DEFAULT_MODEL')
         assert settings.DEFAULT_MODEL is not None
 
     def test_settings_has_mcp_setting(self):
         """Settings should have MCP-related settings."""
-        from src.config import settings
+        from coldwind.core.config import settings
 
         # Check for any MCP-related setting (different naming conventions)
         mcp_attrs = [a for a in dir(settings) if 'mcp' in a.lower() or 'MCP' in a]
@@ -35,7 +35,7 @@ class TestSettings:
 
     def test_settings_has_browser_settings(self):
         """Settings should have browser-related settings."""
-        from src.config import settings
+        from coldwind.core.config import settings
 
         # Check for any browser-related setting
         browser_attrs = [a for a in dir(settings) if 'browser' in a.lower() or 'BROWSER' in a]
@@ -44,13 +44,13 @@ class TestSettings:
 
     def test_settings_has_log_settings(self):
         """Settings should have logging-related settings."""
-        from src.config import settings
+        from coldwind.core.config import settings
 
         assert hasattr(settings, 'LOG_LEVEL')
 
     def test_settings_paths_exist(self):
         """Settings path values should point to valid locations."""
-        from src.config import settings
+        from coldwind.core.config import settings
 
         if hasattr(settings, 'PROJECT_ROOT'):
             assert Path(settings.PROJECT_ROOT).exists()

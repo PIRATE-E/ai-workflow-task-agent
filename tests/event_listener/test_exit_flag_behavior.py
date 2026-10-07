@@ -19,8 +19,8 @@ import time
 
 # Add project root to path
 
-from src.utils.listeners.exit_listener import ExitListener
-from src.config import settings
+from coldwind.core.utils.listeners.exit_listener import ExitListener
+from coldwind.core.config import settings
 
 
 def test_exit_flag_behavior():

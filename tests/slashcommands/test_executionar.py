@@ -17,11 +17,11 @@ import os
 
 # Add the project root to Python path
 
-from src.slash_commands.executionar import ExecutionAr
-from src.slash_commands.parser import ParseCommand
-from src.slash_commands.commands.clear import register_clear_command
-from src.slash_commands.commands.help import register_help_command
-from src.slash_commands.protocol import CommandOption, SlashCommand
+from coldwind.desktop.slash_commands.executionar import ExecutionAr
+from coldwind.desktop.slash_commands.parser import ParseCommand
+from coldwind.desktop.slash_commands.commands.clear import register_clear_command
+from coldwind.desktop.slash_commands.commands.help import register_help_command
+from coldwind.desktop.slash_commands.protocol import CommandOption, SlashCommand
 
 
 def test_executionar():

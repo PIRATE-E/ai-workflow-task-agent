@@ -15,7 +15,7 @@ from pathlib import Path
 
 
 # Import the function
-from src.utils.error_transfer import new_logger_write
+from coldwind.core.utils.error_transfer import new_logger_write
 import json
 
 # Create a test message

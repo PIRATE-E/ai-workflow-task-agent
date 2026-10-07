@@ -16,9 +16,9 @@ from pathlib import Path
 
 print("Testing log file creation with absolute path...")
 
-from src.system_logging.on_time_registry import OnTimeRegistry
-from src.system_logging.handlers.handler_base import TextHandler
-from src.system_logging.dispatcher import Dispatcher
+from coldwind.core.system_logging.on_time_registry import OnTimeRegistry
+from coldwind.core.system_logging.handlers.handler_base import TextHandler
+from coldwind.core.system_logging.dispatcher import Dispatcher
 import json
 
 # Register handler (idempotent)
@@ -43,7 +43,7 @@ disp.dispatch(test_json)
 print("✓ Message dispatched")
 
 # Check for log files in src/basic_logs
-from src.config import settings
+from coldwind.core.config import settings
 log_dir = settings.BASE_DIR / "basic_logs"
 print(f"\nLooking for log files in: {log_dir}")
 

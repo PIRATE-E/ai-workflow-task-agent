@@ -19,7 +19,7 @@ import tempfile
 import shutil
 
 try:
-    from src.agents.agentic_orchestrator.AgentGraphCore import (
+    from coldwind.core.agents.agentic_orchestrator.AgentGraphCore import (
         AgentGraphCore,
         TASK,
         REQUIRED_CONTEXT,
@@ -30,7 +30,7 @@ try:
         AgentState,
         Spawn_subAgent,
     )
-    from src.models.state import State
+    from coldwind.core.models.state import State
 
     MODULES_AVAILABLE = True
 except ImportError as e:
@@ -60,8 +60,8 @@ class TestCompleteWorkflow(unittest.TestCase):
         if os.path.exists(self.test_output_dir):
             shutil.rmtree(self.test_output_dir)
 
-    @patch('src.agents.agentic_orchestrator.AgentGraphCore.ModelManager')
-    @patch('src.agents.agentic_orchestrator.AgentGraphCore.ToolAssign')
+    @patch('coldwind.core.agents.agentic_orchestrator.AgentGraphCore.ModelManager')
+    @patch('coldwind.core.agents.agentic_orchestrator.AgentGraphCore.ToolAssign')
     def test_complete_dark_web_research_workflow(self, mock_tool_assign, mock_model_manager):
         """
         Test complete workflow: User asks for dark web research ? Agent decomposes ? Executes ? Generates report
@@ -288,9 +288,9 @@ class TestCompleteWorkflow(unittest.TestCase):
         # ========== STEP 7: Execute Complete Workflow ==========
         print("?? Step 7: Executing complete workflow...")
 
-        with patch('src.agents.agentic_orchestrator.AgentGraphCore.ModelManager.convert_to_json', side_effect=mock_json_convert), \
-             patch('src.agents.agentic_orchestrator.AgentGraphCore.AgentGraphCore._AgentGraphCore__tool_executor', side_effect=mock_tool_execution), \
-             patch('src.agents.agentic_orchestrator.AgentGraphCore.HierarchicalAgentPrompt', side_effect=mock_prompt_generator):
+        with patch('coldwind.core.agents.agentic_orchestrator.AgentGraphCore.ModelManager.convert_to_json', side_effect=mock_json_convert), \
+             patch('coldwind.core.agents.agentic_orchestrator.AgentGraphCore.AgentGraphCore._AgentGraphCore__tool_executor', side_effect=mock_tool_execution), \
+             patch('coldwind.core.agents.agentic_orchestrator.AgentGraphCore.HierarchicalAgentPrompt', side_effect=mock_prompt_generator):
 
             # Create initial state
             print("   ?? Creating initial agent state...")
@@ -432,7 +432,7 @@ class TestCompleteWorkflow(unittest.TestCase):
         )
 
         # Verify that complex tasks can trigger spawning analysis
-        with patch('src.agents.agentic_orchestrator.AgentGraphCore.ModelManager') as mock_model_manager:
+        with patch('coldwind.core.agents.agentic_orchestrator.AgentGraphCore.ModelManager') as mock_model_manager:
             mock_response = Mock()
             mock_response.content = '{"requires_decomposition": true, "reasoning": "Task requires multiple specialized tools and extensive research"}'
 
@@ -440,7 +440,7 @@ class TestCompleteWorkflow(unittest.TestCase):
             mock_instance.invoke.return_value = mock_response
             mock_model_manager.return_value = mock_instance
 
-            with patch('src.agents.agentic_orchestrator.AgentGraphCore.ModelManager.convert_to_json') as mock_convert:
+            with patch('coldwind.core.agents.agentic_orchestrator.AgentGraphCore.ModelManager.convert_to_json') as mock_convert:
                 mock_convert.return_value = {
                     "requires_decomposition": True,
                     "reasoning": "Task requires multiple specialized tools and extensive research"
@@ -454,7 +454,7 @@ class TestCompleteWorkflow(unittest.TestCase):
                 print("   ? Complex task properly identified for decomposition")
                 print(f"   ?? Reasoning: {analysis_result.get('reasoning')}")
 
-    @patch('src.agents.agentic_orchestrator.AgentGraphCore.ToolAssign')
+    @patch('coldwind.core.agents.agentic_orchestrator.AgentGraphCore.ToolAssign')
     def test_workflow_error_recovery(self, mock_tool_assign):
         """
         Test workflow error recovery and fallback mechanisms.
@@ -484,10 +484,10 @@ class TestCompleteWorkflow(unittest.TestCase):
         def mock_failing_tool_executor(tool_name, parameters):
             return (False, "Tool execution failed: Network timeout")
 
-        with patch('src.agents.agentic_orchestrator.AgentGraphCore.AgentGraphCore._AgentGraphCore__tool_executor', side_effect=mock_failing_tool_executor), \
-             patch('src.agents.agentic_orchestrator.AgentGraphCore.HierarchicalAgentPrompt') as mock_prompt_class, \
-             patch('src.agents.agentic_orchestrator.AgentGraphCore.ModelManager') as mock_model_manager_error, \
-             patch('src.agents.agentic_orchestrator.AgentGraphCore.ModelManager.convert_to_json') as mock_convert_error:
+        with patch('coldwind.core.agents.agentic_orchestrator.AgentGraphCore.AgentGraphCore._AgentGraphCore__tool_executor', side_effect=mock_failing_tool_executor), \
+             patch('coldwind.core.agents.agentic_orchestrator.AgentGraphCore.HierarchicalAgentPrompt') as mock_prompt_class, \
+             patch('coldwind.core.agents.agentic_orchestrator.AgentGraphCore.ModelManager') as mock_model_manager_error, \
+             patch('coldwind.core.agents.agentic_orchestrator.AgentGraphCore.ModelManager.convert_to_json') as mock_convert_error:
 
             # Mock prompt generator
             mock_prompt_instance = Mock()
