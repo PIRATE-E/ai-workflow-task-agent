@@ -18,3 +18,8 @@ lint.select = ["PTH", "ASYNC", "UP028"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+
+[dependency-groups]
+test = [
+    "pytest>=9.1.1",
+]
