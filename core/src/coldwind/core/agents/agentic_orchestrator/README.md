@@ -13,9 +13,13 @@ This README documents the package contents, runtime data shapes, node catalog an
 
 Package contents
 ----------------
-- AgentGraphCore.py — Core orchestrator that implements the main workflow loop, task models, helper utilities, and synthesis logic.
-- hierarchical_agent_prompts.py — Depth-aware prompt templates used by planner, sub-agent nodes, synthesis and validators.
-- __init__.py — Package entry file.
+- graphCore.py — Core orchestrator class (`AgentGraphCore`) defining the LangGraph workflow structure.
+- agent_core_helpers.py — Tool pre-filtering, schema resolution, and execution helper methods.
+- spawn_agent.py — Hierarchical sub-agent spawner and progressive decomposition engine.
+- agent_status.py — Real-time task and workflow status notification handlers.
+- pydantic_models.py — Strongly typed state schemas (`WorkflowStateModel`, `TASK`, `AgentState`).
+- hierarchical_agent_prompts.py — Depth-aware prompt templates used by planner, sub-agents, and validators.
+- __init__.py — Package entry file exposing `AgentGraphCore` and core Pydantic models.
 
 Node catalog (explicit)
 ------------------------

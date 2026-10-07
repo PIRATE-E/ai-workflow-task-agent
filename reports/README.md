@@ -19,6 +19,7 @@ library** — read the report you need, don't pre-load all of them.
 | System | Domain(s) | Folder | Contents |
 |--------|-----------|--------|----------|
 | **Logging System** | core, desktop | [`logging-system/`](logging-system/README.md) | Handler architecture, routing, text-archiving, dashboard handler, socket transport, dashboard printer. Full DIY-handler tutorial. |
+| **UV Package Manager** | shared | [`uv-package-manager/`](uv-package-manager/README.md) | Essentials-only uv curriculum: packaging foundations (virtualenv, wheels, editable/.pth, namespace packages), then uv setup, dependency lifecycle, pyproject/hatchling, lockfile mechanics, and the workspace capstone. |
 
 ## Future Systems
 
