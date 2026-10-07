@@ -21,7 +21,7 @@ from datetime import datetime
 
 try:
     # Import the modules we need to test
-    from src.agents.agentic_orchestrator.AgentGraphCore import (
+    from coldwind.core.agents.agentic_orchestrator.AgentGraphCore import (
         AgentGraphCore,
         TASK,
         REQUIRED_CONTEXT,
@@ -32,7 +32,7 @@ try:
         AgentState,
         Spawn_subAgent,
     )
-    from src.models.state import State
+    from coldwind.core.models.state import State
 
     MODULES_AVAILABLE = True
 except ImportError as e:
@@ -174,7 +174,7 @@ class TestAgentGraphCoreHelpers(unittest.TestCase):
         if not MODULES_AVAILABLE:
             self.skipTest("Required modules not available")
 
-    @patch('src.agents.agentic_orchestrator.AgentGraphCore.ToolAssign')
+    @patch('coldwind.core.agents.agentic_orchestrator.AgentGraphCore.ToolAssign')
     def test_get_safe_tools_list_success(self, mock_tool_assign):
         """Test __get_safe_tools_list when tools are available."""
         # Mock tools
@@ -191,7 +191,7 @@ class TestAgentGraphCoreHelpers(unittest.TestCase):
         self.assertEqual(tools[0].name, "test_tool_1")
         self.assertEqual(tools[1].name, "test_tool_2")
 
-    @patch('src.agents.agentic_orchestrator.AgentGraphCore.ToolAssign')
+    @patch('coldwind.core.agents.agentic_orchestrator.AgentGraphCore.ToolAssign')
     def test_get_safe_tools_list_empty(self, mock_tool_assign):
         """Test __get_safe_tools_list when no tools are available."""
         mock_tool_assign.get_tools_list.return_value = []
@@ -201,7 +201,7 @@ class TestAgentGraphCoreHelpers(unittest.TestCase):
         
         self.assertIn("No tools available", str(context.exception))
 
-    @patch('src.agents.agentic_orchestrator.AgentGraphCore.AgentGraphCore.get_detailed_tool_context')
+    @patch('coldwind.core.agents.agentic_orchestrator.AgentGraphCore.AgentGraphCore.get_detailed_tool_context')
     def test_get_tools_string(self, mock_get_detailed_context):
         """Test __get_detailed_tool_context formatting."""
         # Mock the context returned by the detailed context method
@@ -221,8 +221,8 @@ class TestToolExecutor(unittest.TestCase):
         if not MODULES_AVAILABLE:
             self.skipTest("Required modules not available")
 
-    @patch('src.agents.agentic_orchestrator.AgentGraphCore.AgentGraphCore._AgentGraphCore__get_safe_tools_list')
-    @patch('src.tools.lggraph_tools.tool_response_manager.ToolResponseManager')
+    @patch('coldwind.core.agents.agentic_orchestrator.AgentGraphCore.AgentGraphCore._AgentGraphCore__get_safe_tools_list')
+    @patch('coldwind.core.tools.lggraph_tools.tool_response_manager.ToolResponseManager')
     def test_tool_executor_success(self, mock_response_manager, mock_get_tools):
         """Test successful tool execution."""
         # Mock tool
@@ -245,7 +245,7 @@ class TestToolExecutor(unittest.TestCase):
         self.assertTrue(success)
         self.assertEqual(result, "Tool executed successfully")
 
-    @patch('src.agents.agentic_orchestrator.AgentGraphCore.AgentGraphCore._AgentGraphCore__get_safe_tools_list')
+    @patch('coldwind.core.agents.agentic_orchestrator.AgentGraphCore.AgentGraphCore._AgentGraphCore__get_safe_tools_list')
     def test_tool_executor_tool_not_found(self, mock_get_tools):
         """Test tool executor when tool is not found."""
         mock_tool = Mock()
@@ -260,8 +260,8 @@ class TestToolExecutor(unittest.TestCase):
         self.assertFalse(success)
         self.assertIn("not found", result)
 
-    @patch('src.agents.agentic_orchestrator.AgentGraphCore.AgentGraphCore._AgentGraphCore__get_safe_tools_list')
-    @patch('src.tools.lggraph_tools.tool_response_manager.ToolResponseManager')
+    @patch('coldwind.core.agents.agentic_orchestrator.AgentGraphCore.AgentGraphCore._AgentGraphCore__get_safe_tools_list')
+    @patch('coldwind.core.tools.lggraph_tools.tool_response_manager.ToolResponseManager')
     def test_tool_executor_no_response(self, mock_response_manager, mock_get_tools):
         """Test tool executor when no response is received."""
         # Mock tool
@@ -310,7 +310,7 @@ class TestSpawnSubAgent(unittest.TestCase):
             original_goal="Test goal"
         )
 
-    @patch('src.agents.agentic_orchestrator.AgentGraphCore.ModelManager')
+    @patch('coldwind.core.agents.agentic_orchestrator.AgentGraphCore.ModelManager')
     def test_analyze_spawn_requirement_should_spawn(self, mock_model_manager):
         """Test spawn requirement analysis that recommends spawning."""
         # Mock LLM response indicating spawning is needed
@@ -322,7 +322,7 @@ class TestSpawnSubAgent(unittest.TestCase):
         mock_model_manager.return_value = mock_model_instance
         
         # Mock JSON conversion
-        with patch('src.agents.agentic_orchestrator.AgentGraphCore.ModelManager.convert_to_json') as mock_convert:
+        with patch('coldwind.core.agents.agentic_orchestrator.AgentGraphCore.ModelManager.convert_to_json') as mock_convert:
             mock_convert.return_value = {
                 "should_spawn": True,
                 "reasoning": "Task is complex"
@@ -337,7 +337,7 @@ class TestSpawnSubAgent(unittest.TestCase):
             self.assertTrue(result["should_spawn"])
             self.assertEqual(result["reasoning"], "Task is complex")
 
-    @patch('src.agents.agentic_orchestrator.AgentGraphCore.ModelManager')
+    @patch('coldwind.core.agents.agentic_orchestrator.AgentGraphCore.ModelManager')
     def test_analyze_spawn_requirement_no_spawn(self, mock_model_manager):
         """Test spawn requirement analysis that doesn't recommend spawning."""
         # Mock LLM response indicating no spawning needed
@@ -349,7 +349,7 @@ class TestSpawnSubAgent(unittest.TestCase):
         mock_model_manager.return_value = mock_model_instance
         
         # Mock JSON conversion
-        with patch('src.agents.agentic_orchestrator.AgentGraphCore.ModelManager.convert_to_json') as mock_convert:
+        with patch('coldwind.core.agents.agentic_orchestrator.AgentGraphCore.ModelManager.convert_to_json') as mock_convert:
             mock_convert.return_value = {
                 "should_spawn": False,
                 "reasoning": "Task is simple"
@@ -364,9 +364,9 @@ class TestSpawnSubAgent(unittest.TestCase):
             self.assertFalse(result["should_spawn"])
             self.assertEqual(result["reasoning"], "Task is simple")
 
-    @patch('src.agents.agentic_orchestrator.AgentGraphCore.AgentGraphCore.recommend_tools_for_task')
-    @patch('src.agents.agentic_orchestrator.AgentGraphCore.AgentGraphCore.get_safe_tools_list')
-    @patch('src.agents.agentic_orchestrator.AgentGraphCore.ModelManager')
+    @patch('coldwind.core.agents.agentic_orchestrator.AgentGraphCore.AgentGraphCore.recommend_tools_for_task')
+    @patch('coldwind.core.agents.agentic_orchestrator.AgentGraphCore.AgentGraphCore.get_safe_tools_list')
+    @patch('coldwind.core.agents.agentic_orchestrator.AgentGraphCore.ModelManager')
     def test_decompose_task_for_subAgent(self, mock_model_manager, mock_get_tools, mock_recommend_tools):
         """Test task decomposition into sub-tasks."""
         # Mock available tools
@@ -388,7 +388,7 @@ class TestSpawnSubAgent(unittest.TestCase):
         mock_model_manager.return_value = mock_model_instance
         
         # Mock JSON conversion
-        with patch('src.agents.agentic_orchestrator.AgentGraphCore.ModelManager.convert_to_json') as mock_convert:
+        with patch('coldwind.core.agents.agentic_orchestrator.AgentGraphCore.ModelManager.convert_to_json') as mock_convert:
             mock_convert.return_value = [
                 {"description": "Subtask 1", "tool_name": "subtool_1"},
                 {"description": "Subtask 2", "tool_name": "subtool_2"}
@@ -462,7 +462,7 @@ class TestWorkflowIntegration(unittest.TestCase):
         except Exception as e:
             self.fail(f"Graph building failed: {e}")
 
-    @patch('src.agents.agentic_orchestrator.AgentGraphCore.ModelManager')
+    @patch('coldwind.core.agents.agentic_orchestrator.AgentGraphCore.ModelManager')
     def test_initial_planner_basic_execution(self, mock_model_manager):
         """Test basic execution of the initial planner node."""
         # Mock LLM response
@@ -474,7 +474,7 @@ class TestWorkflowIntegration(unittest.TestCase):
         mock_model_manager.return_value = mock_model_instance
         
         # Mock JSON conversion
-        with patch('src.agents.agentic_orchestrator.AgentGraphCore.ModelManager.convert_to_json') as mock_convert:
+        with patch('coldwind.core.agents.agentic_orchestrator.AgentGraphCore.ModelManager.convert_to_json') as mock_convert:
             mock_convert.return_value = [
                 {"task_id": 1, "description": "Test task", "tool_name": "test_tool"}
             ]
@@ -512,8 +512,8 @@ class TestFailureRecovery(unittest.TestCase):
         if not MODULES_AVAILABLE:
             self.skipTest("Required modules not available")
 
-    @patch('src.agents.agentic_orchestrator.AgentGraphCore.ModelManager')
-    @patch('src.agents.agentic_orchestrator.AgentGraphCore.AgentGraphCore._AgentGraphCore__tool_executor')
+    @patch('coldwind.core.agents.agentic_orchestrator.AgentGraphCore.ModelManager')
+    @patch('coldwind.core.agents.agentic_orchestrator.AgentGraphCore.AgentGraphCore._AgentGraphCore__tool_executor')
     def test_failure_recovery_loop_and_fallback(self, mock_tool_executor, mock_model_manager):
         """
         Test the full failure-retry-fallback loop.

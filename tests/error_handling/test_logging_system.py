@@ -11,7 +11,7 @@ import time
 # Add the project root to the Python path so we can import modules
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
-from src.utils.socket_manager import SocketManager
+from coldwind.core.utils.socket_manager import SocketManager
 
 
 def test_logging():

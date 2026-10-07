@@ -23,12 +23,12 @@ if project_root not in sys.path:
 
 try:
     # Import hierarchical agent system
-    from src.agents.agentic_orchestrator.AgentGraphCore import (
+    from coldwind.core.agents.agentic_orchestrator.AgentGraphCore import (
         AgentGraphCore, TASK, REQUIRED_CONTEXT, EXECUTION_CONTEXT
     )
     
     # Import supporting systems
-    from src.tools.lggraph_tools.tool_assign import ToolAssign
+    from coldwind.core.tools.lggraph_tools.tool_assign import ToolAssign
     
     MODULES_AVAILABLE = True
     print("? Core modules imported successfully")

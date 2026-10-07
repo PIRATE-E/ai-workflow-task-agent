@@ -15,7 +15,7 @@ class TestOpenAIIntegration:
 
     def test_integration_importable(self):
         """OpenAIIntegration should be importable."""
-        from src.utils.open_ai_integration import OpenAIIntegration
+        from coldwind.core.utils.open_ai_integration import OpenAIIntegration
         assert OpenAIIntegration is not None
 
     def test_integration_creation(self, openai_integration):

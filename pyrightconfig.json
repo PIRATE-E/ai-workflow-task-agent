@@ -1,0 +1,12 @@
+{
+  // PEP 420 native namespace: coldwind.* is assembled from these two
+  // source roots. uv already wires both into sys.path via editable
+  // installs at runtime; Pyright does not read uv, so we tell it here.
+  "extraPaths": [
+    "core/src",
+    "desktop/src"
+  ],
+  // Keep using the project venv for third-party stubs (langchain, etc.)
+  "venvPath": ".",
+  "venv": ".venv"
+}

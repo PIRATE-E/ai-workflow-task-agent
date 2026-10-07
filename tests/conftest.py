@@ -39,8 +39,8 @@ def temp_dir(tmp_path):
 @pytest.fixture
 def model_manager():
     """Create ModelManager instance for testing."""
-    from src.utils.model_manager import ModelManager
-    from src.config import settings
+    from coldwind.core.utils.model_manager import ModelManager
+    from coldwind.core.config import settings
     return ModelManager(model=settings.DEFAULT_MODEL)
 
 
@@ -51,7 +51,7 @@ def model_manager():
 @pytest.fixture
 def mcp_manager():
     """Create MCP_Manager instance for testing."""
-    from src.mcp.manager import MCP_Manager
+    from coldwind.core.mcp.manager import MCP_Manager
     return MCP_Manager()
 
 
@@ -72,14 +72,14 @@ def mock_mcp_server():
 @pytest.fixture
 def dispatcher():
     """Create Dispatcher instance for testing."""
-    from src.system_logging.dispatcher import Dispatcher
+    from coldwind.core.system_logging.dispatcher import Dispatcher
     return Dispatcher()
 
 
 @pytest.fixture
 def registry():
     """Create OnTimeRegistry instance for testing."""
-    from src.system_logging.on_time_registry import OnTimeRegistry
+    from coldwind.core.system_logging.on_time_registry import OnTimeRegistry
     return OnTimeRegistry()
 
 
@@ -115,7 +115,7 @@ def mock_openai_client():
 @pytest.fixture
 def openai_integration():
     """Create OpenAIIntegration instance for testing."""
-    from src.utils.open_ai_integration import OpenAIIntegration
+    from coldwind.core.utils.open_ai_integration import OpenAIIntegration
     return OpenAIIntegration()
 
 
@@ -126,14 +126,14 @@ def openai_integration():
 @pytest.fixture
 def empty_state():
     """Create empty State for testing."""
-    from src.models.state import State
+    from coldwind.core.models.state import State
     return State()
 
 
 @pytest.fixture
 def state_accessor(empty_state):
     """Create StateAccessor for testing."""
-    from src.models.state import StateAccessor
+    from coldwind.core.models.state import StateAccessor
     return StateAccessor(empty_state)
 
 

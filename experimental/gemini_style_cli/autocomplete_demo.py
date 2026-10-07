@@ -10,7 +10,7 @@ from rich.layout import Layout
 from rich.panel import Panel
 from rich.text import Text
 
-from src.config import settings
+from coldwind.core.config import settings
 
 # For cross-platform keyboard input
 try:

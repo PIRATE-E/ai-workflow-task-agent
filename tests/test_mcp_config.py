@@ -24,7 +24,7 @@ def check_existing_mcp_servers():
     print("🔍 Checking existing MCP server configurations...")
 
     try:
-        from src.mcp.manager import MCP_Manager
+        from coldwind.core.mcp.manager import MCP_Manager
 
         # Initialize MCP Manager
         mcp_manager = MCP_Manager()
@@ -38,10 +38,10 @@ def check_existing_mcp_servers():
             print("⚠️ No servers configured. Need to manually add servers.")
 
             # Let's manually add the servers we know work from the error log
-            from src.tools.lggraph_tools.wrappers.mcp_wrapper.uni_mcp_wrappers import (
+            from coldwind.core.tools.lggraph_tools.wrappers.mcp_wrapper.uni_mcp_wrappers import (
                 UniversalMCPWrapper,
             )
-            from src.mcp.mcp_register_structure import Command
+            from coldwind.core.mcp.mcp_register_structure import Command
 
             # Add servers based on the error log
             servers_to_add = [
@@ -109,7 +109,7 @@ def test_server_startup():
     print("\n🚀 Testing server startup...")
 
     try:
-        from src.mcp.manager import MCP_Manager
+        from coldwind.core.mcp.manager import MCP_Manager
 
         startup_results = {}
 

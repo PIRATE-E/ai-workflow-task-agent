@@ -12,8 +12,8 @@ import time
 # Add the project root to the Python path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
-from src.utils.error_transfer import SocketCon
-from src.config import settings
+from coldwind.core.utils.error_transfer import SocketCon
+from coldwind.core.config import settings
 
 
 def test_socket_connection_basic():

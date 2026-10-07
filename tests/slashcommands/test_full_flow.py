@@ -18,11 +18,11 @@ import time
 
 # Add the project root to Python path
 start_time = time.perf_counter()
-from src.slash_commands.executionar import ExecutionAr
-from src.slash_commands.parser import ParseCommand
-from src.slash_commands.commands.clear import register_clear_command
-from src.slash_commands.commands.help import register_help_command
-from src.slash_commands.commands.core_slashs.agent import register_agent_command
+from coldwind.desktop.slash_commands.executionar import ExecutionAr
+from coldwind.desktop.slash_commands.parser import ParseCommand
+from coldwind.desktop.slash_commands.commands.clear import register_clear_command
+from coldwind.desktop.slash_commands.commands.help import register_help_command
+from coldwind.desktop.slash_commands.commands.core_slashs.agent import register_agent_command
 
 def test_full_flow():
     """Test the full flow from user input to execution."""

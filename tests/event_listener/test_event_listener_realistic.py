@@ -39,8 +39,8 @@ import sys
 import os
 
 
-from src.utils.listeners.rich_status_listen import RichStatusListener
-from src.utils.listeners.event_listener import EventListener
+from coldwind.core.utils.listeners.rich_status_listen import RichStatusListener
+from coldwind.core.utils.listeners.event_listener import EventListener
 
 
 class RealisticTestRunner:

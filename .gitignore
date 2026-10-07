@@ -167,14 +167,14 @@ lggraphOLD_MAIN.py
 .kiro
 copilot_instructions
 AI_llm.sln
-reports
+# reports
 .crush
 QWEN.md
 .gemini
 GEMINI.md
 # custom memory file
 memory.json
-.github
+# .github for testing purposes because instructions are now got updated 
 # Node.js/MCP config (if not needed in root)
 package.json
 

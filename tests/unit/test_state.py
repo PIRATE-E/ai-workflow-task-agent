@@ -13,12 +13,12 @@ class TestState:
 
     def test_state_importable(self):
         """State should be importable."""
-        from src.models.state import State
+        from coldwind.core.models.state import State
         assert State is not None
 
     def test_state_creation(self):
         """State should be creatable."""
-        from src.models.state import State
+        from coldwind.core.models.state import State
         state = State()
         assert state is not None
 

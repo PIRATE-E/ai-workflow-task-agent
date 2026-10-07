@@ -307,7 +307,7 @@ src/agents/
 ├── agents_schema/               # typed schemas
 │   └── agents_schema.py
 └── agentic_orchestrator/        # hierarchical orchestration
-    ├── AgentGraphCore.py
+    ├── graphCore.py
     └── hierarchical_agent_prompts.py
 ```
 
@@ -399,12 +399,8 @@ src/basic_logs/                   # output log files
 src/ui/
 ├── chatInputHandler.py          # ⌨️ prompt_toolkit input + autocomplete
 ├── print_banner.py
-├── print_history.py
 ├── print_message_style.py
-├── rich_error_print.py
 └── diagnostics/
-    ├── debug_helpers.py
-    ├── debug_message_protocol.py
     └── rich_traceback_manager.py
 ```
 

@@ -16,8 +16,8 @@ from pathlib import Path
 
 print("Testing socket connection...")
 
-from src.config import settings
-from src.utils.socket_manager import SocketManager
+from coldwind.core.config import settings
+from coldwind.core.utils.socket_manager import SocketManager
 
 # Test 1: Check paths
 print(f"\nPaths:")
@@ -42,7 +42,7 @@ if socket_con:
 
     # Test sending a message
     try:
-        from src.ui.diagnostics.debug_helpers import debug_info
+        from coldwind.desktop.ui.diagnostics.debug_helpers import debug_info
         debug_info("TEST • SOCKET", "Socket connection test successful", {"test_id": 1})
         print(f"✅ Test message sent successfully")
     except Exception as e:

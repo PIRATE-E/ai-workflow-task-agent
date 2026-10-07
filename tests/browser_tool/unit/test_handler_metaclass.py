@@ -18,21 +18,21 @@ class TestHandlerMetaclass:
 
     def test_handler_has_enum_driver_map(self, handler):
         """Handler class should have enum_driver_map attribute."""
-        from src.tools.lggraph_tools.tools.browser_tool.Handler import Handler
+        from coldwind.core.tools.lggraph_tools.tools.browser_tool.Handler import Handler
 
         assert hasattr(Handler, 'enum_driver_map')
         assert isinstance(Handler.enum_driver_map, dict)
 
     def test_enum_driver_map_has_all_enums(self, handler):
         """enum_driver_map should have entries for all HandlerEnums."""
-        from src.tools.lggraph_tools.tools.browser_tool.Handler import Handler, HandlerEnums
+        from coldwind.core.tools.lggraph_tools.tools.browser_tool.Handler import Handler, HandlerEnums
 
         for enum_member in HandlerEnums:
             assert enum_member in Handler.enum_driver_map, f"{enum_member} missing from map"
 
     def test_all_drivers_registered(self, handler):
         """All enum values should have driver classes registered."""
-        from src.tools.lggraph_tools.tools.browser_tool.Handler import Handler
+        from coldwind.core.tools.lggraph_tools.tools.browser_tool.Handler import Handler
 
         for enum_member, driver_class in Handler.enum_driver_map.items():
             assert driver_class is not None, f"{enum_member} has no driver"
@@ -40,7 +40,7 @@ class TestHandlerMetaclass:
 
     def test_driver_has_enum_value(self):
         """Each driver class should have enum_value attribute."""
-        from src.tools.lggraph_tools.tools.browser_tool.Handler import Handler, HandlerEnums
+        from coldwind.core.tools.lggraph_tools.tools.browser_tool.Handler import Handler, HandlerEnums
 
         for enum_member, driver_class in Handler.enum_driver_map.items():
             assert hasattr(driver_class, 'enum_value'), f"{driver_class} missing enum_value"
@@ -52,7 +52,7 @@ class TestExecuteMethodInjection:
 
     def test_driver_has_execute_method(self):
         """Driver classes should have execute attribute."""
-        from src.tools.lggraph_tools.tools.browser_tool.Handler import Handler, HandlerEnums
+        from coldwind.core.tools.lggraph_tools.tools.browser_tool.Handler import Handler, HandlerEnums
 
         driver_class = Handler.enum_driver_map.get(HandlerEnums.ON_PRE_REQUIREMENTS)
         assert driver_class is not None, "PreRequirementsCustomEvent not registered"
@@ -60,7 +60,7 @@ class TestExecuteMethodInjection:
 
     def test_execute_is_coroutine(self):
         """execute should be a coroutine function."""
-        from src.tools.lggraph_tools.tools.browser_tool.Handler import Handler, HandlerEnums
+        from coldwind.core.tools.lggraph_tools.tools.browser_tool.Handler import Handler, HandlerEnums
 
         driver_class = Handler.enum_driver_map.get(HandlerEnums.ON_PRE_REQUIREMENTS)
         assert asyncio.iscoroutinefunction(driver_class.execute), "execute not async"
@@ -68,7 +68,7 @@ class TestExecuteMethodInjection:
     @pytest.mark.asyncio
     async def test_execute_runs_driver_methods(self, runner, moving_forward_bus):
         """execute() should find and run driver methods."""
-        from src.tools.lggraph_tools.tools.browser_tool.Handler import Handler, HandlerEnums
+        from coldwind.core.tools.lggraph_tools.tools.browser_tool.Handler import Handler, HandlerEnums
 
         handler = Handler()
         driver = handler.get(runner, HandlerEnums.ON_PRE_REQUIREMENTS)
@@ -86,7 +86,7 @@ class TestHandlerGetMethod:
 
     def test_get_returns_driver_instance(self, handler, runner):
         """get() should return driver instance, not class."""
-        from src.tools.lggraph_tools.tools.browser_tool.Handler import Handler, HandlerEnums
+        from coldwind.core.tools.lggraph_tools.tools.browser_tool.Handler import Handler, HandlerEnums
 
         driver = handler.get(runner, HandlerEnums.ON_PRE_REQUIREMENTS)
 
@@ -96,7 +96,7 @@ class TestHandlerGetMethod:
 
     def test_get_injects_runner(self, handler, runner):
         """get() should inject runner instance into driver."""
-        from src.tools.lggraph_tools.tools.browser_tool.Handler import HandlerEnums
+        from coldwind.core.tools.lggraph_tools.tools.browser_tool.Handler import HandlerEnums
 
         driver = handler.get(runner, HandlerEnums.ON_PRE_REQUIREMENTS)
 
@@ -106,7 +106,7 @@ class TestHandlerGetMethod:
 
     def test_get_different_enums_returns_different_drivers(self, handler, runner):
         """get() with different enums should return different driver classes."""
-        from src.tools.lggraph_tools.tools.browser_tool.Handler import HandlerEnums
+        from coldwind.core.tools.lggraph_tools.tools.browser_tool.Handler import HandlerEnums
 
         driver1 = handler.get(runner, HandlerEnums.ON_PRE_REQUIREMENTS)
         driver2 = handler.get(runner, HandlerEnums.SET_UP)
@@ -120,7 +120,7 @@ class TestExceptionHandling:
     @pytest.mark.asyncio
     async def test_driver_exception_propagates(self, runner, moving_forward_bus):
         """Exceptions in driver methods should propagate."""
-        from src.tools.lggraph_tools.tools.browser_tool.Handler import Handler, HandlerEnums
+        from coldwind.core.tools.lggraph_tools.tools.browser_tool.Handler import Handler, HandlerEnums
 
         handler = Handler()
         driver = handler.get(runner, HandlerEnums.ON_PRE_REQUIREMENTS)

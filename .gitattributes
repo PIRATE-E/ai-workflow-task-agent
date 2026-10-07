@@ -1,0 +1,29 @@
+# Auto-detect text files and normalize to LF line endings
+* text=auto eol=lf
+
+# Explicitly mark binary files
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.zip binary
+*.tar.gz binary
+*.tgz binary
+*.gz binary
+*.db binary
+*.sqlite binary
+*.sqlite3 binary
+*.pickle binary
+*.pkl binary
+*.bin binary
+*.ttf binary
+*.woff binary
+*.woff2 binary
+*.eot binary
+*.otf binary
+*.mp3 binary
+*.mp4 binary
+*.mov binary
+*.pdf binary

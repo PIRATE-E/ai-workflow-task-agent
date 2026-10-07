@@ -30,11 +30,11 @@ def setup_mcp_servers():
     print("?? Setting up MCP servers from error log configuration...")
 
     try:
-        from src.mcp.manager import MCP_Manager
-        from src.tools.lggraph_tools.wrappers.mcp_wrapper.uni_mcp_wrappers import (
+        from coldwind.core.mcp.manager import MCP_Manager
+        from coldwind.core.tools.lggraph_tools.wrappers.mcp_wrapper.uni_mcp_wrappers import (
             UniversalMCPWrapper,
         )
-        from src.mcp.mcp_register_structure import Command
+        from coldwind.core.mcp.mcp_register_structure import Command
 
         # Initialize MCP Manager
         mcp_manager = MCP_Manager()
@@ -107,7 +107,7 @@ def test_failing_tools_before_fix():
 
     try:
         # Import the ORIGINAL universal tool (should fail)
-        from src.tools.lggraph_tools.tools.mcp_integrated_tools.universal import (
+        from coldwind.core.tools.lggraph_tools.tools.mcp_integrated_tools.universal import (
             universal_tool,
         )
 
@@ -200,7 +200,7 @@ def test_fixed_tools():
 
     try:
         # Start some servers first
-        from src.mcp.manager import MCP_Manager
+        from coldwind.core.mcp.manager import MCP_Manager
 
         # Start memory server specifically (for read_graph and search_nodes)
         print("?? Starting memory server...")
@@ -215,7 +215,7 @@ def test_fixed_tools():
             time.sleep(2)
 
             # Test the tools
-            from src.tools.lggraph_tools.tools.mcp_integrated_tools.universal import (
+            from coldwind.core.tools.lggraph_tools.tools.mcp_integrated_tools.universal import (
                 universal_tool,
             )
 
@@ -296,7 +296,7 @@ def simulate_agent_mode():
 
         # Instead of running full agent (which has other dependencies),
         # let's simulate the exact tool calls that agent would make
-        from src.tools.lggraph_tools.tools.mcp_integrated_tools.universal import (
+        from coldwind.core.tools.lggraph_tools.tools.mcp_integrated_tools.universal import (
             universal_tool,
         )
 

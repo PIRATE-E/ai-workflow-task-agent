@@ -17,12 +17,12 @@ class TestSystemInitialization:
 
     def test_chat_initializer_importable(self):
         """ChatInitializer should be importable."""
-        from src.core.chat_initializer import ChatInitializer
+        from coldwind.core.engine.chat_initializer import ChatInitializer
         assert ChatInitializer is not None
 
     def test_chat_initializer_creation(self):
         """ChatInitializer should be instantiable."""
-        from src.core.chat_initializer import ChatInitializer
+        from coldwind.core.engine.chat_initializer import ChatInitializer
 
         try:
             initializer = ChatInitializer()
@@ -32,7 +32,7 @@ class TestSystemInitialization:
 
     def test_initializer_has_graph(self):
         """Initializer should have graph attribute."""
-        from src.core.chat_initializer import ChatInitializer
+        from coldwind.core.engine.chat_initializer import ChatInitializer
 
         try:
             initializer = ChatInitializer()
@@ -42,7 +42,7 @@ class TestSystemInitialization:
 
     def test_initializer_has_tools(self):
         """Initializer should have tools loaded."""
-        from src.core.chat_initializer import ChatInitializer
+        from coldwind.core.engine.chat_initializer import ChatInitializer
 
         try:
             initializer = ChatInitializer()
@@ -60,7 +60,7 @@ class TestAgentMode:
     @pytest.mark.asyncio
     async def test_agent_mode_basic(self):
         """Test basic agent mode execution."""
-        from src.mcp.manager import MCP_Manager
+        from coldwind.core.mcp.manager import MCP_Manager
 
         # Check if MCP is enabled
         if not MCP_Manager.mcp_enabled:

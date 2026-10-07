@@ -22,11 +22,11 @@ from pathlib import Path
 
 # Add project root to path
 
-from src.config import settings
-from src.core.chat_initializer import ChatInitializer
-from src.models.state import State, StateAccessor
-from src.utils.model_manager import ModelManager
-from src.mcp.manager import MCP_Manager
+from coldwind.core.config import settings
+from coldwind.core.engine.chat_initializer import ChatInitializer
+from coldwind.core.models.state import State, StateAccessor
+from coldwind.core.utils.model_manager import ModelManager
+from coldwind.core.mcp.manager import MCP_Manager
 
 
 class AIWorkflowTestSuite:
@@ -250,7 +250,7 @@ class AIWorkflowTestSuite:
                 return False
 
             # Test API failure simulation
-            from src.utils.open_ai_integration import OpenAIIntegration
+            from coldwind.core.utils.open_ai_integration import OpenAIIntegration
 
             # Check if circuit breaker exists
             if not hasattr(OpenAIIntegration, "_check_circuit_breaker"):

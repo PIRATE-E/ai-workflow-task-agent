@@ -8,7 +8,7 @@ class TestBrowserRequiredConfig:
 
     def test_minimal_config_creation(self, tmp_path):
         """Config with only required fields should work."""
-        from src.tools.lggraph_tools.tools.browser_tool.config import BrowserRequiredConfig
+        from coldwind.core.tools.lggraph_tools.tools.browser_tool.config import BrowserRequiredConfig
 
         config = BrowserRequiredConfig(
             query="test",
@@ -43,7 +43,7 @@ class TestBrowserRequiredConfig:
 
     def test_config_validates_paths(self, tmp_path):
         """Config should accept Path objects."""
-        from src.tools.lggraph_tools.tools.browser_tool.config import BrowserRequiredConfig
+        from coldwind.core.tools.lggraph_tools.tools.browser_tool.config import BrowserRequiredConfig
 
         result_file = tmp_path / "result.json"
         video_dir = tmp_path / "videos"
