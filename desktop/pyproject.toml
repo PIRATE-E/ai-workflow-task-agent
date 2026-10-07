@@ -26,6 +26,14 @@ packages = ["src/coldwind/desktop"]
 [tool.hatch.build.targets.wheel.sources]
 src = ""  # suggested by the ai because the hatching .pth file is not pointing to the correct location.  it must be pointed above the namespace directory which is 'src'
 
+# reason we have to evict the src !! from the root we want to make the namespace instead as the root !!
+# "src" = ""
+# │      │
+# │      └── "replace the prefix with... nothing (empty string)"
+# └──────── "for any file whose path starts with this prefix"
+#
+# src/coldwind/desktop -> coldwind/desktop
+#
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
