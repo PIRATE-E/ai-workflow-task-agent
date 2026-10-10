@@ -27,6 +27,7 @@ This project runs in **two interaction modes**. The mode controls *how* the AI c
 - **Zero hallucination**: Never invent APIs, functions, syntax, or facts. Verify through documentation or web search. Say "I need to research this" rather than guess.
 - **Learning-first**: Explain WHY, not just WHAT. Provide context for design decisions.
 - **Follow user instructions literally**: If user says "explain every line" → explain EVERY line.
+- **Documentation paths → strictly relative**: Every file path, reference, or markdown hyperlink in documentation and reports (`reports/`, `docs/`, `README.md`) MUST be a relative path (e.g., `../../core/src/...` or `./01-doc.md`), NEVER an absolute path (`/home/...` or `file:///...`), so that links render and navigate as clickable hyperlinks in all markdown viewers and editors.
 
 ## 💬 Chat Output Format
 
@@ -181,6 +182,7 @@ Rules the agent must follow when **writing or modifying code** in this repo:
 - **Tools:** `@tool("tool_name")` from langchain, registered via `tool_assign.py`
 - **Models:** Pydantic `BaseModel`; settings use `pydantic-settings` `BaseSettings` inheritance
 - **.mcp.json:** MCP server definitions at project root, loaded by `core/mcp/load_config.py`
+- **Doc links:** Markdown links in `reports/` and `docs/` MUST always be relative paths (`../../core/src/...`), never absolute paths (`file:///...` or `/home/...`).
 
 Quote style and lint-only conventions are enforced via `pyproject.toml` ruff config — refer to the config file rather than restating rule details here.
 

@@ -23,11 +23,12 @@ from coldwind.core.utils.model_manager import ModelManager
 import pathlib
 
 
-# ✅ LAZY LOADING: Heavy imports google_sheet.md to function level
-# torch, cosine_similarity, genai, Chroma, OllamaEmbeddings, ChatOllama
-# will be imported only when needed
+# ✅ LAZY LOADING: heavy imports (Google Sheets RAG, torch, cosine_similarity,
+# genai, Chroma, OllamaEmbeddings, ChatOllama) are deferred to function level
+# and imported only when needed.
 
-# Socket connection now centralized in settings - no longer needed
+# Socket connection lives on the active runtime context
+# (ContextRegistry.get().get_socket_connection()) — no module-level import needed.
 
 
 # ✅ HELPER FUNCTION: Lazy loading for rich prompts

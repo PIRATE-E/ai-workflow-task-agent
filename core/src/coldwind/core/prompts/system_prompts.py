@@ -1,5 +1,5 @@
 """
-Centralized System Prompts for LangGraph Chatbot
+Centralized System Prompts for Cold Wind AI
 All system prompts are organized here for better maintainability and reusability.
 """
 

@@ -1,6 +1,6 @@
 """chat_initializer.py
 
-Chat session initialization and lifecycle management for AI Agent Workflow.
+Chat session initialization and lifecycle management for Cold Wind AI.
 
 This module provides the ChatInitializer class which orchestrates the complete
 setup of the chat application, including LangGraph compilation, tool registration,
@@ -67,7 +67,6 @@ from coldwind.core.mcp.load_config import McpConfigFile
 from coldwind.core.mcp.manager import MCP_Manager
 from coldwind.core.models.state import StateAccessor, State
 
-
 # WHAT: Route diagnostics and message display through core interface contracts.
 # WHY: Eliminates illegal Core -> Desktop imports, preserving the Layering Invariant.
 from coldwind.core.interfaces.exception_interface import rich_exception_handler
@@ -76,10 +75,17 @@ from coldwind.core.interfaces.ui_interface import print_message
 
 class _CoreExceptionHandlerAdapter:
     """Adapter routing legacy RichTracebackManager calls to the active runtime error handler."""
+
     @staticmethod
-    def handle_exception(error: Exception, context: str = "", extra_context: Optional[dict[str, Any]] = None) -> None:
+    def handle_exception(
+        error: Exception,
+        context: str = "",
+        extra_context: Optional[dict[str, Any]] = None,
+    ) -> None:
         try:
-            ContextRegistry.get().get_error_handler().handle_exception(error, context, extra_context)
+            ContextRegistry.get().get_error_handler().handle_exception(
+                error, context, extra_context
+            )
         except Exception:
             pass
 
@@ -87,7 +93,6 @@ class _CoreExceptionHandlerAdapter:
 RichTracebackManager = _CoreExceptionHandlerAdapter
 
 from coldwind.core.utils.listeners.exit_listener import ExitListener
-
 
 
 class ChatInitializer:
@@ -182,21 +187,14 @@ class ChatInitializer:
         (settings.console / settings.HumanMessage / settings.socket_con /
         settings.listeners). Those globals are deprecated — all runtime objects
         now live exclusively on the active context owned by ContextRegistry.
-        The console itself is already created inside DesktopRunTimeContext.__init__,
-        so `self.console` here is kept only as a local convenience handle that
-        mirrors the context's console.
+        The console slot is born `None` inside DesktopRunTimeContext.__init__ and
+        is filled by `boot()` via `set_console()` before ChatInitializer runs,
+        so `self.console` here is only a local convenience handle mirroring the slot.
         """
         try:
             # Import here to avoid circular imports (chat_initializer is imported
             # very early; langchain_core only needs to load when we boot messages).
             from langchain_core.messages import HumanMessage, AIMessage, BaseMessage
-
-            try:
-                import sentry_sdk  # Optional; ignore if missing
-
-                sentry_sdk.init(send_default_pii=True)
-            except Exception:
-                pass
 
             context = ContextRegistry.get()
 
@@ -280,7 +278,7 @@ class ChatInitializer:
         )
         return {
             "messages": [
-                AIMessage(content="Thank you for using the LangGraph Chatbot!")
+                AIMessage(content="Thank you for using Cold Wind AI!")
             ]
         }
 
@@ -348,7 +346,9 @@ class ChatInitializer:
         try:
             from coldwind.core.mcp.manager import MCP_Manager
 
-            # Add and start MCP servers if needed with allowed path of AI_llm folder
+            # Add and start MCP servers if needed. Server list comes from .mcp.json
+            # via McpConfigFile; the commented-out block below is a pre-refactor
+            # example kept for reference only.
             # to add server we required [server_name, runner, package, server_args, server_wrapper]
             # list form of that is: (that's working)
             # add_servers_config: List[ServerConfig] = [
@@ -444,7 +444,9 @@ class ChatInitializer:
                     body="Neo4j driver is not installed. Skipping Neo4j initialization.",
                     metadata={
                         "neo4j_uri": ContextRegistry.get().get_settings().neo4j_uri,
-                        "neo4j_username": ContextRegistry.get().get_settings().neo4j_username,
+                        "neo4j_username": ContextRegistry.get()
+                        .get_settings()
+                        .neo4j_username,
                     },
                 )
                 return
@@ -471,7 +473,9 @@ class ChatInitializer:
                 body="Neo4j driver created successfully.",
                 metadata={
                     "neo4j_uri": ContextRegistry.get().get_settings().neo4j_uri,
-                    "neo4j_username": ContextRegistry.get().get_settings().neo4j_username,
+                    "neo4j_username": ContextRegistry.get()
+                    .get_settings()
+                    .neo4j_username,
                     "driver_status": "created_successfully",
                 },
             )
@@ -482,7 +486,9 @@ class ChatInitializer:
                 context="Neo4j Database Connection (optional)",
                 extra_context={
                     "neo4j_uri": ContextRegistry.get().get_settings().neo4j_uri,
-                    "neo4j_username": ContextRegistry.get().get_settings().neo4j_username,
+                    "neo4j_username": ContextRegistry.get()
+                    .get_settings()
+                    .neo4j_username,
                     "driver_status": "failed_to_create_optional",
                 },
             )
@@ -495,7 +501,9 @@ class ChatInitializer:
                     body="Neo4j driver initialization failed. Continuing without Neo4j support.",
                     metadata={
                         "neo4j_uri": ContextRegistry.get().get_settings().neo4j_uri,
-                        "neo4j_username": ContextRegistry.get().get_settings().neo4j_username,
+                        "neo4j_username": ContextRegistry.get()
+                        .get_settings()
+                        .neo4j_username,
                         "error_message": str(e),
                     },
                 )
@@ -676,9 +684,7 @@ class ChatInitializer:
                 self.break_loop = True
             else:
                 try:
-                    self._state["messages"].append(
-                        HumanMessage(content=user_input)
-                    )
+                    self._state["messages"].append(HumanMessage(content=user_input))
                     print_message(user_input, sender="user")
                     self._state = self.graph.invoke(self._state)
 

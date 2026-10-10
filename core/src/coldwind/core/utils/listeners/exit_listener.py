@@ -1,12 +1,16 @@
 """
-the slash command of the exit  is not working as it assumed because the exit is handled up on the next message send by the user if user
-used the /exit command so the value of the exist flag is set to true but the actual handled above the setting it so the part which could trigger the exit is not aware of the flag
-so when user send the next message to the llm could be anything the application will exit because the flag is evaluated now .... which is the actual problem
-we can fix this by creating event listener which could listen to the change of the exit flag and then trigger the exit when it is set to true
+ExitListener — design notes (original problem → current design).
 
-but I am creating this to not the exit application instant after user type /exit command i want that llm could display a message like "exiting application" and then exit
-which is more graceful way to exit the application
+Original problem (before this listener existed): /exit only took effect on the
+user's NEXT message — the flag was set when /exit was typed, but the code that
+evaluated it ran after the next LLM turn, so the app exited one message too late.
 
+The fix: an event listener that reacts as soon as the exit flag flips to True,
+instead of waiting for the next message.
+
+Graceful-exit intent: the exit is not instant. The two-emit ticket system
+implemented by the ExitListener class below lets the LLM display a message
+like "exiting application" first, and only then exits.
 """
 
 from coldwind.core.utils.listeners.event_listener import EventListener

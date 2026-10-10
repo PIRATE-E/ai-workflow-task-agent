@@ -533,7 +533,7 @@ wheels = [
 
 [[package]]
 name = "cold-wind-ai"
-version = "1.9.1"
+version = "2.0.0"
 source = { virtual = "." }
 
 [package.dev-dependencies]

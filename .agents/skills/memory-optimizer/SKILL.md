@@ -17,7 +17,7 @@ A healthy graph is a **rooted tree**, not a pile.
 - Every entity has exactly one `entityType` from the canonical set: `project`, `module`, `pattern`, `solution`, `decision`, `status`, `insight`, `standard`, `workflow`.
 - Every observation carries a `kind`. The only universal value is `generic`; the graph also uses entity types as kinds (`project`, `module`, `pattern`, `solution`, `decision`, `status`, `insight`, `standard`, `workflow`) and `metadata` for summary digests. Never invent a kind (e.g. `hallazgo`, `estado`, `spec`, `metrica`) — the tool stores any string but those are not recognized and only add noise.
 - Relations are meaningful and directional (active voice): `depends_on`, `uses`, `implements`, `relates_to`, `evolved_from`, `resolves`, `contradicts`, `enhances`, `replaces`, and the structural `contiene`/`parte_de`.
-- Logs are append-only and never treated as knowledge nodes. Architecture lives on entities; logs carry timestamped events.
+- Logs are append-only (sole exception: user-directed consolidation, see 🗜️ Log consolidation) and never treated as knowledge nodes. Architecture lives on entities; logs carry timestamped events.
 
 ## 📡 The memory MCP tools you MUST use (do not guess)
 
@@ -37,7 +37,7 @@ Never "review the graph" in prose. Invoke the specific tools that *do* the analy
 
 1. **Scan.** Call `consolidation_report` and `find_split_candidates`. This gives the objective list of what is bloated, duplicated, or stale — not your intuition.
 
-2. **Verify structure.** For the entities in scope, check that each is anchored (`parte_de` a root) and that its relations are typed and directional. Flag orphans.
+2. **Verify structure.** For the entities in scope, check that each is anchored (`parte_de` a root) and that its relations are typed and directional. **Orphan sweep (mandatory):** `consolidation_report` does NOT detect orphans — after the scan, `open_nodes` every in-scope entity and confirm each has a `parte_de` path to a project root; any entity with zero relations, or reachable only via `relates_to`, is an orphan/loose defect — re-anchor it (`parte_de` the root) or delete it after extracting its durable knowledge.
 
 3. **Handle duplicates.** For each entity with duplicates, call `find_duplicate_observations`, then consolidate: keep the richest/factual observation, use `supersedes` (or `delete_observations`) to retire the redundant ones. Preserve historical observations when they explain a decision.
 
@@ -54,8 +54,19 @@ Before reporting, confirm:
 - No entity is an orphan (every non-root entity has a `parte_de`/`contiene` path to a `project` root).
 - No entity exceeds the observation threshold without being a *legitimate* split candidate.
 - Every new/changed observation has a `kind`.
-- No log entity was overwritten (logs are append-only).
+- No log entity was overwritten (logs are append-only — sole exception: user-directed consolidation, see 🗜️ Log consolidation).
 - All relations are valid typed edges in active voice; no dangling relation points to a deleted entity.
+
+## 🗜️ Log consolidation (merge + compress — the only sanctioned append-only exception)
+
+Split-brain logs (two log entities for one project, e.g. em-dash vs hyphen name drift) are repaired ONLY under an explicit user directive. Procedure:
+
+1. **Canonical survivor:** the entity named exactly `Session Activity Log — <ProjectName>` (per the mcp-memory-management contract); any non-canonical twin is the merge source.
+2. **Compress, don't copy:** group the merge source's observations by session/topic and write dense `SESSION DIGEST` entries into the survivor — keep the `[YYYY-MM-DD HH:MM]` format, aim for ~3:1+ text reduction, and preserve commit hashes, report paths, entity cross-references, and user rulings verbatim.
+3. **Extract knowledge first:** durable architecture found in log history moves to properly-typed entities BEFORE anything is deleted.
+4. **Anchor the survivor** with `parte_de` the project root if that edge is missing.
+5. **Delete the redundancy:** remove the non-canonical log entity, and when compressing a canonical log's own verbose history, delete the superseded originals — every deletion covered by the explicit user authorization that initiated the consolidation.
+6. **Leave the trail:** log the operation as a timestamped `DECISION` event in the surviving log, with before/after observation counts.
 
 ## 🚫 Rules (hard)
 

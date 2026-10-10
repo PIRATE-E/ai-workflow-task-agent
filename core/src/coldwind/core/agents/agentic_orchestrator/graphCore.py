@@ -29,7 +29,7 @@ class AgentGraphCore:
     - Hierarchical parent-child task relationship management
 
     🔄 WORKFLOW ORCHESTRATION:
-    - 7-node LangGraph workflow with conditional routing
+    - 9-node LangGraph workflow with conditional routing
     - State-machine-based execution with comprehensive error handling
     - Tool execution with safe bounds checking and validation
     - Schema-aware parameter generation for optimal tool usage
@@ -2304,7 +2304,7 @@ class AgentGraphCore:
     def build_graph(cls):
         """🏗️ LANGGRAPH WORKFLOW BUILDER: Constructs the complete hierarchical agent workflow.
 
-        This method creates a sophisticated 7-node state machine that handles:
+        This method creates a sophisticated 9-node state machine that handles:
         - Dynamic task planning with tool pre-filtering
         - Intelligent task execution with spawning capabilities
         - Advanced error recovery with spawning-based recovery
@@ -2312,9 +2312,14 @@ class AgentGraphCore:
         - Schema-aware parameter generation
         - Comprehensive result finalization
 
-        WORKFLOW ARCHITECTURE:
-        Entry → initial_planner → classifier → [parameter_generator|error_fallback]
-              → task_executor → [task_planner|finalizer] → classifier → ... → END
+        WORKFLOW ARCHITECTURE (matches the nodes and edges registered below):
+        Entry → initial_planner → classifier
+        classifier → [parameter_generator | error_fallback]
+        parameter_generator → task_executor → context_synthesizer → goal_validator
+        error_fallback → classifier (retry loop)
+        goal_validator → [classifier | task_planner | finalizer]
+        task_planner → [classifier | finalizer]
+        finalizer → END
 
         The conditional routing enables sophisticated decision-making while maintaining
         clean separation of concerns and full observability throughout execution.

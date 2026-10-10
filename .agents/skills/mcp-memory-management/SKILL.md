@@ -59,6 +59,10 @@ Session events are logged to a **per-project activity log**, not a single global
 - **Global index:** entity `Session Activity Log` (`workflow`). It holds only a compact cross-project index of `SESSION_START`/`SESSION_END` pointers, each with a `→ project: <name>` marker. It is NOT the detail log.
 - **Per-project log:** entity `Session Activity Log — <ProjectName>` (`workflow`). This is where the full detail for one project lives, append-only.
 
+### Write-time anchor & name check (prevents split-brain logs)
+
+Before writing ANY session event, `open_nodes` the exact canonical name `Session Activity Log — <ProjectName>` (em-dash). If it does not exist, create it in the SAME step with a `parte_de` relation to the project root — never append to an unanchored log, and never create or tolerate a name-drifted twin (e.g. a hyphen `-` variant of the em-dash name). One project ⇒ exactly one activity log: exact canonical name, always anchored.
+
 ### Fixed timestamp format
 
 `[YYYY-MM-DD HH:MM]` — no other format. This is the string `project-context-initializer` parses to anchor delta fetches. Every boundary and mid-session entry uses it.
@@ -101,6 +105,10 @@ Format:
 ```
 [YYYY-MM-DD HH:MM] - <CATEGORY> - <description>
 ```
+
+### Session events go ONLY to the log entity (no de-facto logs)
+
+The categories above are appended ONLY to `Session Activity Log — <ProjectName>` — never to `status`, `decision`, `solution`, or other knowledge entities. Knowledge entities hold durable facts (what / why / consequence); if you catch yourself appending timestamped chronology (session starts, per-batch progress, approval state) to a non-log entity, that entity is becoming a de-facto activity log — extract the durable facts into properly-typed entities and route the chronology to the project log instead.
 
 ### Pre-response checklist (run mentally before EVERY assistant turn)
 
@@ -184,5 +192,5 @@ This is deterministic: you read the project log first, extract names from it, th
 - Create entities only when they add unique, distinct value — never a near-duplicate of an existing node.
 - Every non-root entity is created *with* a `parte_de` relation to its project root in the same step.
 - Every observation carries a `kind`. Every relation is a meaningful typed edge in active voice.
-- Logs (`Session Activity Log`, and each `Session Activity Log — <Project>`) are append-only and carry timestamped events, not architectural facts.
+- Logs (`Session Activity Log`, and each `Session Activity Log — <Project>`) are append-only and carry timestamped events, not architectural facts. Sole exception: user-directed log consolidation, as codified in memory-optimizer's 🗜️ Log consolidation section.
 - "When in doubt, log it" — better too much context than lost context. Failure to log is a protocol violation, not a style choice.

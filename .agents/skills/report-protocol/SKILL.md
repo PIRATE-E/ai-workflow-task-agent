@@ -105,6 +105,10 @@ desktop/ copies of the same fact.
 `core/01-...`, `core/02-...` is allowed when reading order matters (multi-part
 tutorials). NEVER number systems or domains themselves.
 
+### Rule 6 — Strictly relative hyperlinks
+
+Every file path, code reference, and markdown link inside reports MUST be a relative path (e.g., `../../core/src/...` or `./01-doc.md`), NEVER an absolute path (`file:///...` or `/home/...`), ensuring links render and navigate as clickable hyperlinks in all markdown viewers and editors.
+
 ### Filing checklist (run mentally before ANY report write)
 
 1. Which SYSTEM does this belong to? (create it if it doesn't exist — with README)
@@ -112,6 +116,7 @@ tutorials). NEVER number systems or domains themselves.
 3. Does the system README Index + Ownership Table mention the new doc?
 4. Does `reports/README.md` have a row for the system
 5. Does the doc open with `Domain & Dependencies`?
+6. Are all internal and file links strictly relative paths?
 
 If any answer is no, the report is not done.
 

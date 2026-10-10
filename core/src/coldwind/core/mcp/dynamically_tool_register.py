@@ -5,7 +5,7 @@ from coldwind.core.tools.lggraph_tools.tool_assign import ToolAssign
 
 class DynamicToolRegister:
     """
-    A class to dynamically register tools in the MCP (Multi-Channel Processing) system along with their input schema.
+    A class to dynamically register tools in the MCP (Model Context Protocol) system along with their input schema.
     This class is designed to be used as a singleton, ensuring that only one instance
     exists throughout the application.
     """

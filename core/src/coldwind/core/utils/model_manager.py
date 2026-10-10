@@ -35,9 +35,6 @@ class _CoreExceptionHandlerAdapter:
 
 RichTracebackManager = _CoreExceptionHandlerAdapter
 
-# 🔧 COMPLETELY ISOLATED DEBUG LOGGING - NO IMPORTS, NO DEPENDENCIES
-# (Replaced by ContextRegistry.get().get_logger().debug_helpers unified system_logging)
-
 
 class ModelManager(ChatOllama):
     """

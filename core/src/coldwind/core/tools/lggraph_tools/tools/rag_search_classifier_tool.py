@@ -9,7 +9,6 @@ from rich.prompt import Prompt
 
 import coldwind.core.prompts.rag_search_classifier_prompts
 
-# from lggraph import console  # this need to fixed we are importing console from "lggraph" file
 from coldwind.core.RAG.RAG_FILES import neo4j_rag
 from coldwind.core.RAG.RAG_FILES import rag
 from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
