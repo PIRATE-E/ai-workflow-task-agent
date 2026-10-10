@@ -1,126 +1,121 @@
-# 🌐 MCP Package
+# 🔌 MCP Package (`coldwind.core.mcp`)
 
-**Model Context Protocol Integration**
+> Lets Cold Wind AI use external tool servers — any tool that speaks the Model Context Protocol, plugged in through a config file.
 
-> Integration with Model Context Protocol (MCP) servers for extended capabilities.
-
----
-
-## 📋 **Table of Contents**
-
-1. [What is MCP](#what-is-mcp)
-2. [Available MCP Servers](#available-mcp-servers)
-3. [How MCP Works](#how-mcp-works)
-4. [Configuration](#configuration)
-5. [Quick Start Guide](#quick-start-guide)
+**Part of:** `coldwind-core` · **Last Updated:** October 2026
 
 ---
 
-## 🎯 **What is MCP**
+## 🗺️ Where This Fits
 
-**Model Context Protocol** is a standard for extending LLM capabilities through external servers.
-
-### **Why MCP?**
-
-- ✅ **Extensibility** - Add new capabilities without changing code
-- ✅ **Standardization** - Common protocol across tools
-- ✅ **Isolation** - Servers run in separate processes
-- ✅ **Reusability** - Share servers across projects
-
----
-
-## 🔌 **Available MCP Servers**
-
-### **1. GitHub Server**
-- Create/update files
-- Create issues and PRs
-- Search repositories
-- Manage branches
-
-### **2. Filesystem Server**
-- Read/write files
-- List directories
-- Search files
-- File operations
-
-### **3. Memory Server**
-- Store knowledge graph
-- Create entities and relations
-- Query semantic memory
-
-### **4. Git Server**
-- Git operations
-- Commit, push, pull
-- Branch management
-
-### **5. Sequential Thinking Server**
-- Chain-of-thought reasoning
-- Step-by-step problem solving
+```text
+.mcp.json (config file)
+        │  McpConfigFile.retrieve_config()
+        ▼
+   MCP_Manager ──► starts server subprocess ──► tool_discovery
+        │                                            │
+        ▼                                            ▼
+  call_mcp_server()                        DynamicToolRegister ──► ToolAssign
+  (run a tool call)                        (MCP tools join the normal menu)
+```
 
 ---
 
-## ⚙️ **Configuration**
+## 🎯 Why This Exists
 
-### **MCP Config File**
+- Writing every integration by hand doesn't scale — **MCP is a shared language** for tools.
+- One config file lists your servers; the app **discovers their tools automatically**.
+- MCP tools appear next to built-in tools — **agents don't know or care where a tool came from**.
 
-Location: `.mcp.json` (project root)
+---
+
+## 📦 Module Map
+
+| File | Plain-English job |
+|------|-------------------|
+| `load_config.py` | `McpConfigFile` — reads the config file from disk |
+| `mcp_manager.py` | `MCP_Manager` — singleton lifecycle manager (start, call, stop) |
+| `DynamicToolRegister.py` | `DynamicToolRegister` — holds discovered MCP tools |
+| `mcp_register_structure.py` | `Command` enum + `ServerConfig` types (see below) |
+| `mcp_manager_util.py` | `Utils(MCP_Manager)` — extra helpers on top of the manager |
+| (adaptation lives in tools/) | `UniversalMCPWrapper` in `tools/lggraph_tools/mcp_wrapper/` |
+
+---
+
+## 📝 The Config File (`.mcp.json`)
+
+The path comes from settings: `ContextRegistry.get().get_settings().mcp_config_path` (a `DesktopConfig` field — not hardcoded).
 
 ```json
 {
-  "mcpServers": {
+  "servers": {
     "github": {
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-github@latest"],
-      "env": {
-        "GITHUB_PERSONAL_ACCESS_TOKEN": "your_token"
-      }
+      "command": "NPX",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": { "GITHUB_TOKEN": "…" }
     },
     "filesystem": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@modelcontextprotocol/server-filesystem@latest",
-        "C:\\path\\to\\workspace"
-      ]
+      "command": "UVX",
+      "args": ["mcp-server-filesystem", "/safe/dir"]
     }
   }
 }
 ```
 
+> ⚠️ The key is **`"servers"`** — the loader reads `config.get("servers", {})`. Older docs showed `"mcpServers"` (the Claude Desktop format); that key is silently ignored here.
+
+`command` is a `Command` enum: `NPX` | `UVX` | `PIPX` | `PIP` | `PYTHON` — how the server process gets launched.
+
 ---
 
-## 🚀 **Quick Start Guide**
+## 🏗️ Lifecycle of an MCP Server
 
-### **Step 1: Configure MCP Servers**
-
-Edit `.mcp.json` to add servers.
-
-### **Step 2: Start MCP Manager**
-
-```python
-from src.mcp.mcp_manager import MCPManager
-
-mcp = MCPManager()
-mcp.start_all_servers()
+```text
+ 1. McpConfigFile.retrieve_config()      read .mcp.json → server definitions
+ 2. MCP_Manager.add_server(name, cfg)    register the definition
+ 3. MCP_Manager.start_server(name)       launch subprocess, speak MCP over stdio
+ 4. MCP_Manager.tool_discovery(name)     "what tools do you offer?"
+ 5. DynamicToolRegister.register_tool()   each tool joins the menu
+ 6. MCP_Manager.call_mcp_server(...)     agents call tools (JSON-RPC 2.0)
+ 7. MCP_Manager.stop_server / stop_all_servers / cleanup()   shutdown
 ```
 
-### **Step 3: Use MCP Tools**
-
-MCP tools are automatically available to agents.
+**Boot happens in** `ChatInitializer._initialize_mcp_servers_sync()`; **shutdown is registered** with `ChatDestructor` — MCP servers never outlive the app.
 
 ---
 
-## 🆘 **Support**
+## 🚀 Quick Start
 
-**Questions?** Check:
-1. MCP official documentation
-2. Server-specific docs
+```python
+from coldwind.core.mcp.mcp_manager import MCP_Manager
+
+manager = MCP_Manager()
+manager.add_server("github", server_config)
+manager.start_server("github")          # subprocess up + tools discovered
+
+tools = manager.tool_discovery("github")
+result = manager.call_mcp_server("github", tool_name, arguments)
+```
+
+Usually you won't do this by hand — the engine boots MCP, and agents call tools through the normal tool menu.
+
+Also available: `read_uri_resource(...)` to fetch MCP resources (like files) directly.
 
 ---
 
-**Status:** ✅ **Production-Ready**
+## 🛡️ Runtime Rules
 
-**Maintainer:** AI-Agent-Workflow Team
+- **Singleton** — one `MCP_Manager` for the whole process; never instantiate a second one.
+- **Not thread-safe by design** — call it from one place (the engine does exactly that).
+- **Config is declarative** — add a server by editing `.mcp.json`, not code. The absence of the file simply means "no external servers right now"; the runtime flow stays the same.
 
-**Last Updated:** December 24, 2025
+---
 
+## ❓ FAQ
+
+- **`MCPManager`?** Doesn't exist — the class is `MCP_Manager` (with underscore), plus a `Utils` subclass in `mcp_manager_util.py`.
+- **How do MCP tools reach the agents?** `DynamicToolRegister` → `UniversalMCPWrapper` → `ToolAssign` — see the tools README.
+
+---
+
+**Cold Wind AI · `coldwind-core` · Updated in the v2.0.0 docs pass (fixed the broken `mcpServers` config example to the real `servers` key; corrected class names).**

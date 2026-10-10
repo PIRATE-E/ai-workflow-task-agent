@@ -1,139 +1,93 @@
-# 📝 Prompts Package
+# 💬 Prompts Package (`coldwind.core.prompts`)
 
-**Prompt Templates for AI Agents**
+> Every word the system says to a model, organized: one module per job, no giant prompt blobs.
 
-> Carefully crafted prompts for different agent behaviors and task types.
-
----
-
-## 📋 **Table of Contents**
-
-1. [Why We Need This Package](#why-we-need-this-package)
-2. [Available Prompts](#available-prompts)
-3. [How to Use Prompts](#how-to-use-prompts)
-4. [Creating Custom Prompts](#creating-custom-prompts)
+**Part of:** `coldwind-core` · **Last Updated:** October 2026
 
 ---
 
-## 🎯 **Why We Need This Package**
+## 🗺️ Where This Fits — Who Feeds Whom
 
-### **The Problem**
+```text
+                        ┌────────────────────────┐
+      user message ───► │ classify_message_type   │ ◄── system_prompts.message_classifier
+                        └───────────┬────────────┘
+              ┌─────────────────────┼──────────────────────┐
+              ▼                     ▼                      ▼
+        💬 chat reply         🛠️ tool pick          ⚡ agent mission
+   chat_prompts            system_prompt_       agent_mode_prompts
+   .get_chat_system_prompt  tool_selector        + hierarchical_agent_prompts
+              │                     │                      │        (orchestrator)
+              ▼                     ▼                      ▼
+        open_ai_prompt          tools/            spawn / plan / execute
+        (JSON extraction)       (ToolAssign)
 
-Prompt engineering is hard:
-- ❌ Inconsistent prompt formats
-- ❌ Duplicated prompt logic
-- ❌ Hard to maintain prompts
-- ❌ No versioning
-
-### **What This Package Provides**
-
-**Centralized prompts** that are:
-- ✅ **Reusable** - One prompt, many uses
-- ✅ **Maintainable** - Edit in one place
-- ✅ **Versioned** - Track changes
-- ✅ **Optimized** - Tested and refined
-
----
-
-## 📚 **Available Prompts**
-
-### **1. System Prompts**
-
-```python
-from src.prompts.system_prompts import get_system_prompt
-
-# Get agent system prompt
-prompt = get_system_prompt("agent_mode")
+   🔎 web search: web_search_prompts          📚 RAG: rag_prompts
+   🧮 knowledge graph: system_prompts.cypher_query_generator + rag_search_classifier_prompts
+   🧾 triples: structured_triple_prompt       🧠 assistant: system_prompts.ai_assistant
 ```
 
-### **2. Task Prompts**
+---
+
+## 🎯 Why This Exists
+
+- Prompts rot when scattered — **one module per job** makes them findable and fixable.
+- Each class is a **prompt factory**: call a method, get the exact text for that stage.
+- Prompts reference **real runtime data** (tool lists, history) instead of placeholders.
+
+---
+
+## 📦 Module Map (all 9, verified)
+
+| Module | Class | What it generates |
+|--------|-------|-------------------|
+| `system_prompts.py` | `SystemPrompts` + `PromptTemplates` + `PromptManager` | Core personas: `web_search_assistant`, `cypher_query_generator`, `knowledge_graph_explainer`, `rag_system_selector`, `message_classifier`, `ai_assistant` |
+| `chat_prompts.py` | `ChatPrompts` | `get_chat_system_prompt(tools_context, history, latest_message_content)` |
+| `agent_mode_prompts.py` | `Prompt` | Agent-mode: `generate_tool_list_prompt`, `generate_parameter_prompt`, `evaluate_in_end`, `evaluate_final_response` |
+| `system_prompt_tool_selector.py` | `get_tool_selector_prompt(...)` | "Which tool should we use?" |
+| `web_search_prompts.py` | `WebSearchPrompts` | `search_result_processor`, `query_enhancer`, `search_result_validator` |
+| `rag_prompts.py` | `RAGPrompts` + `KnowledgeGraphPrompts` | `document_analyzer`, `knowledge_graph_builder`, `text_chunk_processor`, `get_json_text_rag_search_prompt`, `hybrid_rag_coordinator`; `entity_resolver`, `relationship_validator` |
+| `rag_search_classifier_prompts.py` | `Prompts` | `get_system_prompt_cypher`, `get_system_prompt_classifier` |
+| `structured_triple_prompt.py` | `Prompt` | `STRUCTURED_DATA_TRIPLE_PROMPT`, `create_structured_prompt`, `get_unstructured_triple_prompt` |
+| `open_ai_prompt.py` | `Prompt` | `get_json_extraction_prompts`, `get_extracted_json_prompt` |
+
+---
+
+## 🏗️ The Pattern: Prompt Factory
+
+Every module follows the same shape — **no exceptions, no giant string blobs in business code**:
 
 ```python
-from src.prompts.task_prompts import get_task_prompt
+from coldwind.core.prompts.chat_prompts import ChatPrompts
 
-# Get tool selection prompt
-prompt = get_task_prompt("tool_selection")
-```
-
-### **3. Formatting Prompts**
-
-```python
-from src.prompts.formatting import format_with_context
-
-# Format prompt with context
-formatted = format_with_context(
-    template=prompt_template,
-    context={"user_query": "What's the weather?"}
+prompt = ChatPrompts().get_chat_system_prompt(
+    tools_context=tool_context,          # real tool descriptions
+    history=history,                      # real conversation so far
+    latest_message_content=user_text,     # the new message
 )
 ```
 
----
-
-## 🚀 **Quick Start Guide**
-
-### **Using a Prompt**
-
-```python
-from src.prompts.agent_prompts import Prompt
-
-prompt_gen = Prompt()
-system_prompt = prompt_gen.get_agent_mode_prompt()
-
-# Use with LLM
-response = llm.invoke([
-    {"role": "system", "content": system_prompt},
-    {"role": "user", "content": "Help me"}
-])
+```text
+ call a method ──► get the exact prompt text (data baked in) ──► send to model
 ```
 
----
-
-## 🎨 **Creating Custom Prompts**
-
-### **Step 1: Create Prompt File**
-
-```python
-# src/prompts/my_prompts.py
-
-CUSTOM_PROMPT = """
-You are a helpful assistant specializing in {domain}.
-
-Your task: {task}
-
-Guidelines:
-- Be concise
-- Be accurate
-- Cite sources
-"""
-
-def get_custom_prompt(domain: str, task: str) -> str:
-    return CUSTOM_PROMPT.format(domain=domain, task=task)
-```
-
-### **Step 2: Use Custom Prompt**
-
-```python
-from src.prompts.my_prompts import get_custom_prompt
-
-prompt = get_custom_prompt(
-    domain="Python programming",
-    task="Help debug code"
-)
-```
+Need every persona in one place? `PromptManager` bundles the `get_*_prompt` accessors from `system_prompts.py`.
 
 ---
 
-## 🆘 **Support**
+## 🚀 Quick Start: Add or Edit a Prompt
 
-**Questions?** Check:
-1. Prompt engineering guides
-2. Example prompts in package
+1. Find the module that owns the stage you're changing (map above).
+2. Edit (or add) a `generate_*` / `get_*` method there — keep it a **pure function**: inputs in, text out.
+3. Call it from your node/tool. Never inline prompt text in agent code.
 
 ---
 
-**Status:** ✅ **Production-Ready**
+## ❓ FAQ
 
-**Maintainer:** AI-Agent-Workflow Team
+- **Where are the orchestrator's prompts?** In the orchestrator itself: `agents/agentic_orchestrator/hierarchical_agent_prompts.py` (`HierarchicalAgentPrompt`) — they're stage-specific, so they live with the pipeline.
+- **Why `Prompt` classes instead of constants?** Prompts need runtime data (tool lists, history) — methods take parameters; constants can't.
 
-**Last Updated:** December 24, 2025
+---
 
+**Cold Wind AI · `coldwind-core` · Updated in the v2.0.0 docs pass (old file listed APIs that don't exist; rebuilt from the verified 9-module inventory).**

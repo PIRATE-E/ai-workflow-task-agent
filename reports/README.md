@@ -20,6 +20,9 @@ library** — read the report you need, don't pre-load all of them.
 |--------|-----------|--------|----------|
 | **Logging System** | core, desktop | [`logging-system/`](logging-system/README.md) | Handler architecture, routing, text-archiving, dashboard handler, socket transport, dashboard printer. Full DIY-handler tutorial. |
 | **UV Package Manager** | shared | [`uv-package-manager/`](uv-package-manager/README.md) | Essentials-only uv curriculum: packaging foundations (virtualenv, wheels, editable/.pth, namespace packages), then uv setup, dependency lifecycle, pyproject/hatchling, lockfile mechanics, and the workspace capstone. |
+| **Cold Wind AI Vision** | shared | [`new_wind_ai/`](new_wind_ai/COLD_WIND_AI_VISION.md) | Long-term architecture blueprint: headless agent engine, pluggable Slint/Rust GUI, MCP cloud pods, and modernized single-shot RAG. |
+| **RAG & ETL Infrastructure** | core, shared | [`urgent_development/rag-ETL-infra/`](urgent_development/rag-ETL-infra/README.md) | Legacy RAG architectural autopsy, fatal bottlenecks (PyTorch bloat, process exit traps, 16 terminal pauses), and pluggable dual-plane pipeline design. |
+| **Documentation Audit (v2.0.0)** | shared | [`urgent_development/docs-updated-2026-10-08.md`](urgent_development/docs-updated-2026-10-08.md) | Final report of the repo-wide docs staleness audit (issue #7): root + 11 core + 2 desktop READMEs rewritten to verified v2.0.0 reality; MCP `"servers"` key fix; latent code bugs flagged to the memory graph. |
 
 ## Future Systems
 

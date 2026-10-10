@@ -1,547 +1,156 @@
-# 🎨 UI Package
+# 🎨 UI Package (`coldwind.desktop.ui`)
 
-**User Interface Components for AI-Agent-Workflow**
+> Everything the user sees and types in the terminal: the input box with autocomplete, styled message panels, the boot banner, and pretty crash reports.
 
-> Beautiful, interactive terminal UI using Rich library with structured debug messaging and error handling.
-
----
-
-## 📋 **Table of Contents**
-
-1. [Why We Need This Package](#why-we-need-this-package)
-2. [Architecture Overview](#architecture-overview)
-3. [Components Explained](#components-explained)
-4. [Quick Start Guide](#quick-start-guide)
-5. [Debug Helpers](#debug-helpers)
-6. [Message Protocol](#message-protocol)
-7. [Troubleshooting](#troubleshooting)
+**Part of:** `coldwind-desktop` · **Last Updated:** October 2026
 
 ---
 
-## 🎯 **Why We Need This Package**
+## 🗺️ Where This Fits
 
-### **The Problem We Solved**
-
-Console output can be messy:
-- ❌ Plain text logs hard to read
-- ❌ No structure to debug messages
-- ❌ Errors lost in output flood
-- ❌ No visual distinction between message types
-
-### **What This Package Provides**
-
-A **beautiful terminal UI** with:
-- ✅ **Rich Formatting** - Colors, panels, progress bars
-- ✅ **Structured Messages** - Debug protocol with metadata
-- ✅ **Debug Helpers** - Easy-to-use logging functions
-- ✅ **Error Handling** - Beautiful error displays
-- ✅ **Message Styles** - Visual distinction (user, AI, tool)
-
----
-
-## 🏗️ **Architecture Overview**
-
+```text
+        ┌─────────────── you ───────────────┐
+        ▼                                  ▲
+  chatInputHandler.py              print_message_style.py
+  (type + autocomplete)            (styled reply panels)
+        │                                  ▲
+        ▼                                  │
+  slash_commands/  ──► core chat loop ─────┘
+                            │
+        print_banner.py      │ crashes go to…
+        (boot ASCII art)     ▼
+                    rich_traceback_manager.py ──► system_logging ──► dashboard window
 ```
-┌──────────────────────────────────────────────────────────┐
-│                  UI PACKAGE ARCHITECTURE                  │
-│             (Terminal UI Components)                      │
-├──────────────────────────────────────────────────────────┤
-│                                                           │
-│  ┌─────────────────────────────────────────────────────┐ │
-│  │ 1. Debug Helpers (diagnostics/debug_helpers.py)    │ │
-│  │    • debug_info(), debug_warning(), debug_error()  │ │
-│  │    • debug_tool_response(), debug_api_call()       │ │
-│  │    • Simple wrapper for debug messaging            │ │
-│  └────────────────────┬────────────────────────────────┘ │
-│                       ↓                                   │
-│  ┌─────────────────────────────────────────────────────┐ │
-│  │ 2. Debug Protocol (diagnostics/debug_message_*)    │ │
-│  │    • DebugMessageSender - Sends structured JSON    │ │
-│  │    • LogLevel, DataType, ObjectType enums          │ │
-│  │    • Metadata support for rich debugging           │ │
-│  └────────────────────┬────────────────────────────────┘ │
-│                       ↓                                   │
-│  ┌─────────────────────────────────────────────────────┐ │
-│  │ 3. Socket Connection (via settings.socket_con)     │ │
-│  │    • Sends JSON to error_transfer.py subprocess    │ │
-│  │    • TCP socket communication                      │ │
-│  └────────────────────┬────────────────────────────────┘ │
-│                       ↓                                   │
-│  ┌─────────────────────────────────────────────────────┐ │
-│  │ 4. Rich Display (error_transfer.py subprocess)     │ │
-│  │    • Receives JSON messages                        │ │
-│  │    • Displays in Rich console (separate window)    │ │
-│  │    • Beautiful panels, colors, formatting          │ │
-│  └─────────────────────────────────────────────────────┘ │
-│                                                           │
-│  ┌─────────────────────────────────────────────────────┐ │
-│  │ 5. Message Styles (print_message_style.py)         │ │
-│  │    • print_message(msg, sender="user"|"ai"|"tool") │ │
-│  │    • Displays in main console with icons           │ │
-│  └─────────────────────────────────────────────────────┘ │
-│                                                           │
-└──────────────────────────────────────────────────────────┘
+
+> 💡 The old debug-window socket pipeline (`debug_helpers.py`, `debug_message_protocol.py`, `rich_error_print.py`, `error_transfer.py`) was **removed in the v2.0.0 purge**. Logging is now core's `system_logging` package, and the live "debug window" is the **dashboard** (`../dashboard/`).
+
+---
+
+## 🎯 Why This Exists
+
+- A plain `input()` box can't autocomplete, can't recall history — **prompt_toolkit can**.
+- Raw prints are unreadable — **rich panels** give user/AI/tool messages distinct looks.
+- Crashes should be **informative, not scary** — rich tracebacks with context, routed to the dashboard.
+
+---
+
+## 📦 Module Map (the real 4)
+
+| File | Plain-English job |
+|------|-------------------|
+| `chatInputHandler.py` | `InputHandler` — the prompt_toolkit input box with slash-command autocomplete + history |
+| `print_message_style.py` | `print_message(msg, sender)` — styled panels for user / AI / tool |
+| `print_banner.py` | `print_banner()` — the ASCII boot banner |
+| `diagnostics/rich_traceback_manager.py` | `RichTracebackManager` + `rich_exception_handler` — pretty, tracked crash reports |
+
+---
+
+## ⌨️ The Input Box (`chatInputHandler.py`)
+
+```text
+┌───────────────────────────────────────────────┐
+│ you ➜  /ag█                                   │
+├───────────────────────────────────────────────┤
+│  🤖 /agent   Invoke a specific agent to…      │  ◄── live from OnRunTimeRegistry
+│  ⚡ …                                         │
+└───────────────────────────────────────────────┘
+ TAB    → accept suggestion
+ ENTER  → apply selected completion (keep typing) — or submit
+ ESC    → close the dropdown        RIGHT → accept ghost text
+```
+
+- **`ChatCompleter`** reads the slash-command registry live — new commands appear in the dropdown without touching UI code.
+- **`InputHandler`** is a singleton owning one `PromptSession` (history + auto-suggest + `MODERN_STYLE` theme).
+- **Fallbacks**: not a TTY → plain `input('you ➜ ')`; EOF (Ctrl+D) → returns `'/exit'` so the app shuts down cleanly.
+
+```python
+from coldwind.desktop.ui.chatInputHandler import InputHandler
+
+user_input = InputHandler().get_user_input()   # prompt: "you ➜ "
 ```
 
 ---
 
-## 🧩 **Components Explained**
+## 💬 Message Panels & Banner
 
-### **1. Debug Helpers (`diagnostics/debug_helpers.py`)**
-
-**What it does:** Convenience functions for sending debug messages.
-
-**Simple API:**
 ```python
-from src.ui.diagnostics.debug_helpers import (
-    debug_info,
-    debug_warning,
-    debug_error,
-    debug_critical
-)
+from coldwind.desktop.ui.print_message_style import print_message
+from coldwind.desktop.ui.print_banner import print_banner
 
-# Send messages with different levels
-debug_info("APP • STARTED", "Application initialized")
-debug_warning("API • SLOW", "API took 5 seconds", {"duration": 5.0})
-debug_error("TOOL • FAILED", "Tool crashed", {"error": str(e)})
-debug_critical("SYSTEM • FAILURE", "Critical error!")
+print_message("Hello!", sender="user")   # 👤 [USER] cyan panel
+print_message("Hi there.", sender="ai")  # 🤖 [AI]  green panel
+print_message("Done.", sender="tool")    # 🛠️ [TOOL] yellow panel
+
+print_banner()   # the ASCII art boot banner (no arguments)
 ```
 
-**Specialized Functions:**
-```python
-# Tool responses
-debug_tool_response(
-    tool_name="google_search",
-    status="success",
-    response_summary="Found 10 results",
-    execution_time=1.2,
-    metadata={"query": "Python"}
-)
-
-# API calls
-debug_api_call(
-    api_name="OpenAI",
-    operation="chat_completion",
-    status="completed",
-    duration=2.5,
-    metadata={"model": "gpt-4"}
-)
-
-# Performance warnings
-debug_performance_warning(
-    operation="database_query",
-    duration=5.2,
-    threshold=2.0,
-    context="User search",
-    metadata={"query": "SELECT *"}
-)
-
-# Error logs
-debug_error_log(
-    error_type="ValueError",
-    error_message="Invalid input",
-    context="Parameter validation",
-    traceback_summary="File x.py, line 10",
-    metadata={"input": "bad_value"}
-)
-```
-
-**Output (in debug window):**
-```
-╭─────────── ℹ️ APP • STARTED • 10:30:45 ────────────╮
-│ Application initialized                            │
-╰────────────────────────────────────────────────────╯
-```
+- The rich `Console` comes from **`ContextRegistry.get().get_console()`** — never a global.
+- Optional **sound notification** on each message when `enable_sound_notifications` is on (Windows only, via `winsound`).
 
 ---
 
-### **2. Debug Message Protocol (`diagnostics/debug_message_protocol.py`)**
+## 🚨 Crash Reports (`diagnostics/rich_traceback_manager.py`)
 
-**What it does:** Structured JSON protocol for debug messages.
-
-**Data Types:**
 ```python
-class DataType(Enum):
-    PLAIN_TEXT = "PlainText"
-    DEBUG_MESSAGE = "DebugMessage"
-    ERROR_LOG = "ErrorLog"
-    PERFORMANCE_WARNING = "PerformanceWarning"
-    TOOL_RESPONSE = "ToolResponse"
-    API_CALL = "ApiCall"
-```
-
-**Log Levels:**
-```python
-class LogLevel(Enum):
-    DEBUG = "DEBUG"
-    INFO = "INFO"
-    WARNING = "WARNING"
-    ERROR = "ERROR"
-    CRITICAL = "CRITICAL"
-```
-
-**Message Structure:**
-```json
-{
-  "obj_type": "str",
-  "data_type": "DebugMessage",
-  "timestamp": "2025-12-24T10:30:45.123456",
-  "data": {
-    "heading": "APP • STARTED",
-    "body": "Application initialized",
-    "level": "INFO",
-    "metadata": {}
-  }
-}
-```
-
-**Sender Class:**
-```python
-from src.ui.diagnostics.debug_message_protocol import DebugMessageSender
-
-sender = DebugMessageSender(socket_connection)
-
-# Send debug message
-sender.send_debug_message(
-    heading="APP • STARTED",
-    body="Application initialized",
-    level="INFO",
-    metadata={"version": "1.0"}
-)
-
-# Send plain text
-sender.send_plain_text("Simple message")
-```
-
----
-
-### **3. Rich Error Print (`rich_error_print.py`)**
-
-**What it does:** Beautiful error display using Rich panels.
-
-**Usage:**
-```python
-from rich.console import Console
-from src.ui.rich_error_print import RichErrorPrint
-
-console = Console()
-error_printer = RichErrorPrint(console)
-
-# Print rich formatted messages
-error_printer.print_rich("Error occurred!")
-error_printer.print_rich("[green]Success![/green]")
-```
-
----
-
-### **4. Print Message Style (`print_message_style.py`)**
-
-**What it does:** Display messages in main console with visual styles.
-
-**API:**
-```python
-from src.ui.print_message_style import print_message
-
-# User message (blue panel)
-print_message("Hello, AI!", sender="user")
-
-# AI response (green panel)
-print_message("Hello, human!", sender="ai")
-
-# Tool output (yellow panel)
-print_message("Search completed", sender="tool")
-```
-
-**Output:**
-```
-╭──────────────────────────────────────────────────╮
-│ 👤 [USER] Hello, AI!                             │
-╰──────────────────────────────────────────────────╯
-
-╭──────────────────────────────────────────────────╮
-│ 🤖 [AI] Hello, human!                            │
-╰──────────────────────────────────────────────────╯
-
-╭──────────────────────────────────────────────────╮
-│ 🛠️ [TOOL] Search completed                       │
-╰──────────────────────────────────────────────────╯
-```
-
----
-
-### **5. Rich Traceback Manager (`diagnostics/rich_traceback_manager.py`)**
-
-**What it does:** Beautiful exception tracebacks using Rich.
-
-**Usage:**
-```python
-from src.ui.diagnostics.rich_traceback_manager import (
+from coldwind.desktop.ui.diagnostics.rich_traceback_manager import (
     RichTracebackManager,
-    rich_exception_handler
+    rich_exception_handler,
 )
 
-# Auto-install rich tracebacks
-RichTracebackManager.install()
+# at boot (main_orchestrator.py does exactly this):
+RichTracebackManager.initialize(
+    show_locals=False, max_frames=10, suppress_modules=[...],
+)
 
-# Decorator for functions
-@rich_exception_handler("My Function")
-def my_function():
-    raise ValueError("Something went wrong")
-
-# Manual exception handling
+# manual handling with context:
 try:
-    risky_operation()
+    risky()
 except Exception as e:
-    RichTracebackManager.handle_exception(
-        e,
-        context="My Operation",
-        extra_context={"user_id": 123}
-    )
+    RichTracebackManager.handle_exception(e, context="My Operation",
+                                           extra_context={"user": 123})
+
+# or just decorate:
+@rich_exception_handler("Main Chat Application")
+def run_chat(): ...
 ```
 
-**Output:**
-```
-╭─────────────────────── Traceback (most recent call last) ────────────────────────╮
-│ File "my_file.py", line 42, in my_function                                       │
-│   39 │   def my_function():                                                      │
-│   40 │       try:                                                                 │
-│   41 │           risky_operation()                                                │
-│ ❱ 42 │       except Exception as e:                                              │
-│   43 │           raise                                                            │
-│                                                                                   │
-│ ValueError: Something went wrong                                                 │
-╰───────────────────────────────────────────────────────────────────────────────────╯
-```
+What it gives you:
+
+| API | Plain-English job |
+|-----|-------------------|
+| `initialize(...)` | Boot for the main process: installs `sys.excepthook` + starts error tracking |
+| `initialize_debug_process(console, ...)` | Boot for the debug/dashboard process: rich visual tracebacks |
+| `handle_exception(e, context, extra_context)` | Format + log one exception (re-entrancy guarded) |
+| `rich_exception_handler("Name")` | Decorator: catch → log with context → re-raise |
+| `create_safe_wrapper(func, ctx, default_return)` | Wrap a function so failures return a default instead of crashing |
+| `log_performance_warning(op, duration, threshold)` | Warn when an operation is slower than the threshold |
+| `get_error_statistics()` / `reset_statistics()` | Error counts per category (monitoring/testing) |
+
+> ⚠️ Old docs claimed `RichTracebackManager.install()` — that method doesn't exist; the real entry points are **`initialize()`** (main process) and **`initialize_debug_process()`** (debug window). Display goes through core's `debug_error` → the dashboard handler, never the user's chat window.
 
 ---
 
-## 🚀 **Quick Start Guide**
+## 🧩 How Core Sees This Package
 
-### **Step 1: Basic Debug Messages**
+Core never imports these files directly. The **runtime adapters** in `runtime/DesktopContext.py` wrap them behind core's UI contracts:
 
-```python
-from src.ui.diagnostics.debug_helpers import debug_info, debug_error
-
-# Send info message
-debug_info("STARTUP", "Application started successfully")
-
-# Send error message
-try:
-    risky_operation()
-except Exception as e:
-    debug_error("OPERATION_FAILED", str(e), {"operation": "risky"})
+```text
+core contract                    desktop adapter            wraps (this package)
+MessageDisplayInterface   ──►  DesktopMessageDisplay  ──►  print_message / print_banner
+ExceptionHandlerInterface ──►  DesktopExceptionHandler ──►  RichTracebackManager
+CommandParserInterface    ──►  DesktopCommandParser    ──►  InputHandler + slash execution
+DebugLoggerInterface      ──►  DesktopDebugLogger      ──►  core system_logging debug_*
 ```
 
-### **Step 2: Print User Messages**
-
-```python
-from src.ui.print_message_style import print_message
-
-# User input
-user_input = input("You: ")
-print_message(user_input, sender="user")
-
-# AI response
-ai_response = "Here's my response"
-print_message(ai_response, sender="ai")
-```
-
-### **Step 3: Advanced Debug Logging**
-
-```python
-from src.ui.diagnostics.debug_helpers import (
-    debug_tool_response,
-    debug_api_call
-)
-
-# Log tool execution
-debug_tool_response(
-    tool_name="web_search",
-    status="success",
-    response_summary="Found 10 results",
-    execution_time=1.5
-)
-
-# Log API call
-debug_api_call(
-    api_name="OpenAI",
-    operation="completion",
-    status="completed",
-    duration=2.3
-)
-```
+That's the layering invariant in action: **core defines the contracts, desktop supplies the looks.**
 
 ---
 
-## 📚 **Debug Helpers API**
+## ❓ FAQ
 
-### **Message Levels**
-
-```python
-debug_info(heading, body, metadata=None)
-debug_warning(heading, body, metadata=None)
-debug_error(heading, body, metadata=None)
-debug_critical(heading, body, metadata=None)
-```
-
-### **Specialized Logging**
-
-```python
-debug_tool_response(tool_name, status, response_summary, execution_time, metadata)
-debug_api_call(api_name, operation, status, duration, metadata)
-debug_performance_warning(operation, duration, threshold, context, metadata)
-debug_error_log(error_type, error_message, context, traceback_summary, metadata)
-```
-
-### **Plain Text**
-
-```python
-debug_plain_text(text)
-```
+- **Where do my debug messages go now?** Call core's `debug_info/debug_error/...` (`coldwind.core.system_logging`) — they land in `basic_logs/*.txt` and stream to the dashboard window.
+- **Why does the input box sometimes fall back to plain input?** prompt_toolkit needs a real TTY — scripts, pipes, and some IDEs don't have one; the fallback keeps the app usable.
 
 ---
 
-## 🎨 **Message Protocol**
-
-### **Debug Message Structure**
-
-```python
-{
-    "obj_type": "str",          # Object type (str or pickle)
-    "data_type": "DebugMessage", # Message type
-    "timestamp": "ISO8601",      # When sent
-    "data": {
-        "heading": "CATEGORY • ACTION",
-        "body": "Detailed message",
-        "level": "INFO",
-        "metadata": {
-            "key": "value"
-        }
-    }
-}
-```
-
-### **Heading Convention**
-
-Format: `CATEGORY • ACTION`
-
-**Examples:**
-- `APP • STARTED`
-- `MCP • SERVER_INITIALIZED`
-- `TOOL • EXECUTION_COMPLETE`
-- `API • REQUEST_FAILED`
-- `ERROR • VALIDATION_ERROR`
-
----
-
-## 🐛 **Troubleshooting**
-
-### **Problem: Debug Messages Not Showing**
-
-**Cause:** Socket connection not established
-
-**Fix:**
-```python
-from src.config import settings
-
-# Check socket
-if settings.socket_con is None:
-    print("Socket not initialized!")
-else:
-    print("Socket connected")
-```
-
----
-
-### **Problem: Messages Go to Wrong Console**
-
-**Issue:** Messages appear in main console instead of debug window
-
-**Fix:**
-- Debug messages → Debug window (separate subprocess)
-- User/AI messages → Main console
-
-```python
-# For debug window
-from src.ui.diagnostics.debug_helpers import debug_info
-debug_info("TEST", "Debug message")
-
-# For main console
-from src.ui.print_message_style import print_message
-print_message("User message", sender="user")
-```
-
----
-
-## 📝 **Best Practices**
-
-### **1. Use Descriptive Headings**
-
-```python
-# ❌ Bad
-debug_info("Error", "Something failed")
-
-# ✅ Good
-debug_error("API • CONNECTION_TIMEOUT", "OpenAI API request timed out", {
-    "timeout": 60,
-    "endpoint": "/v1/chat/completions"
-})
-```
-
-### **2. Include Metadata**
-
-```python
-# ❌ Bad
-debug_info("Tool executed", "Success")
-
-# ✅ Good
-debug_tool_response(
-    tool_name="google_search",
-    status="success",
-    response_summary="Found 10 results",
-    execution_time=1.2,
-    metadata={
-        "query": "Python tutorials",
-        "results_count": 10
-    }
-)
-```
-
-### **3. Use Appropriate Levels**
-
-```python
-# INFO - Normal operations
-debug_info("USER_INPUT", "Received user message")
-
-# WARNING - Recoverable issues
-debug_warning("RETRY", "Retrying failed request", {"attempt": 2})
-
-# ERROR - Errors that affect functionality
-debug_error("TOOL_FAILED", "Tool execution failed", {"error": str(e)})
-
-# CRITICAL - System-breaking errors
-debug_critical("SYSTEM_FAILURE", "Cannot continue", {"reason": "..."})
-```
-
----
-
-## 🆘 **Support**
-
-**Questions?** Check:
-1. This README
-2. Code comments in `debug_helpers.py`
-3. `debug_message_protocol.py` docstrings
-
-**Found a bug?** Create an issue with:
-- Function called
-- Expected output
-- Actual output
-
----
-
-**Status:** ✅ **Production-Ready**
-
-**Maintainer:** AI-Agent-Workflow Team
-
-**Last Updated:** December 24, 2025
-
+**Cold Wind AI · `coldwind-desktop` · Updated in the v2.0.0 docs pass (old file documented the purged debug_helpers/socket pipeline; rebuilt from the 4 real modules + dashboard flow).**

@@ -1,165 +1,112 @@
-# 📖 RAG Package
+# 📚 RAG Package (`coldwind.core.RAG`)
 
-**Retrieval Augmented Generation System**
+> Give the AI long-term memory: turn documents and spreadsheets into knowledge it can search.
 
-> Enhance LLM responses with relevant document retrieval.
-
----
-
-## 📋 **Table of Contents**
-
-1. [What is RAG](#what-is-rag)
-2. [How RAG Works](#how-rag-works)
-3. [Components](#components)
-4. [Quick Start Guide](#quick-start-guide)
-5. [Indexing Documents](#indexing-documents)
+**Part of:** `coldwind-core` · **Last Updated:** October 2026
 
 ---
 
-## 🎯 **What is RAG**
+## 🗺️ Where This Fits
 
-**Retrieval Augmented Generation** enhances LLM responses by:
-1. **Retrieving** relevant documents
-2. **Augmenting** the prompt with context
-3. **Generating** informed responses
-
-### **Why RAG?**
-
-- ✅ **Accuracy** - Ground answers in facts
-- ✅ **Up-to-date** - Use latest documents
-- ✅ **Specific** - Company/domain knowledge
-- ✅ **Cited** - Reference sources
-
----
-
-## ⚙️ **How RAG Works**
-
-```
-User Query: "What is Kafka?"
-    ↓
-1. Embed Query → Vector
-    ↓
-2. Search Vector DB → Find similar docs
-    ↓
-3. Retrieve Top K Documents
-    ↓
-4. Augment Prompt with Context
-    ↓
-5. LLM Generates Answer
-    ↓
-Response: "Apache Kafka is a distributed streaming platform..."
+```text
+PDFs / Google Sheets          Neo4j knowledge graph
+        │                            ▲
+        ▼                            │ save_knowledge_graph_*
+   rag.py (chunks + triples) ────────┘
+        │
+        ▼
+rag_search_classifier_tool (tools/) ──► answers questions with REAL data
 ```
 
 ---
 
-## 🧩 **Components**
+## 🎯 Why This Exists
 
-### **1. Document Loader**
+- Models forget everything between chats — **RAG stores facts outside the model** and fetches them on demand.
+- Two memory styles: **vector search** (find similar text chunks) and **knowledge graph** (find structured facts/triples).
+- Sources aren't just PDFs — **Google Sheets** can become a knowledge graph too.
 
-Load documents from files:
-```python
-from src.RAG.document_loader import load_pdf
+---
 
-chunks = load_pdf("kafka.pdf")
+## 📦 Module Map
+
+| File | Plain-English job |
+|------|-------------------|
+| `rag.py` | Ingest documents: load, chunk, embed, extract triples |
+| `neo4j_rag.py` | Store + query triples in Neo4j (the graph database) |
+| `sheets_rag.py` | `GoogleSheetsRAG` — turn a Google Sheet into knowledge-graph documents |
+
+> ⚠️ A major **RAG ETL refinement** is the next big work item on the roadmap — expect this package's internals to modernize. The flows below describe today's pipeline.
+
+---
+
+## 🏗️ Pipeline 1: PDF → Searchable Knowledge (rag.py)
+
+```text
+ load_pdf_document            split_into_unique_chunks
+┌──────────────┐            ┌──────────────────┐
+│  PDF file    │──────────► │  small text       │
+└──────────────┘            │  chunks          │
+                            └────────┬─────────┘
+              ┌──────────────────────┼──────────────────────┐
+              ▼                                            ▼
+   get_genai_embedding                         extract_triples_process_query
+   (vector embeddings)                          (facts: subject → relation → object)
+              │                                            │
+              ▼                                            ▼
+   search_similar_chunks_genai                save_knowledge_graph_gemini_cli
+   text_rag_search_using_llm                  save_knowledge_graph_gemini_api
+   (answer questions)                         save_knowledge_graph_open_ai
 ```
 
-### **2. Embeddings**
+Key functions: `find_similar_documents`, `get_processed_chunks`, `get_all_triples_from_file` (reads saved triples), `text_rag_search_using_llm` (LLM-driven search over chunks).
 
-Convert text to vectors:
-```python
-from src.RAG.embeddings import create_embeddings
+---
 
-vectors = create_embeddings(chunks)
+## 🏗️ Pipeline 2: Triples → Neo4j (neo4j_rag.py)
+
+```text
+ triples from rag.py
+        │
+        ▼
+ insert_triples ──► Neo4j graph ──► get_retrieve_triples ──► context for answers
+                    (nodes + relationships)
+ clear_database                    get_all_labels_and_names
+ prompt_local_llm_for_triples      get_all_relationship_types
+                                   get_response (ask the graph a question)
 ```
 
-### **3. Vector Store**
+Cypher generation prompts live in `prompts/` (`rag_search_classifier_prompts`, `system_prompts.cypher_query_generator`).
 
-Store and search embeddings:
+---
+
+## 🏗️ Pipeline 3: Google Sheets (sheets_rag.py)
+
 ```python
-from src.RAG.vector_store import VectorStore
+from coldwind.core.RAG.sheets_rag import GoogleSheetsRAG
 
-store = VectorStore()
-store.add_documents(chunks, vectors)
-
-results = store.search(query="What is Kafka?")
-```
-
-### **4. Retriever**
-
-High-level retrieval interface:
-```python
-from src.RAG.retriever import retrieve_context
-
-context = retrieve_context("What is Kafka?")
+sheets_rag = GoogleSheetsRAG(
+    sheets_url="https://docs.google.com/spreadsheets/d/…",
+    schema_config={...},          # which columns mean what
+)
+documents = sheets_rag.get_structured_documents_for_kg()   # → knowledge-graph ready
 ```
 
 ---
 
-## 🚀 **Quick Start Guide**
+## 🔗 Where Paths Are Configured
 
-### **Step 1: Index Documents**
+The RAG file paths live on `DesktopConfig` (not hardcoded): `rag_example_file_path`, `rag_hash_file_path`, `rag_triples_file_path`.
 
-```python
-from src.RAG.indexer import index_document
-
-# Index a PDF
-index_document("kafka.pdf")
-```
-
-### **Step 2: Query with RAG**
-
-```python
-from src.RAG.rag_chain import RAGChain
-
-rag = RAGChain()
-response = rag.query("What is Kafka?")
-print(response)
-```
+**Who consumes this package?** The `rag_search_classifier_tool` in `tools/` — it decides whether your query needs a vector search, a knowledge-graph lookup, or plain LLM.
 
 ---
 
-## 📄 **Indexing Documents**
+## ❓ FAQ
 
-### **Supported Formats**
-
-- PDF
-- TXT
-- DOCX
-- MD
-
-### **Index a File**
-
-```python
-from src.RAG.indexer import index_document
-
-index_document("my_document.pdf")
-```
-
-### **Batch Indexing**
-
-```python
-from src.RAG.indexer import batch_index
-
-batch_index([
-    "doc1.pdf",
-    "doc2.pdf",
-    "doc3.txt"
-])
-```
+- **Vector search vs knowledge graph?** Vector = "find text like this" (fuzzy, great for documents). Graph = "find facts connected to this" (precise, great for structured data).
+- **Why Neo4j?** Triples (subject → relation → object) map perfectly onto a graph database.
 
 ---
 
-## 🆘 **Support**
-
-**Questions?** Check:
-1. RAG documentation
-2. LangChain RAG guides
-
----
-
-**Status:** ✅ **Production-Ready**
-
-**Maintainer:** AI-Agent-Workflow Team
-
-**Last Updated:** December 24, 2025
-
+**Cold Wind AI · `coldwind-core` · Updated in the v2.0.0 docs pass (old file documented six modules that never existed; rebuilt from the three real modules).**

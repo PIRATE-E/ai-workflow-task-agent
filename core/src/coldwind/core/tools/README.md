@@ -1,166 +1,116 @@
-# 🛠️ Tools Package
+# 🛠️ Tools Package (`coldwind.core.tools`)
 
-**Tool Implementations for AI Agents**
+> The AI's hands: Google Search, shell commands, translation, RAG lookups, and browser automation — plus a registry that makes them all discoverable.
 
-> Extensible tool system that allows agents to interact with external services, databases, and APIs.
-
----
-
-## 📋 **Table of Contents**
-
-1. [Why We Need This Package](#why-we-need-this-package)
-2. [Available Tools](#available-tools)
-3. [How Tools Work](#how-tools-work)
-4. [Quick Start Guide](#quick-start-guide)
-5. [Creating Custom Tools](#creating-custom-tools)
+**Part of:** `coldwind-core` · **Last Updated:** October 2026
 
 ---
 
-## 🎯 **Why We Need This Package**
+## 🗺️ Where This Fits
 
-### **The Problem**
-
-LLMs alone can't:
-- ❌ Access real-time information
-- ❌ Query databases
-- ❌ Call APIs
-- ❌ Execute code
-
-### **What This Package Provides**
-
-**Powerful tools** that agents can use:
-- ✅ **Web Search** - Google, DuckDuckGo
-- ✅ **Database** - Neo4j graph queries
-- ✅ **File I/O** - Read/write files
-- ✅ **APIs** - External service calls
-- ✅ **Browser** - Web automation
-
----
-
-## 🔧 **Available Tools**
-
-### **1. Google Search**
-```python
-from src.tools.google_search import google_search
-
-results = google_search("Python tutorials")
-```
-
-### **2. Neo4j Query**
-```python
-from src.tools.neo4j_tool import query_neo4j
-
-result = query_neo4j("MATCH (n) RETURN n LIMIT 10")
-```
-
-### **3. File Reader**
-```python
-from src.tools.file_reader import read_file
-
-content = read_file("data.txt")
-```
-
-### **4. Code Executor**
-```python
-from src.tools.code_executor import execute_python
-
-output = execute_python("print('Hello')")
+```text
+agents (tool mode) ──► tool_selector ──► ToolAssign (registry) ──► the right tool
+                                                          │
+                              ┌───────────┬───────────┬───┴────────┬───────────┐
+                              ▼           ▼           ▼            ▼           ▼
+                           Google      Shell      Translate     RAG        Browser
+                           search     command      text       lookup     automation
 ```
 
 ---
 
-## ⚙️ **How Tools Work**
+## 🎯 Why This Exists
 
-### **Tool Interface**
-
-Every tool implements:
-```python
-class Tool:
-    name: str
-    description: str
-    
-    def invoke(self, params: dict) -> str:
-        """Execute tool logic"""
-        pass
-```
-
-### **Tool Registration**
-
-```python
-# Tools are auto-registered
-from src.tools import get_all_tools
-
-tools = get_all_tools()
-```
+- The model can't touch the world by itself — **tools are the bridge from words to actions**.
+- One **registry** (`ToolAssign`) keeps every tool discoverable with name, description, and argument schema.
+- New tools (including MCP server tools) **plug in without touching the agents**.
 
 ---
 
-## 🚀 **Quick Start Guide**
+## 📦 Module Map
 
-### **Using Tools Directly**
-
-```python
-from src.tools.google_search import google_search
-
-# Simple search
-results = google_search("AI news")
-print(results)
-```
-
-### **Using Tools with Agents**
-
-```python
-from src.agents.tool_agent import ToolAgent
-
-agent = ToolAgent()
-response = agent.invoke("Search for Python tutorials")
-```
+| File | Plain-English job |
+|------|-------------------|
+| `lggraph_tools/tool_assign.py` | `ToolAssign` — the registry every agent reads |
+| `lggraph_tools/google_search_tool.py` | `search_google_tool(query)` — live Google results |
+| `lggraph_tools/run_shell_command_tool.py` | `run_shell_command(command)` — run shell commands |
+| `lggraph_tools/translate_tool.py` | `translate_text(message, target_language)` |
+| `lggraph_tools/rag_search_classifier_tool.py` | `rag_search_classifier_tool(query)` + `retrieve_knowledge_graph` — ask your stored knowledge |
+| `lggraph_tools/browser_tool_main.py` | `browser_use_tool(...)` + `BrowserHandler` — drive a real browser |
+| `lggraph_tools/tool_wrappers/` | One wrapper per tool (safety + normalization layer) |
+| `lggraph_tools/mcp_wrapper/` | `UniversalMCPWrapper` + `filesystem_wrapper` — MCP tools become normal tools |
+| `lggraph_tools/tool_schemas/` | `tools_structured_classes.py` — typed argument schemas |
+| `lggraph_tools/tool_response_manager.py` | Normalizes tool responses for the agents |
+| `lggraph_tools/tool_selector.py` | Helps pick the right tool for a request |
 
 ---
 
-## 🎨 **Creating Custom Tools**
+## 🏗️ The Two-Layer Design
 
-### **Step 1: Create Tool File**
-
-```python
-# src/tools/my_tool.py
-
-from langchain.tools import tool
-
-@tool
-def my_custom_tool(query: str) -> str:
-    """
-    My custom tool that does something useful.
-    
-    Args:
-        query: The input query
-        
-    Returns:
-        Tool result as string
-    """
-    # Your tool logic here
-    result = do_something(query)
-    return result
+```text
+┌─────────────────────────────────────────────────┐
+│  LAYER 2 — WHAT AGENTS SEE                      │
+│  ToolAssign registry: name + description + args  │
+│  (the "menu" the model chooses from)             │
+└───────────────────────┬─────────────────────────┘
+                        │ wrapper picks the real function
+┌───────────────────────▼─────────────────────────┐
+│  LAYER 1 — WHAT ACTUALLY RUNS                   │
+│  search_google_tool()  run_shell_command()  …    │
+│  wrapped in GoogleSearchToolWrapper etc.         │
+│  (validation, error handling, logging)           │
+└─────────────────────────────────────────────────┘
 ```
 
-### **Step 2: Register Tool**
-
-Tool is auto-registered when imported.
+Why layers? The **registry** can list a tool and its schema even before it's called; the **wrapper** keeps the raw function clean and crash-safe.
 
 ---
 
-## 🆘 **Support**
+## 🚀 Quick Start: Use The Built-ins
 
-**Questions?** Check:
-1. This README
-2. Individual tool files
-3. LangChain tools documentation
+```python
+from coldwind.core.tools.lggraph_tools.google_search_tool import search_google_tool
+from coldwind.core.tools.lggraph_tools.run_shell_command_tool import run_shell_command
+
+results = search_google_tool("cold wind ai github")
+output  = run_shell_command("ls -la")
+```
+
+In the running app you rarely call these directly — tool mode + the orchestrator pick them for you.
 
 ---
 
-**Status:** ✅ **Production-Ready**
+## 🔧 Quick Start: Add Your Own Tool
 
-**Maintainer:** AI-Agent-Workflow Team
+```python
+# 1) Write the raw function
+def get_weather(city: str) -> str:
+    """Fetch the weather for a city."""
+    ...
 
-**Last Updated:** December 24, 2025
+# 2) Give it a typed schema (tool_schemas/tools_structured_classes.py)
+# 3) Wrap it (tool_wrappers/) and register:
+from coldwind.core.tools.lggraph_tools.tool_assign import ToolAssign
 
+registry = ToolAssign(name="get_weather", description="Get current weather", func=get_weather)
+registry.set_tools_list([...])      # or append_tools_list(your_tool)
+```
+
+Once registered, agents discover it through the tool-selection prompts — **no agent code changes needed**.
+
+---
+
+## 🌐 MCP Tools Are Tools Too
+
+The `mcp/` package discovers external MCP servers and registers their tools via `DynamicToolRegister`; `UniversalMCPWrapper` (here, in `mcp_wrapper/`) adapts any MCP tool into the same shape as the built-ins. **One menu, zero special cases.**
+
+---
+
+## ❓ FAQ
+
+- **What happened to `neo4j_tool` / `file_reader` / `code_executor` / `get_all_tools`?** They never existed here — old docs were fiction. Neo4j access lives in `RAG/neo4j_rag.py`, file reading in `mcp_wrapper/filesystem_wrapper.py`, and the registry is `ToolAssign`.
+- **Is shell execution safe?** It runs in a subprocess with response management and logging — treat it like any shell access: be deliberate about what you run.
+
+---
+
+**Cold Wind AI · `coldwind-core` · Updated in the v2.0.0 docs pass (old file documented fictional tools; rebuilt from the five real tools + registry design).**
