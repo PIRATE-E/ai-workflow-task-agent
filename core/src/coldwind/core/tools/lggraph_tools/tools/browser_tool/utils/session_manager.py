@@ -122,8 +122,10 @@ class SessionManager:
         import aiofiles
         from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
         from pathlib import Path
-        # MIGRATED: settings.BROWSER_USE_USER_PROFILE_PATH → get_settings().BROWSER_USE_USER_PROFILE_PATH
-        session_file_path = Path(ContextRegistry.get().get_settings().BROWSER_USE_USER_PROFILE_PATH) / 'custom_sessions.json'
+        # 🔧 FIX (BUG-5): BROWSER_USE_USER_PROFILE_PATH was a ghost attr — the real
+        # typed field on DesktopConfig is browser_use_user_profile_path (pydantic
+        # attr access is case-sensitive), so this raised AttributeError at runtime.
+        session_file_path = Path(ContextRegistry.get().get_settings().browser_use_user_profile_path) / 'custom_sessions.json'
         async with aiofiles.open(session_file_path, 'w', encoding='utf-8') as f:
             content = json.dumps(session_data, indent=2)
             await f.write(content)
@@ -157,8 +159,9 @@ class SessionManager:
         await wait_until_browser_ready()
         from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
         session_data = {}
-        # MIGRATED: settings.BROWSER_USE_USER_PROFILE_PATH → get_settings().BROWSER_USE_USER_PROFILE_PATH
-        session_file_path = Path(ContextRegistry.get().get_settings().BROWSER_USE_USER_PROFILE_PATH) / "custom_sessions.json"
+        # 🔧 FIX (BUG-5): ghost attr BROWSER_USE_USER_PROFILE_PATH → real typed field
+        # browser_use_user_profile_path (case-sensitive pydantic attr access).
+        session_file_path = Path(ContextRegistry.get().get_settings().browser_use_user_profile_path) / "custom_sessions.json"
         if not session_file_path.exists():
             print("[SUBPROCESS] No custom session file found, starting fresh.")
             return

@@ -542,7 +542,7 @@ class MCP_Manager:
         Notes:
             - Server process uses PIPE for stdin/stdout for JSON-RPC communication
             - stderr is logged separately for debugging
-            - Working directory set to project root (BASE_DIR.parent)
+            - Working directory set to project root (DesktopConfig.project_root)
             - Handshake sends initialize request with protocol version info
             - Tool discovery happens immediately after successful handshake
             - Tools are automatically registered with DynamicToolRegister for LangChain
@@ -612,10 +612,12 @@ class MCP_Manager:
                     return False
 
                 # Check working directory
-                # MIGRATED: settings.BASE_DIR → ContextRegistry.get().get_settings().BASE_DIR
+                # 🔧 FIX (BUG-5): BASE_DIR was a ghost attr — the real typed field is
+                # project_root (pydantic attr access is case-sensitive), so every
+                # server start died with AttributeError here and returned False.
                 try:
                     working_dir = str(
-                        ContextRegistry.get().get_settings().BASE_DIR.parent.resolve()
+                        ContextRegistry.get().get_settings().project_root.resolve()
                     )
                     ContextRegistry.get().get_logger().log_info(
                         heading="MCP • DEBUG_WORKING_DIR",
@@ -623,8 +625,8 @@ class MCP_Manager:
                         metadata={
                             "server": name,
                             "working_dir": working_dir,
-                            "base_dir": str(
-                                ContextRegistry.get().get_settings().BASE_DIR
+                            "project_root": str(
+                                ContextRegistry.get().get_settings().project_root
                             ),
                             "parent_exists": pathlib.Path(working_dir).exists(),
                         },
@@ -837,7 +839,7 @@ class MCP_Manager:
         """
         # Perform any necessary initialization here
         # MIGRATED: settings.MCP_CONFIG.get('MCP_ENABLED') →
-        # ContextRegistry.get().get_settings().mcp_config.get('MCP_ENABLED')
+        # ContextRegistry.get().get_settings().mcp_enabled (typed field on CoreSettinngs)
         MCP_Manager.mcp_enabled = ContextRegistry.get().get_settings().mcp_enabled
         ContextRegistry.get().get_logger().log_info(
             heading="MCP • MANAGER_INIT",

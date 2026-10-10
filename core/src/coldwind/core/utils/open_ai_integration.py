@@ -61,7 +61,8 @@ class OpenAIIntegration:
         Initialize the OpenAIIntegration instance.
 
         Args:
-            api_key (Optional[str]): The OpenAI API key. If not provided, uses OPEN_AI_API_KEY from settings.
+            api_key (Optional[str]): The OpenAI API key. If not provided, read from the
+            active context settings (ContextRegistry.get().get_settings().openai_api_key).
             model (Optional[str]): The model name to use. Defaults to 'openai/gpt-oss-120b'.
         """
         # Prevent re-initialization of singleton
@@ -390,9 +391,6 @@ class OpenAIIntegration:
                 timeout=self._settings.openai_timeout,
             )
 
-            # Enhanced response system_logging
-            # if settings.socket_con:
-            #     settings.socket_con.send_error(f"[DEBUG] OpenAI async API call completed successfully")
 
             return self._handle_non_streaming_response_with_debugging(completion)
 
@@ -893,7 +891,7 @@ class OpenAIIntegration:
 
         IMPORTANT: THIS METHOD SHOULD BE CALLED BEFORE EACH OPENAI API REQUEST TO ENSURE COMPLIANCE WITH RATE LIMITS.
         IMPORTANT: THIS IS A SYNCHRONOUS METHOD, SO IT SHOULD BE USED IN SYNC CONTEXTS ONLY.
-        :return: fuck the cpu for waiting
+        :return: None. Blocks the calling thread (time.sleep) while the rate-limit window resets.
         """
         from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
 
@@ -948,7 +946,7 @@ class OpenAIIntegration:
         This method ensures that no more than 30 requests are made 60 sec.
 
         IMPORTANT: THIS METHOD SHOULD BE CALLED BEFORE EACH OPENAI API REQUEST TO ENSURE COMPLIANCE WITH RATE LIMITS.
-        :return: fuck the asynchronicity
+        :return: None. Awaits the rate-limit window reset asynchronously (asyncio.sleep) so the event loop stays responsive.
         """
         # 🔧 FIX: Proper async context management
         from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
@@ -1165,15 +1163,6 @@ class OpenAIIntegration:
         """
         old_value = OpenAIIntegration.requests_count
         OpenAIIntegration.requests_count = value
-
-        # Emit event to listeners
-        # eval_listener: RichStatusListener = settings.listeners.get('eval', None)
-        # if eval_listener is not None:
-        #     new_value = (f"{eval_listener.get_last_event().meta_data.get('new_value')!s}"
-        #                  .split('@'))[0] + f"@request count :- {value}"
-        #     eval_listener.emit_on_variable_change(OpenAIIntegration, "status",
-        #                                           f"{eval_listener.get_last_event().meta_data.get('new_value')}",
-        #                                           new_value)
 
 
 if __name__ == "__main__":

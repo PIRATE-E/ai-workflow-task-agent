@@ -18,14 +18,19 @@ from coldwind.core.utils.model_manager import ModelManager
 from coldwind.desktop.config.DesktopConfig import DesktopConfig
 from coldwind.desktop.dashboard.dashboard_handler import DashBoardHandler
 from coldwind.desktop.runtime.DesktopContext import DesktopRunTimeContext
+# WHAT: Removed the now-unused direct `print_banner` import.
+# WHY: Boot now displays the banner through the core contract
+#      (context.get_message_display().display_banner(...)) instead of a direct
+#      desktop import, so the only former call site no longer exists. Keeps the
+#      module free of a dead import (ruff F401) and the boot path fully on the
+#      contract road (MessageDisplayInterface), per the Layering Invariant.
 from coldwind.desktop.ui.diagnostics.rich_traceback_manager import (
     RichTracebackManager,
     rich_exception_handler,
 )
-from coldwind.desktop.ui.print_banner import print_banner
 
 # Add project root to Python path
-project_root = Path.cwd()  ### NOTE:- AI_LLM directory
+project_root = Path.cwd()  ### NOTE:- the app must be launched from the repo root (cwd = project root)
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
@@ -64,17 +69,18 @@ def run_chat(destructor: ChatDestructor):
         # settings-globals write.
 
         os.system("cls" if os.name == "nt" else "clear")  # Clear console
-        print_banner()
         # Resolve the primary rich Console via the runtime context slot, falling
         # back to a fresh Console() if the platform did not pre-assign one. Persist
         # the resolved console back onto the context slot (was settings.console
         # read/write) so the rest of the app reads it via ContextRegistry.get().get_console().
         context = ContextRegistry.get()
+        ##NOTE: print_banner doesnt ask for title and subtitle !!
+        context.get_message_display().display_banner("null", "null")
         console = context.get_console() or __import__("rich").console.Console()
         context.set_console(console)
 
         console.print(
-            Align.center("[bold blue]Welcome to the LangGraph Chatbot![/bold blue]")
+            Align.center("[bold blue]Welcome to Cold Wind AI![/bold blue]")
         )
         console.print(
             Align.center("Type '[bold red]exit[/bold red]' to end the conversation.\n")

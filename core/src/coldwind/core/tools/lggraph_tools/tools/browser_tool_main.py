@@ -11,6 +11,7 @@ import json
 import os
 import subprocess
 import sys
+import uuid
 from pathlib import Path
 from typing import List
 
@@ -80,12 +81,21 @@ class BrowserHandler:
         """
         Manages the subprocess using subprocess.Popen and returns the result or error message.
         """
-        # # Create unique result file for this execution
-        # result_file_name = f"browser_result_{uuid.uuid4().hex}.json"
-        # self.result_file = settings.BASE_DIR / "basic_logs" / result_file_name
-        # self.result_file.parent.mkdir(parents=True, exist_ok=True)
-        # MIGRATED: settings.BROWSER_USE_LOG_FILE → get_settings().BROWSER_USE_LOG_FILE
-        self.result_file = Path(ContextRegistry.get().get_settings().BROWSER_USE_LOG_FILE).resolve()
+        # 🔧 FIX (BUG-5): the migrated line read ghost attrs — BASE_DIR and
+        # BROWSER_USE_LOG_FILE never existed on CoreSettinngs/DesktopConfig (the
+        # typed classes declare project_root / browser_use_log_file), so this
+        # crashed with AttributeError before the subprocess could even spawn.
+        # WHAT: restored the pre-migration design — a unique per-execution result
+        # file under <project_root>/basic_logs, deleted after the parent reads it.
+        # WHY: the subprocess writes its result JSON here while the parent streams
+        # subprocess stdout into browser.txt, so both need distinct paths.
+        result_file_name = f"browser_result_{uuid.uuid4().hex}.json"
+        self.result_file = (
+            Path(ContextRegistry.get().get_settings().project_root)
+            / "basic_logs"
+            / result_file_name
+        )
+        self.result_file.parent.mkdir(parents=True, exist_ok=True)
 
         # Prepare arguments for subprocess
         args_dict = {
@@ -106,8 +116,11 @@ class BrowserHandler:
         try:
             # Setup stdout/stderr redirection
             if self.log:
-                # MIGRATED: settings.BASE_DIR → get_settings().BASE_DIR
-                log_path = ContextRegistry.get().get_settings().BASE_DIR / "basic_logs" / "browser.txt"
+                # 🔧 FIX (BUG-5): BASE_DIR was a ghost attr (real field: project_root).
+                # Log file name now comes from the typed browser_use_log_file field
+                # instead of a hardcoded "browser.txt".
+                _settings = ContextRegistry.get().get_settings()
+                log_path = Path(_settings.project_root) / "basic_logs" / _settings.browser_use_log_file
                 log_path.parent.mkdir(parents=True, exist_ok=True)
 
                 # Open log file for subprocess output
@@ -293,8 +306,10 @@ def browser_use_tool(query: str, head_less_mode: bool = True, log: bool = True, 
         # Try to log the error if system_logging is enabled
         if log:
             try:
-                # MIGRATED: settings.BASE_DIR → get_settings().BASE_DIR
-                log_path = ContextRegistry.get().get_settings().BASE_DIR / "basic_logs" / "browser.txt"
+                # 🔧 FIX (BUG-5): BASE_DIR was a ghost attr (real field: project_root);
+                # log file name comes from the typed browser_use_log_file field.
+                _settings = ContextRegistry.get().get_settings()
+                log_path = Path(_settings.project_root) / "basic_logs" / _settings.browser_use_log_file
                 log_path.parent.mkdir(parents=True, exist_ok=True)
                 with open(log_path, "a", encoding="utf-8") as f:
                     f.write(f"\n[ERROR] {error_msg}\n")

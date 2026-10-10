@@ -36,7 +36,8 @@ from coldwind.desktop.ui.print_message_style import print_message
 class DesktopDebugLogger(DebugLoggerInterface):
     """
     Desktop implementation of the DebugLoggerInterface.
-    Routes core logs to the existing desktop debug_helpers which use rich console output.
+    Routes core logs to the core system_logging debug protocol
+    (debug_info / debug_warning / debug_error / debug_critical).
     """
 
     @override
@@ -98,7 +99,8 @@ class DesktopMessageDisplay(MessageDisplayInterface):
         print_message(content, sender=role)
 
     def display_banner(self, title: str, subtitle: str = "") -> None:
-        print_banner(title, subtitle)
+        # NOTE: print banner doesnt accept any argument for desktop !!
+        print_banner()
 
 
 class DesktopCommandParser(CommandParserInterface):
@@ -126,12 +128,20 @@ class DesktopCommandParser(CommandParserInterface):
         WHY: Moves desktop slash command registration out of core chat_initializer.py,
         preserving the Layering Invariant ('Desktop imports Core; Core NEVER imports Desktop').
         """
-        from coldwind.desktop.slash_commands.commands.clear import register_clear_command
+        from coldwind.desktop.slash_commands.commands.clear import (
+            register_clear_command,
+        )
         from coldwind.desktop.slash_commands.commands.help import register_help_command
         from coldwind.desktop.slash_commands.commands.exit import register_exit_command
-        from coldwind.desktop.slash_commands.commands.core_slashs.agent import register_agent_command
-        from coldwind.desktop.slash_commands.commands.core_slashs.chat_llm import register_chat_llm_command
-        from coldwind.desktop.slash_commands.commands.core_slashs.use_tool import register_slash_command_use_tool
+        from coldwind.desktop.slash_commands.commands.core_slashs.agent import (
+            register_agent_command,
+        )
+        from coldwind.desktop.slash_commands.commands.core_slashs.chat_llm import (
+            register_chat_llm_command,
+        )
+        from coldwind.desktop.slash_commands.commands.core_slashs.use_tool import (
+            register_slash_command_use_tool,
+        )
 
         for reg_fn in (
             register_clear_command,
@@ -145,7 +155,6 @@ class DesktopCommandParser(CommandParserInterface):
                 reg_fn()
             except Exception:
                 pass
-
 
 
 #### NOTE:-this is the main runtine context that we would be gonna access using the get method on the context registry !!

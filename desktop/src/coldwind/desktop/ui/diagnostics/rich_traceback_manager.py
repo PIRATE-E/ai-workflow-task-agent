@@ -1,6 +1,6 @@
 # 🎨 Rich Traceback Manager - Comprehensive Error Handling System
 """
-Rich Traceback Manager for AI-Agent-Workflow Project
+Rich Traceback Manager for the Cold Wind AI project
 
 This module provides centralized rich traceback functionality across the entire application.
 It enhances error handling with beautiful, informative tracebacks that show:
@@ -33,8 +33,6 @@ from typing import Optional, Dict, Any, Callable
 from rich.console import Console
 from rich.traceback import install, Traceback
 
-
-# Import settings for socket integration
 
 
 class RichTracebackManager:
@@ -379,11 +377,7 @@ class RichTracebackManager:
                     # Ultimate fallback - route to debug console via the runtime
                     # context's socket slot if one is registered. Routed through
                     # ContextRegistry.get().get_socket_connection() (was a lazy
-                    # `settings.socket_con` read guarded by hasattr). NOTE: this
-                    # module importing ContextRegistry from coldwind.core is fine for
-                    # the socket lookup, but the surrounding `debug_helpers` import
-                    # in this file remains a Core→Desktop leak tracked in AGENTS.md
-                    # (Known Architectural Debt) — flag, do not fix here.
+                    # `settings.socket_con` read guarded by hasattr).
                     try:
                         from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
 
