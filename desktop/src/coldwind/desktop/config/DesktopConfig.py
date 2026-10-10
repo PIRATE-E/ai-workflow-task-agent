@@ -1,4 +1,6 @@
 from pathlib import Path
+
+from pydantic import Field
 from coldwind.core.config.coreSettings import CoreSettinngs
 
 
@@ -23,7 +25,7 @@ class DesktopConfig(CoreSettinngs):
     # ── Desktop Path Settings ──
     # WHAT: Explicitly declare project_root as a Path field on DesktopConfig.
     # WHY: Handlers and cleanup routines (such as TextHandler at
-    # core/system_logging/handlers/handler_base.py:112 and error_transfer.py:111)
+    # core/system_logging/handlers/handler_base.py:112)
     # query `ContextRegistry.get().get_settings().project_root`. Without this field
     # declared and populated, accessing the property raises:
     # AttributeError: 'DesktopConfig' object has no attribute 'project_root'
@@ -36,6 +38,11 @@ class DesktopConfig(CoreSettinngs):
     rag_example_file_path: Path
     rag_hash_file_path: Path
     rag_triples_file_path: Path
+
+    # -- dashboard terminal ---
+    dashboard_terminal_bin: str = "auto"
+    dashboard_terminal_flags_before: list[str] = Field(default_factory=list)
+    dashboard_terminal_flags_after: list[str] = Field(default_factory=list)
 
     def __init__(self, project_root: Path, **kwargs):
         """
