@@ -51,8 +51,10 @@
 
 | File | What it does (plain English) |
 |------|------------------------------|
-| `coreSettings.py` | Defines `CoreSettinngs` — every setting Core needs |
+| [`coreSettings.py`](coreSettings.py) | Defines `CoreSettinngs` — every setting Core needs |
 | `__init__.py` | Package exports |
+
+> 📘 **Deep doc:** the complete settings schema — all 37 keys, env-var mapping rules, placeholder-poison keys, and the platform subclass contract — lives in [`coreSettings.md`](coreSettings.md).
 
 > 💡 There is **no `settings.py` anymore** — the old flat-global settings module was removed in the v2.0.0 purge. If you see `from src.config import settings` in old notes, it's dead history.
 
