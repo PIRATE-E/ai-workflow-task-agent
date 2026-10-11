@@ -23,6 +23,8 @@ library** — read the report you need, don't pre-load all of them.
 | **Cold Wind AI Vision** | shared | [`new_wind_ai/`](new_wind_ai/COLD_WIND_AI_VISION.md) | Long-term architecture blueprint: headless agent engine, pluggable Slint/Rust GUI, MCP cloud pods, and modernized single-shot RAG. |
 | **RAG & ETL Infrastructure** | core, shared | [`urgent_development/rag-ETL-infra/`](urgent_development/rag-ETL-infra/README.md) | Legacy RAG architectural autopsy, fatal bottlenecks (PyTorch bloat, process exit traps, 16 terminal pauses), and pluggable dual-plane pipeline design. |
 | **Documentation Audit (v2.0.0)** | shared | [`urgent_development/docs-updated-2026-10-08.md`](urgent_development/docs-updated-2026-10-08.md) | Final report of the repo-wide docs staleness audit (issue #7): root + 11 core + 2 desktop READMEs rewritten to verified v2.0.0 reality; MCP `"servers"` key fix; latent code bugs flagged to the memory graph. |
+| **Core Headless Refactor** | core, shared | [`urgent_development/core-refactor/`](urgent_development/core-refactor/README.md) | Universal platform integration audit, turnkey headless engine facade (`ColdWindEngine`), Ticket data contracts, and platform ambassadors (Slint+Rust GUI, FastAPI server, Desktop CLI). |
+| **Core Platform Docs** | core, shared | [`core-platform-docs/`](core-platform-docs/README.md) | Link hub to the in-package platform integration documentation: master runtime contract, UI/exception/logging contracts, full settings schema (37 keys), and the registry + boot-injection contract. Closes the platform-integration-spec audit gaps; engine files intentionally excluded (slated for rework). |
 
 ## Future Systems
 
