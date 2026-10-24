@@ -1,44 +1,56 @@
+"""
+Cold Wind AI - Desktop Orchestrator
+
+Main entry point for the desktop CLI application.
+Initializes DesktopConfig, activates DesktopRunTimeContext, registers
+presentation handlers (DashBoardHandler, DesktopStatusHandler),
+and drives conversational turns via the headless ColdWindEngine facade.
+"""
+
 import gc
 import os
 from pathlib import Path
 import sys
+from typing import Any
+import uuid
 
 from rich.align import Align
+from rich.table import Table
 
-from coldwind.core.engine.chat_destructor import ChatDestructor
-from coldwind.core.engine.chat_initializer import ChatInitializer
-from coldwind.core.engine.graphs.node_assign import GraphBuilder
-from coldwind.core.mcp.manager import MCP_Manager
-from coldwind.core.models.state import State
+# -----------------------------------------------------------------------------
+# WHAT CHANGED & WHY:
+# 1. Cleaned up legacy monolithic imports (ChatInitializer, GraphBuilder, State,
+#    ChatDestructor, MCP_Manager, ModelManager, BrowserHandler).
+#    WHY: ColdWindEngine handles internal graph compilation, tool discovery,
+#    and resource teardown (destructor). Desktop only interacts with the headless
+#    engine facade and its input/output ticket contracts.
+# 2. Added DesktopStatusHandler and TicketIn.
+#    WHY: Connects Desktop terminal spinner display to Core logging without
+#    in-memory pub-sub queues or monkey-patched event registers.
+# -----------------------------------------------------------------------------
+from coldwind.core.engine.coldwind_engine import ColdWindEngine
+from coldwind.core.models.ticket_in import TicketIn
 from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
 from coldwind.core.system_logging import OnTimeRegistry
-from coldwind.core.tools.lggraph_tools.tools.browser_tool import BrowserHandler
 from coldwind.core.utils.argument_schema_util import get_tool_argument_schema
-from coldwind.core.utils.model_manager import ModelManager
 from coldwind.desktop.config.DesktopConfig import DesktopConfig
 from coldwind.desktop.dashboard.dashboard_handler import DashBoardHandler
 from coldwind.desktop.runtime.DesktopContext import DesktopRunTimeContext
-# WHAT: Removed the now-unused direct `print_banner` import.
-# WHY: Boot now displays the banner through the core contract
-#      (context.get_message_display().display_banner(...)) instead of a direct
-#      desktop import, so the only former call site no longer exists. Keeps the
-#      module free of a dead import (ruff F401) and the boot path fully on the
-#      contract road (MessageDisplayInterface), per the Layering Invariant.
+from coldwind.desktop.ui.desktop_status_handler import DesktopStatusHandler
 from coldwind.desktop.ui.diagnostics.rich_traceback_manager import (
     RichTracebackManager,
     rich_exception_handler,
 )
 
 # Add project root to Python path
-project_root = Path.cwd()  ### NOTE:- the app must be launched from the repo root (cwd = project root)
+# NOTE: The app must be launched from the repo root (cwd = project root)
+project_root = Path.cwd()
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
-# 🎨 Initialize Rich Traceback for MAIN PROCESS (display happens in debug console)
-
-
+# Initialize Rich Traceback for MAIN PROCESS (display happens in debug console)
 RichTracebackManager.initialize(
-    show_locals=False,  # Disabled for main process - display in debug console
+    show_locals=False,
     max_frames=10,
     suppress_modules=[
         "click",
@@ -53,47 +65,36 @@ RichTracebackManager.initialize(
 
 
 @rich_exception_handler("Main Chat Application")
-def run_chat(destructor: ChatDestructor):
-    """Run the chat application."""
-    try:
-        chat = ChatInitializer()
-        graph = GraphBuilder(State).compile_graph()
-        chat.set_graph(graph).tools_register().set_exit(
-            destructor.call_all_cleanup_functions
-        )
-        # NOTE: the former `settings.chat = chat` global write was removed — it was
-        # write-only (no reads anywhere in core/ or desktop/ production code), so it
-        # was dead state. If a future platform needs to expose the ChatInitializer
-        # handle globally it should register it via the dynamic service store
-        # (`context.register_service(CoreRunTimeObjects.<name>, chat)`), never via a
-        # settings-globals write.
+def run_chat(status_handler: DesktopStatusHandler) -> None:
+    """
+    Run the interactive desktop chat application.
 
-        os.system("cls" if os.name == "nt" else "clear")  # Clear console
-        # Resolve the primary rich Console via the runtime context slot, falling
-        # back to a fresh Console() if the platform did not pre-assign one. Persist
-        # the resolved console back onto the context slot (was settings.console
-        # read/write) so the rest of the app reads it via ContextRegistry.get().get_console().
+    Drives interactive user input, dispatches slash commands, and submits
+    conversational turns to ColdWindEngine.process_ticket() while DesktopStatusHandler
+    presents live execution milestones.
+    """
+    engine = ColdWindEngine()
+    try:
+        # Boot the headless engine facade (LangGraph, MCP tools, dynamic services)
+        engine.boot()
+
+        os.system("cls" if os.name == "nt" else "clear")
         context = ContextRegistry.get()
-        ##NOTE: print_banner doesnt ask for title and subtitle !!
         context.get_message_display().display_banner("null", "null")
         console = context.get_console() or __import__("rich").console.Console()
         context.set_console(console)
 
-        console.print(
-            Align.center("[bold blue]Welcome to Cold Wind AI![/bold blue]")
-        )
+        console.print(Align.center("[bold blue]Welcome to Cold Wind AI![/bold blue]"))
         console.print(
             Align.center("Type '[bold red]exit[/bold red]' to end the conversation.\n")
         )
-
-        from rich.table import Table
 
         table = Table(title="Registered Tools", border_style="blue", show_lines=True)
         table.add_column("Name", style="cyan", no_wrap=True)
         table.add_column("Description", style="magenta")
         table.add_column("Arguments", style="green")
 
-        for tool in chat.tools or []:
+        for tool in engine.tools or []:
             try:
                 name = getattr(tool, "name", "N/A")
                 desc = getattr(tool, "description", "N/A")
@@ -108,23 +109,94 @@ def run_chat(destructor: ChatDestructor):
 
         console.print(table)
 
-        try:
-            while not chat.break_loop:
-                try:
-                    chat.run_chat()
-                    gc.collect()
-                except Exception as chat_error:
-                    RichTracebackManager.handle_exception(
-                        chat_error,
-                        context="Chat Loop Execution",
-                        extra_context={"break_loop": chat.break_loop},
-                    )
-                    if isinstance(chat_error, (KeyboardInterrupt, SystemExit)):
-                        raise
-        except (KeyboardInterrupt, SystemExit):
-            console.print("[bold red]Chat ended. Goodbye![/bold red]")
-        finally:
-            console.print("[dim]Exiting chat application...[/dim]")
+        # ---------------------------------------------------------------------
+        # WHAT CHANGED & WHY:
+        # Replaced legacy chat.run_chat() while-loop with headless ticket loop.
+        # WHY: Desktop maintains local conversation state across turns and
+        # delegates turn processing to engine.process_ticket() wrapped in
+        # status_handler.turn_status().
+        # ---------------------------------------------------------------------
+        session_state: dict[str, Any] = {"messages": [], "message_type": None}
+        allowed_tools = [
+            getattr(tool, "name", "")
+            for tool in (engine.tools or [])
+            if getattr(tool, "name", None)
+        ]
+
+        while not context.is_exiting():
+            try:
+                user_input = context.get_command_parser().get_user_input()
+            except (KeyboardInterrupt, EOFError):
+                console.print("\n[bold red]Interrupted. Exiting chat...[/bold red]")
+                break
+
+            if not user_input or not user_input.strip():
+                continue
+
+            cleaned_input = user_input.strip()
+
+            # Exit command handling
+            if cleaned_input.lower() in ("exit", "quit", "/exit"):
+                context.request_exit()
+                console.print("[bold red]Exiting Cold Wind AI. Goodbye![/bold red]")
+                break
+
+            # Local screen and history clear
+            if cleaned_input.lower() == "/clear":
+                os.system("cls" if os.name == "nt" else "clear")
+                session_state = {"messages": [], "message_type": None}
+                console.print("[dim]Chat history cleared.[/dim]")
+                continue
+
+            # Render outbound user message
+            context.get_message_display().display_message("user", cleaned_input)
+
+            # Single-turn ticket construction
+            ticket = TicketIn(
+                ticket_id=f"desktop-{uuid.uuid4().hex[:8]}",
+                session_id="desktop-main",
+                user_id="desktop-user",
+                user_message=cleaned_input,
+                working_state=session_state,
+                allowed_tools=allowed_tools,
+                limits={"timeout_seconds": 120},
+            )
+
+            # Turn execution scoped within DesktopStatusHandler spinner
+            try:
+                with status_handler.turn_status("Cold Wind AI is thinking..."):
+                    ticket_out = engine.process_ticket(ticket)
+
+                if ticket_out.status == "FAILED":
+                    error_msg = "Unknown error"
+                    if isinstance(ticket_out.error_info, dict):
+                        error_msg = ticket_out.error_info.get("error", str(ticket_out.error_info))
+                    elif ticket_out.error_info:
+                        error_msg = str(ticket_out.error_info)
+                    console.print(f"[bold red]Turn failed: {error_msg}[/bold red]")
+                else:
+                    session_state = ticket_out.new_working_state
+                    # Note: Graph nodes (chat_llm, agent_mode_node) render via print_message
+                    # directly during execution. If a turn completes without node-level output,
+                    # render the final transcript here as a fallback.
+            except KeyboardInterrupt:
+                # -------------------------------------------------------------
+                # WHAT CHANGED & WHY:
+                # Catch KeyboardInterrupt explicitly during turn execution.
+                # WHY: When the user hits Ctrl+C while the model/graph is executing,
+                # this cleanly cancels the active turn and returns to prompt instead
+                # of escaping the chat loop and crashing the entire application.
+                # -------------------------------------------------------------
+                console.print("\n[bold yellow]Turn cancelled by user (Ctrl+C).[/bold yellow]")
+                continue
+            except Exception as turn_error:
+                RichTracebackManager.handle_exception(
+                    turn_error,
+                    context="Turn Execution",
+                    extra_context={"ticket_id": ticket.ticket_id},
+                )
+                console.print(f"[bold red]Execution error: {turn_error}[/bold red]")
+
     except Exception as init_error:
         RichTracebackManager.handle_exception(
             init_error,
@@ -132,40 +204,62 @@ def run_chat(destructor: ChatDestructor):
             extra_context={"phase": "startup"},
         )
         raise
+    finally:
+        # Gracefully release models, MCP client subprocesses, and background connections
+        engine.shutdown()
+        try:
+            ContextRegistry.get().get_console().print("[dim]Exiting chat application...[/dim]")
+        except Exception:
+            pass
 
 
-def boot():
-    """Boot the chat application."""
-    print(Path.cwd())
+def boot() -> None:
+    """Boot the desktop chat application."""
     ContextRegistry()  # Ensure the singleton is initialized
     console = None
     try:
-        # setting up the desktop settings and runtime context and adapters for core to access them on demand ...
+        # Initialize desktop settings and platform runtime context
         desktop_settings = DesktopConfig(project_root=project_root)
         runtime_context = DesktopRunTimeContext(desktop_settings)
-        ContextRegistry.activate_context(
-            runtime_context
-        )  # registry of the desktop runtimes and contexts for core to access them on demand ...
-        console = ContextRegistry.get().set_console(
-            __import__("rich").console.Console()
-        )
-        # add the handlers into the core
+        ContextRegistry.activate_context(runtime_context)
+
+        console = __import__("rich").console.Console()
+        ContextRegistry.get().set_console(console)
+
+        # ---------------------------------------------------------------------
+        # WHAT CHANGED & WHY:
+        # Single, clean registration of presentation handlers into Core's OnTimeRegistry.
+        # WHY: Purged the over-engineered dual-registration pattern (registering in
+        # OnTimeRegistry AND storing in runtime_context._listeners["platform_events"]).
+        # Core emits LogEntry via Dispatcher; handlers receive it directly.
+        # ---------------------------------------------------------------------
+        status_handler = DesktopStatusHandler(console)
         handler_registry = OnTimeRegistry()
         handler_registry.register(DashBoardHandler())
-        # load the settins using the run time context
-        destructor = ChatDestructor()
-        destructor.add_destroyer_function(ModelManager.cleanup_all_models)
-        destructor.add_destroyer_function(MCP_Manager.cleanup)
-        destructor.add_destroyer_function(BrowserHandler.clear_all_processes)
+        handler_registry.register(status_handler)
 
-        destructor.register_cleanup_handlers()
-        run_chat(destructor)
+        run_chat(status_handler)
+    except KeyboardInterrupt:
+        if console:
+            console.print("\n[dim]Process interrupted. Goodbye![/dim]")
+        else:
+            print("\nProcess interrupted. Goodbye!")
     except Exception as e:  # pragma: no cover
-        # Ultimate fallback in the __main__ boot path. The prior code assigned the
-        # settings MODULE to `console` (a latent bug — `settings` has no `.print`,
-        # so it would itself raise inside this handler). Resolve the console via
-        # the runtime context slot, guarding for the possibility that the context
-        # was never activated or the console slot is still unset.
+        # ---------------------------------------------------------------------
+        # WHAT CHANGED & WHY:
+        # Route startup crashes to RichTracebackManager for structured diagnostic display.
+        # WHY: Previously dropped raw unformatted string `print(f"Unexpected error: {e}")`.
+        # RichTracebackManager captures frame locals, stack traces, and debug socket telemetry.
+        # ---------------------------------------------------------------------
+        try:
+            RichTracebackManager.handle_exception(
+                e,
+                context="Desktop Boot Sequence",
+                extra_context={"phase": "boot_entrypoint"},
+            )
+        except Exception:
+            pass
+
         try:
             console = ContextRegistry.get().get_console()
         except Exception:

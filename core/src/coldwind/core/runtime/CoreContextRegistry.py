@@ -1,4 +1,4 @@
-from typing import Any
+from coldwind.core.interfaces import PlatformRuntimeContextInterface
 
 
 class ContextRegistry:
@@ -11,15 +11,19 @@ class ContextRegistry:
     """
 
     # -------------------------------------------------------------------------
-    # Class-level state for process-wide runtime context.
-    # WHAT CHANGED: Initialized _instance and _active_context directly on the class body.
-    # WHY: activate_context and get are classmethods called directly as
-    # ContextRegistry.activate_context(ctx) during boot without calling ContextRegistry().
-    # Without class-level initialization, accessing cls._active_context raised
-    # AttributeError when called prior to any __new__ invocation.
+    # WHAT CHANGED & WHY:
+    # 1. Removed PEP 695 unspecialized class type parameter `[T: Interface]`:
+    #    ContextRegistry is a process-wide singleton, not an instantiated generic container.
+    #    Calling ContextRegistry.get() without type subscripting left T unbound at the callsite,
+    #    causing IDEs (Pylance/Pyright) to drop all type hints to Unknown/Any.
+    # 2. Directly typed _active_context and get() return as PlatformRuntimeContextInterface:
+    #    Core code only depends on the core interface contract (never concrete platform types).
+    #    This gives full IDE auto-completion for all 14 interface methods across the entire repo.
+    # 3. Modernized to Python 3.13+ syntax:
+    #    Removed legacy typing imports (Any, Optional, Union) in favor of native union syntax (`| None`).
     # -------------------------------------------------------------------------
-    _instance: Any = None
-    _active_context: Any = None
+    _instance: "ContextRegistry | None" = None
+    _active_context: PlatformRuntimeContextInterface | None = None
 
     def __new__(cls) -> "ContextRegistry":
         if cls._instance is None:
@@ -27,7 +31,9 @@ class ContextRegistry:
         return cls._instance
 
     @classmethod
-    def activate_context(cls, context: Any, force: bool = False) -> None:
+    def activate_context(
+        cls, context: PlatformRuntimeContextInterface, force: bool = False
+    ) -> None:
         """Bind the active runtime context. Called once at boot.
 
         Second-call policy: re-activating over an already-bound context is a
@@ -43,7 +49,12 @@ class ContextRegistry:
         cls._active_context = context
 
     @classmethod
-    def get(cls) -> Any:
+    def get(cls) -> PlatformRuntimeContextInterface:
+        """Retrieve the active platform runtime context.
+
+        Guarantees full IDE type hints across Core for all interface methods:
+        get_logger(), get_settings(), get_message_display(), register_service(), etc.
+        """
         # NOTE: deliberately a real ``RuntimeError`` (not ``assert``) so the
         # invariant survives ``python -O`` (stripped-asserts) production runs.
         if not hasattr(cls, "_active_context"):

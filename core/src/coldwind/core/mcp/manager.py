@@ -57,10 +57,17 @@ from coldwind.core.interfaces.exception_interface import rich_exception_handler
 
 class _CoreExceptionHandlerAdapter:
     """Adapter routing legacy RichTracebackManager calls to the active runtime error handler."""
+
     @staticmethod
-    def handle_exception(error: Exception, context: str = "", extra_context: Optional[dict[str, Any]] = None) -> None:
+    def handle_exception(
+        error: Exception,
+        context: str = "",
+        extra_context: Optional[dict[str, Any]] = None,
+    ) -> None:
         try:
-            ContextRegistry.get().get_error_handler().handle_exception(error, context, extra_context)
+            ContextRegistry.get().get_error_handler().handle_exception(
+                error, context, extra_context
+            )
         except Exception:
             pass
 
@@ -217,6 +224,7 @@ class MCP_Manager:
         cls,
         name: str,
         runner: Command,
+        # TODO: legacy this is not currently latest now all the module name are getting passed from command !!
         package: Optional[str],
         args: list[str],
         func: Callable,
@@ -905,11 +913,15 @@ class MCP_Manager:
         # Check if server exists and is running
         if name not in MCP_Manager.mcp_servers:
             msg = f"Server '{name}' not found"
-            ContextRegistry.get().get_logger().log_error(heading="MCP • CALL_ERROR", body=msg, metadata={"server": name})
+            ContextRegistry.get().get_logger().log_error(
+                heading="MCP • CALL_ERROR", body=msg, metadata={"server": name}
+            )
             return {"success": False, "error": msg}
         if MCP_Manager.mcp_servers[name]["status"] != "running":
             msg = f"Server '{name}' is not running"
-            ContextRegistry.get().get_logger().log_error(heading="MCP • CALL_ERROR", body=msg, metadata={"server": name})
+            ContextRegistry.get().get_logger().log_error(
+                heading="MCP • CALL_ERROR", body=msg, metadata={"server": name}
+            )
             return {"success": False, "error": msg}
         ContextRegistry.get().get_logger().log_info(
             heading="MCP • TOOL_CALL",
@@ -919,7 +931,9 @@ class MCP_Manager:
         proc = MCP_Manager.running_servers.get(name)
         if not proc:
             msg = f"Server '{name}' process not found"
-            ContextRegistry.get().get_logger().log_error(heading="MCP • CALL_ERROR", body=msg, metadata={"server": name})
+            ContextRegistry.get().get_logger().log_error(
+                heading="MCP • CALL_ERROR", body=msg, metadata={"server": name}
+            )
             return {"success": False, "error": msg}
         try:
             mcp_request = {

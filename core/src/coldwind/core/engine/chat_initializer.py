@@ -276,11 +276,7 @@ class ChatInitializer:
         _HumanMessage, AIMessage, _BaseMessage = ContextRegistry.get().get_service(
             CoreRunTimeObjects.message_classes
         )
-        return {
-            "messages": [
-                AIMessage(content="Thank you for using Cold Wind AI!")
-            ]
-        }
+        return {"messages": [AIMessage(content="Thank you for using Cold Wind AI!")]}
 
     def save_graph_png(self):
         import os
@@ -404,9 +400,8 @@ class ChatInitializer:
 
             utils = Utils()  # Create an instance of the utility class
 
-            start_mcp_server = (
-                utils.start_server_async_with_timeout
-            )  # Use the utility function with timeout (monkey patch for better recovery to the legacy code if any issues or change of mind)
+            # Use the utility function with timeout (monkey patch for better recovery to the legacy code if any issues or change of mind)
+            start_mcp_server = utils.start_server_async_with_timeout
             task: list[Awaitable] = [
                 asyncio.create_task(
                     start_mcp_server(

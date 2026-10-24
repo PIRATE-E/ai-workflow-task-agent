@@ -83,7 +83,16 @@ class DesktopExceptionHandler(ExceptionHandlerInterface):
         context: str = "",
         extra_context: Optional[dict[str, Any]] = None,
     ) -> None:
-        RichTracebackManager.handle_exception(error, context, extra_context)
+        # ---------------------------------------------------------------------
+        # WHAT CHANGED & WHY:
+        # Explicitly pass context and extra_context as keyword arguments.
+        # WHY: Previously passed positionally as the 3rd argument, which landed in
+        # `exc_type` in RichTracebackManager.handle_exception(exception, context, exc_type, ...),
+        # causing an AttributeError ('dict' object has no attribute '__name__').
+        # ---------------------------------------------------------------------
+        RichTracebackManager.handle_exception(
+            error, context=context, extra_context=extra_context
+        )
 
 
 class DesktopMessageDisplay(MessageDisplayInterface):
