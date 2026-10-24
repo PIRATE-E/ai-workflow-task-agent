@@ -11,7 +11,13 @@ dependencies = [
     "pygments>=2.19.2",
     "wcwidth>=0.2.13",
     "psutil>=7.0.0",
-    "browser-use[video]>=0.7.7",   # ← flagged judgment call, see Section 3
+    # -------------------------------------------------------------------------
+    # WHAT CHANGED & WHY:
+    # Changed `browser-use[video]>=0.7.7` to `browser-use>=0.7.7`.
+    # WHY: Dropping the optional `[video]` extra removes heavy multimedia packages
+    # (imageio, imageio-ffmpeg) which are unused in desktop CLI execution.
+    # -------------------------------------------------------------------------
+    "browser-use>=0.7.7",
 ]
 
 [tool.uv.sources]
