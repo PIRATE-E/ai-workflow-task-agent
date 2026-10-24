@@ -144,12 +144,17 @@ def agent_node(state):
                 "context": "hierarchical_graph_execution",
             },
         )
-        from coldwind.core.utils.listeners.rich_status_listen import RichStatusListener
-        rich_evaluation_listener = RichStatusListener(context.get_console())
-        rich_evaluation_listener.start_status('Evaluating workflow quality with simplified structure...',
-                                              spinner='dots')
-        # Register listener on the context's slot (previously: settings.listeners['eval'])
-        context.register_listener('eval', rich_evaluation_listener)
+        # ---------------------------------------------------------------------
+        # WHAT CHANGED & WHY:
+        # Replaced legacy RichStatusListener instantiation with standard logger.log_info.
+        # WHY: Core is headless. Emits LogEntry milestones through system_logging
+        # instead of hijacking terminal Console.status or registering monolithic event listeners.
+        # ---------------------------------------------------------------------
+        context.get_logger().log_info(
+            heading="AGENT_MODE • EVALUATION",
+            body="Evaluating workflow quality with simplified structure...",
+            metadata={"context": "hierarchical_graph_execution"},
+        )
 
         # Execute the AgentGraphCore workflow
         # Ensure these are defined so they are available even if graph invocation fails
@@ -283,9 +288,6 @@ def agent_node(state):
         })
 
         print_message(display_text, "ai")
-        # Stop the rich status listener
-        if 'rich_evaluation_listener' in locals():
-            rich_evaluation_listener.stop_status_display()
         # Unpack the langchain message bundle to construct the AIMessage return value
         # (previously: settings.AIMessage — the legacy global is no longer set).
         _HumanMessage, AIMessage, _BaseMessage = context.get_service(
