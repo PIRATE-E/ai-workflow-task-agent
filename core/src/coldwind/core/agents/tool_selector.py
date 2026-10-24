@@ -73,13 +73,22 @@ def tool_selection_agent(state) -> dict:
             top_p=1.0,  # Focus on most likely tokens for better accuracy
         )
 
-        with console.status("[bold green]Thinking...[/bold green]", spinner="dots"):
-            response = llm.invoke(
-                [
-                    HumanMessage(content=system_prompt),
-                    HumanMessage(content=content),
-                ],
-            )
+        # ---------------------------------------------------------------------
+        # WHAT CHANGED & WHY:
+        # Removed nested console.status context manager; emitted standard STATUS log.
+        # WHY: Core is headless. Platform handler owns terminal status displays.
+        # ---------------------------------------------------------------------
+        ContextRegistry.get().get_logger().log_info(
+            heading="STATUS",
+            body="Selecting appropriate tool...",
+            metadata={"node": "tool_selector"},
+        )
+        response = llm.invoke(
+            [
+                HumanMessage(content=system_prompt),
+                HumanMessage(content=content),
+            ],
+        )
 
         # Use the new JSON conversion method
         selection_json = ModelManager.convert_to_json(response)

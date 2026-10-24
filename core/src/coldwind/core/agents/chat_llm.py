@@ -34,12 +34,22 @@ def generate_llm_response(state) -> dict:
     messages_with_system_prompt = [HumanMessage(content=system_prompt)]
     llm = ModelManager(temperature=0.7, format="json")
 
-    with console.status("[bold green]Thinking...[/bold green]", spinner="dots"):
-        stream = llm.stream(messages_with_system_prompt)
-        content = ""
-        for part in stream:
-            chunk = part.content if part.content is not None else ""
-            content += chunk
+    # -------------------------------------------------------------------------
+    # WHAT CHANGED & WHY:
+    # Removed nested console.status context manager; emitted standard STATUS log.
+    # WHY: Core is headless. Nested console.status displays conflict with the
+    # platform turn status handler on Rich. Terminal spinners belong to platform handlers.
+    # -------------------------------------------------------------------------
+    ContextRegistry.get().get_logger().log_info(
+        heading="STATUS",
+        body="Generating response from LLM...",
+        metadata={"node": "chatBot"},
+    )
+    stream = llm.stream(messages_with_system_prompt)
+    content = ""
+    for part in stream:
+        chunk = part.content if part.content is not None else ""
+        content += chunk
     # Print AI message in modern style
     # now we will not print raw json now we will extract the response from the content
     json_content = llm.convert_to_json(content)

@@ -16,6 +16,11 @@ def classify_message_type(state) -> dict:
         /llm, /tool, and /agent. If no valid command is detected, the default route is /llm.
     """
     print("\t\t----Node is classify_message")
+    ContextRegistry.get().get_logger().log_info(
+        heading="STATUS",
+        body="Analyzing request and routing...",
+        metadata={"node": "classify_message"},
+    )
     console = ContextRegistry.get().get_console()
 
     # Access state directly from LangGraph parameter (no sync needed)
