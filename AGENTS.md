@@ -8,14 +8,15 @@ Brevity constraints apply **ONLY to chat text output**. Tool calls and file writ
 
 ## 👥 Team Modes
 
-This project runs in **two interaction modes**. The mode controls *how* the AI communicates; it never changes *what* the architecture/convention rules below require.
+This project runs in **two interaction modes**. The mode controls _how_ the AI communicates; it never changes _what_ the architecture/convention rules below require.
 
-| Mode | How it's triggered | Communication style |
-|---|---|---|
-| **Engineer** (default) | The default for all sessions in this repo | Direct, fast, code-forward. No metaphors, no 1-concept-per-reply pacing, no response skeleton. Assume expert familiarity with the codebase. Brevity rules and Warp Visual Formatting still apply. |
-| **Tutor** (on demand) | User says something like "teach me", "explain like I'm learning", "walk me through", "tutor me on X", or explicitly invokes the `learning-tutor` skill | Full learning protocol from `.agents/skills/learning-tutor/SKILL.md`: metaphor-first, plain English before code, 1 concept per reply, labeled blockquote, ❓ Questions pause, Beginner-First depth. |
+| Mode                   | How it's triggered                                                                                                                                     | Communication style                                                                                                                                                                                 |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Engineer** (default) | The default for all sessions in this repo                                                                                                              | Direct, fast, code-forward. No metaphors, no 1-concept-per-reply pacing, no response skeleton. Assume expert familiarity with the codebase. Brevity rules and Warp Visual Formatting still apply.   |
+| **Tutor** (on demand)  | User says something like "teach me", "explain like I'm learning", "walk me through", "tutor me on X", or explicitly invokes the `learning-tutor` skill | Full learning protocol from `.agents/skills/learning-tutor/SKILL.md`: metaphor-first, plain English before code, 1 concept per reply, labeled blockquote, ❓ Questions pause, Beginner-First depth. |
 
 **Rules:**
+
 - Mode only changes when the user explicitly switches it. Do not guess.
 - `learning-tutor` fires automatically on question/explanation prompts per its own description; in those replies follow the tutor protocol fully. Toggling to Tutor mode keeps it on for sustained teaching sessions.
 - Safety warnings stay immediate and unstyled in BOTH modes.
@@ -52,7 +53,7 @@ This project runs in **two interaction modes**. The mode controls *how* the AI c
 
 ### ✨ Rich Visuals & ASCII Art (when they add value, not for decoration)
 
-- **Prefer Mermaid diagrams** for structural flows, sequences, and dependencies — they render inline in Warp. **Exception:** step-by-step *teaching traces* (tutor mode, Learning Protocol) use ASCII art in fenced ```text blocks, per the `learning-tutor` skill.
+- **Prefer Mermaid diagrams** for structural flows, sequences, and dependencies — they render inline in Warp. **Exception:** step-by-step _teaching traces_ (tutor mode, Learning Protocol) use ASCII art in fenced ```text blocks, per the `learning-tutor` skill.
 - **Use ASCII art / box drawings** for short structural sketches when a diagram is overkill (e.g., a quick tree, a call-stack sketch, a side-by-side comparison). Keep ASCII art inside a fenced ` ```text ` block so it aligns correctly in the dark UI.
 - **Character/emoji accents** are allowed as section markers (see the allowed emoji list above) but must never decorative-spam the prose. Characters do not replace explanation.
 - **Readability over flair:** ASCII art must use standard box-drawing characters only where they help alignment (`├──`, `│`, `└──`, `─`, `│`). Do NOT draw big logo banners in ASCII — they eat vertical space and add no information.
@@ -84,7 +85,7 @@ When something breaks or behaves unexpectedly, follow this exact order. Never ju
 
 1. **Trace the exact path:** Identify the full call path where the failure occurs (entry point → which module → which function). Quote the real file and line.
 2. **Reproduce minimally:** Create or identify the smallest input/command that reproduces the failure.
-3. **Isolate root cause:** State what the code *was doing* vs. *what it should do*. Explain WHY it fails, not just WHERE. Use Python internals comparisons when helpful (e.g., "this fails the same way CPython's GIL would block two threads on one object").
+3. **Isolate root cause:** State what the code _was doing_ vs. _what it should do_. Explain WHY it fails, not just WHERE. Use Python internals comparisons when helpful (e.g., "this fails the same way CPython's GIL would block two threads on one object").
 4. **Log the pattern:** Record the bug, root cause, and fix in the memory graph (a `status` or `insight` entity under the project). Failed approaches get logged too — they prevent re-trying them later.
 5. **Fix last:** Only now implement the fix. If the fix touches an invariant or a decision entity, note that explicitly.
 
@@ -135,25 +136,13 @@ File-by-file configuration summaries and current migration state live in `report
 
 ```bash
 # Install workspace dependencies
+# read the pyproject.toml first at any cost !! of all the workspaces
 uv sync
-
-# Activate venv
-source .venv/bin/activate
-
 # Run the application
-python desktop/src/coldwind/desktop/main_orchestrator.py
-
-# Run all tests (no --asyncio-mode flag needed; already in pyproject)
-pytest tests/ -v
-
-# Run single test
-pytest tests/path/test_file.py -v
-
-# Skip slow/integration tests
-pytest tests/ -v -m "not slow and not integration"
-
-# Lint
+uv run --package coldwind-desktop coldwind
+# Lint important !!
 ruff check core/src/ desktop/src/ tests/
+ty check
 
 # Auto-fix lint
 ruff check --fix core/src/ desktop/src/ tests/

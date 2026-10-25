@@ -9,13 +9,10 @@ and drives conversational turns via the headless ColdWindEngine facade.
 
 import gc
 import os
-from pathlib import Path
 import sys
-from typing import Any
 import uuid
-
-from rich.align import Align
-from rich.table import Table
+from pathlib import Path
+from typing import Any
 
 # -----------------------------------------------------------------------------
 # WHAT CHANGED & WHY:
@@ -41,6 +38,8 @@ from coldwind.desktop.ui.diagnostics.rich_traceback_manager import (
     RichTracebackManager,
     rich_exception_handler,
 )
+from rich.align import Align
+from rich.table import Table
 
 # Add project root to Python path
 # NOTE: The app must be launched from the repo root (cwd = project root)
@@ -136,7 +135,7 @@ def run_chat(status_handler: DesktopStatusHandler) -> None:
             cleaned_input = user_input.strip()
 
             # Exit command handling
-            if cleaned_input.lower() in ("exit", "quit", "/exit"):
+            if cleaned_input.lower() in ("exit", "quit"):
                 context.request_exit()
                 console.print("[bold red]Exiting Cold Wind AI. Goodbye![/bold red]")
                 break
@@ -170,7 +169,9 @@ def run_chat(status_handler: DesktopStatusHandler) -> None:
                 if ticket_out.status == "FAILED":
                     error_msg = "Unknown error"
                     if isinstance(ticket_out.error_info, dict):
-                        error_msg = ticket_out.error_info.get("error", str(ticket_out.error_info))
+                        error_msg = ticket_out.error_info.get(
+                            "error", str(ticket_out.error_info)
+                        )
                     elif ticket_out.error_info:
                         error_msg = str(ticket_out.error_info)
                     console.print(f"[bold red]Turn failed: {error_msg}[/bold red]")
@@ -187,7 +188,9 @@ def run_chat(status_handler: DesktopStatusHandler) -> None:
                 # this cleanly cancels the active turn and returns to prompt instead
                 # of escaping the chat loop and crashing the entire application.
                 # -------------------------------------------------------------
-                console.print("\n[bold yellow]Turn cancelled by user (Ctrl+C).[/bold yellow]")
+                console.print(
+                    "\n[bold yellow]Turn cancelled by user (Ctrl+C).[/bold yellow]"
+                )
                 continue
             except Exception as turn_error:
                 RichTracebackManager.handle_exception(
@@ -208,7 +211,9 @@ def run_chat(status_handler: DesktopStatusHandler) -> None:
         # Gracefully release models, MCP client subprocesses, and background connections
         engine.shutdown()
         try:
-            ContextRegistry.get().get_console().print("[dim]Exiting chat application...[/dim]")
+            ContextRegistry.get().get_console().print(
+                "[dim]Exiting chat application...[/dim]"
+            )
         except Exception:
             pass
 
