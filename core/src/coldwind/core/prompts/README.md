@@ -15,14 +15,14 @@
               ┌─────────────────────┼──────────────────────┐
               ▼                     ▼                      ▼
         💬 chat reply         🛠️ tool pick          ⚡ agent mission
-   chat_prompts            system_prompt_       agent_mode_prompts
-   .get_chat_system_prompt  tool_selector        + hierarchical_agent_prompts
-              │                     │                      │        (orchestrator)
+   chat_prompts            system_prompt_       hierarchical_agent_prompts
+   .get_chat_system_prompt  tool_selector        (agentic_orchestrator)
+              │                     │                      │
               ▼                     ▼                      ▼
         open_ai_prompt          tools/            spawn / plan / execute
         (JSON extraction)       (ToolAssign)
 
-   🔎 web search: web_search_prompts          📚 RAG: rag_prompts
+   📚 RAG: rag_prompts
    🧮 knowledge graph: system_prompts.cypher_query_generator + rag_search_classifier_prompts
    🧾 triples: structured_triple_prompt       🧠 assistant: system_prompts.ai_assistant
 ```
@@ -37,15 +37,13 @@
 
 ---
 
-## 📦 Module Map (all 9, verified)
+## 📦 Module Map (all 7, verified)
 
 | Module | Class | What it generates |
 |--------|-------|-------------------|
 | `system_prompts.py` | `SystemPrompts` + `PromptTemplates` + `PromptManager` | Core personas: `web_search_assistant`, `cypher_query_generator`, `knowledge_graph_explainer`, `rag_system_selector`, `message_classifier`, `ai_assistant` |
 | `chat_prompts.py` | `ChatPrompts` | `get_chat_system_prompt(tools_context, history, latest_message_content)` |
-| `agent_mode_prompts.py` | `Prompt` | Agent-mode: `generate_tool_list_prompt`, `generate_parameter_prompt`, `evaluate_in_end`, `evaluate_final_response` |
 | `system_prompt_tool_selector.py` | `get_tool_selector_prompt(...)` | "Which tool should we use?" |
-| `web_search_prompts.py` | `WebSearchPrompts` | `search_result_processor`, `query_enhancer`, `search_result_validator` |
 | `rag_prompts.py` | `RAGPrompts` + `KnowledgeGraphPrompts` | `document_analyzer`, `knowledge_graph_builder`, `text_chunk_processor`, `get_json_text_rag_search_prompt`, `hybrid_rag_coordinator`; `entity_resolver`, `relationship_validator` |
 | `rag_search_classifier_prompts.py` | `Prompts` | `get_system_prompt_cypher`, `get_system_prompt_classifier` |
 | `structured_triple_prompt.py` | `Prompt` | `STRUCTURED_DATA_TRIPLE_PROMPT`, `create_structured_prompt`, `get_unstructured_triple_prompt` |

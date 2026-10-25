@@ -111,7 +111,7 @@ The parser infers the type: multiple words after `--name` → `STRING`; a single
 ### Behind the scenes
 
 - **`/clear`** calls `ToolResponseManager().clear_response()` + `StateAccessor().clear_state()` + a terminal clear.
-- **`/exit`** doesn't kill the app directly — it emits an **exit ticket** through the `ExitListener` from `ContextRegistry.get().get_listeners()['exit']`, so cleanup runs first.
+- **`/exit`** doesn't kill the app directly — it invokes `ContextRegistry.get().request_exit()`, signaling the host turn loop to exit cleanly and trigger `ChatDestructor` resource teardown.
 - **`/agent`** complexity handlers (`_handle_low/medium/high_option`) are placeholders; today it just routes with `data={"message_type": "agent"}`.
 
 ---

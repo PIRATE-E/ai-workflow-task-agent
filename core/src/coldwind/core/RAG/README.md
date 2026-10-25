@@ -96,7 +96,7 @@ documents = sheets_rag.get_structured_documents_for_kg()   # → knowledge-graph
 
 ## 🔗 Where Paths Are Configured
 
-The RAG file paths live on `DesktopConfig` (not hardcoded): `rag_example_file_path`, `rag_hash_file_path`, `rag_triples_file_path`.
+Core RAG files live under `coldwind/core/RAG/RAG_FILES/` (`processed_hash_chunks.txt`, `processed_triple.json`).
 
 **Who consumes this package?** The `rag_search_classifier_tool` in `tools/` — it decides whether your query needs a vector search, a knowledge-graph lookup, or plain LLM.
 
