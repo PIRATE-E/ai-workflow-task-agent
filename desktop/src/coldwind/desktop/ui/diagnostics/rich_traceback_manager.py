@@ -374,23 +374,8 @@ class RichTracebackManager:
                         },
                     )
                 except Exception:
-                    # Ultimate fallback - route to debug console via the runtime
-                    # context's socket slot if one is registered. Routed through
-                    # ContextRegistry.get().get_socket_connection() (was a lazy
-                    # `settings.socket_con` read guarded by hasattr).
-                    try:
-                        from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
-
-                        socket_con = ContextRegistry.get().get_socket_connection()
-                        if socket_con:
-                            fallback_msg = f"🚨 ERROR #{cls._error_count}: {error_category} in {context} - {str(exception)}"
-                            socket_con.send_error(fallback_msg)
-                        else:
-                            # Only print to console if absolutely no other option
-                            pass  # Suppress console output to prevent user window spam
-                    except Exception:
-                        # Suppress all output to prevent user window spam
-                        pass
+                    # Ultimate fallback: suppress console output to prevent user window spam
+                    pass
         finally:
             cls._handling_exception = False
 

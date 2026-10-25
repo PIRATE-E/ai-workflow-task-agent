@@ -52,27 +52,25 @@ from coldwind.core.mcp.mcp_register_structure import (
 
 # WHAT: Route exception handling through core exception_interface contract.
 # WHY: Eliminates illegal Core -> Desktop import, preserving the Layering Invariant.
+# WHAT: Route exception handling through core exception_interface contract.
+# WHY: Eliminates legacy _CoreExceptionHandlerAdapter and fake RichTracebackManager aliases.
 from coldwind.core.interfaces.exception_interface import rich_exception_handler
 
 
-class _CoreExceptionHandlerAdapter:
-    """Adapter routing legacy RichTracebackManager calls to the active runtime error handler."""
-
-    @staticmethod
-    def handle_exception(
-        error: Exception,
-        context: str = "",
-        extra_context: Optional[dict[str, Any]] = None,
-    ) -> None:
-        try:
-            ContextRegistry.get().get_error_handler().handle_exception(
-                error, context, extra_context
-            )
-        except Exception:
-            pass
+def _handle_exception(
+    error: Exception,
+    context: str = "",
+    extra_context: Optional[dict[str, Any]] = None,
+) -> None:
+    """Helper to route exceptions to active runtime error handler safely."""
+    try:
+        ContextRegistry.get().get_error_handler().handle_exception(
+            error, context, extra_context
+        )
+    except Exception:
+        pass
 
 
-RichTracebackManager = _CoreExceptionHandlerAdapter
 import pathlib
 
 
@@ -728,7 +726,7 @@ class MCP_Manager:
                                     metadata={"server": name},
                                 )
                         except Exception as tool_discovery_error:
-                            RichTracebackManager.handle_exception(
+                            _handle_exception(
                                 tool_discovery_error,
                                 context=f"MCP Tool Discovery - {name}",
                                 extra_context={
@@ -743,7 +741,7 @@ class MCP_Manager:
                             )
                             return False  # Server started but tool discovery failed, treat as failure for now
                     except Exception as init_error:
-                        RichTracebackManager.handle_exception(
+                        _handle_exception(
                             init_error,
                             context=f"MCP Server Initialization - {name}",
                             extra_context={
@@ -767,7 +765,7 @@ class MCP_Manager:
                     return True
 
                 except subprocess.CalledProcessError as process_error:
-                    RichTracebackManager.handle_exception(
+                    _handle_exception(
                         process_error,
                         context=f"MCP Server Process Creation - {name}",
                         extra_context={
@@ -783,7 +781,7 @@ class MCP_Manager:
                     )
                     return False
                 except Exception as e:
-                    RichTracebackManager.handle_exception(
+                    _handle_exception(
                         e,
                         context=f"MCP Server Startup - {name}",
                         extra_context={
@@ -806,7 +804,7 @@ class MCP_Manager:
                 )
                 return False
         except Exception as e:
-            RichTracebackManager.handle_exception(
+            _handle_exception(
                 e,
                 context=f"MCP Server Startup Wrapper - {name}",
                 extra_context={"server_name": name},

@@ -134,7 +134,7 @@ class DesktopCommandParser(CommandParserInterface):
     def register_default_commands(self) -> None:
         """
         WHAT: Register default desktop slash commands into OnRunTimeRegistry.
-        WHY: Moves desktop slash command registration out of core chat_initializer.py,
+        WHY: Moves desktop slash command registration out of core ColdWindEngine,
         preserving the Layering Invariant ('Desktop imports Core; Core NEVER imports Desktop').
         """
         from coldwind.desktop.slash_commands.commands.clear import (
@@ -209,12 +209,10 @@ class DesktopRunTimeContext(PlatformRuntimeContextInterface):
         self._console = None
         self._debug_console = None
 
-        # 2. Socket Connection (Previously: settings.socket_con)
-        # Born None — filled later by the orchestrator via set_socket_connection().
-        self._socket_con = None
-
-        # 3. Listeners & Flags (Previously: settings.listeners, settings.exit_flag)
-        self._listeners = {"eval": None, "exit": None}
+        # 2. Exit Flag (Previously: settings.exit_flag)
+        # WHAT: Purged legacy `self._listeners` container and `self._socket_con` slot.
+        # WHY: Legacy ExitListener, RichStatusListener, and raw SocketManager were deleted.
+        # Exit signaling is unified via `is_exiting()` / `request_exit()`.
         self._exit_flag = False
 
         # ── Interface Implementations ──
@@ -291,19 +289,3 @@ class DesktopRunTimeContext(PlatformRuntimeContextInterface):
     def set_debug_console(self, console: Any) -> None:
         """Fill the debug Console slot post-construction (e.g. subprocess bootstrap)."""
         self._debug_console = console
-
-    def get_socket_connection(self) -> Any:
-        """Return the raw socket connection, or None if not yet connected."""
-        return self._socket_con
-
-    def set_socket_connection(self, conn: Any) -> None:
-        """Fill the socket slot post-construction (e.g. SocketManager.get_socket_con())."""
-        self._socket_con = conn
-
-    def get_listeners(self) -> Any:
-        """Return the listener dict (born empty)."""
-        return self._listeners
-
-    def register_listener(self, key: str, listener: Any) -> None:
-        """Add ``listener`` to the listener dict under ``key`` (overwrites on clash)."""
-        self._listeners[key] = listener

@@ -107,21 +107,28 @@ class PlatformRuntimeContextInterface(ABC):
     # socket, listener dict). Each platform implements them its own way.
     #
     # MUTABILITY CONTRACT (read carefully before implementing):
-    #   • Slots are MUTABLE — born None (or empty dict) and filled
+    #   • Slots are MUTABLE — born None and filled
     #     POST-construction via the set_* method at orchestrator boot rather
     #     than eagerly built in __init__. Building-then-overwriting in __init__
     #     is wasted work. See DesktopRunTimeContext.__init__ for the canonical
     #     pattern (slots declared None at construction, filled by setters).
-    #   • **get_console / get_debug_console / get_socket_connection return None
+    #   • **get_console / get_debug_console return None
     #     when the slot is still unset.** Callers reading these before boot
     #     MUST handle None explicitly. A headless server implementation that
     #     needs no Console MAY return None literally and skip the slot
     #     entirely — the contract is satisfied either way.
-    #   • get_listeners always returns the dict (born empty); callers append via
-    #     register_listener.
     #   • These differ from get_service (which raises RuntimeError when a
     #     registered service is missing) — these are value slots, not
     #     registry-mandatory services.
+    #
+    # =========================================================================
+    # WHAT CHANGED & WHY:
+    # Purged `get_listeners()`, `register_listener()`, `get_socket_connection()`,
+    # and `set_socket_connection()` from the interface.
+    # WHY: The legacy listeners subsystem was deleted, and raw socket streaming
+    # was superseded by Core's `Dispatcher` and dashboard transport. Runtime
+    # slots now strictly encompass platform UI consoles.
+    # =========================================================================
     #
     # NOTE: the interface deliberately declares ONLY the method shape, never the
     # backing attribute (`self._console` etc.). The platform implementation owns
@@ -144,24 +151,4 @@ class PlatformRuntimeContextInterface(ABC):
     @abstractmethod
     def set_debug_console(self, console: Any) -> None:
         """Fill the debug Console slot post-construction."""
-        pass
-
-    @abstractmethod
-    def get_socket_connection(self) -> Any:
-        """Return the raw socket connection (or None if not yet connected)."""
-        pass
-
-    @abstractmethod
-    def set_socket_connection(self, conn: Any) -> None:
-        """Fill the socket slot post-construction."""
-        pass
-
-    @abstractmethod
-    def get_listeners(self) -> Any:
-        """Return the listener-container (e.g. dict). Born empty on every platform."""
-        pass
-
-    @abstractmethod
-    def register_listener(self, key: str, listener: Any) -> None:
-        """Add ``listener`` to the listener container under ``key``."""
         pass

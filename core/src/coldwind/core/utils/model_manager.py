@@ -19,21 +19,22 @@ from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
 from coldwind.core.utils.open_ai_integration import OpenAIIntegration
 
 # WHAT: Route exception handling through core exception_interface contract.
-# WHY: Eliminates illegal Core -> Desktop import, preserving the Layering Invariant.
+# WHY: Eliminates legacy _CoreExceptionHandlerAdapter and fake RichTracebackManager aliases.
 from coldwind.core.interfaces.exception_interface import rich_exception_handler
 
 
-class _CoreExceptionHandlerAdapter:
-    """Adapter routing legacy RichTracebackManager calls to the active runtime error handler."""
-    @staticmethod
-    def handle_exception(error: Exception, context: str = "", extra_context: Optional[dict[str, Any]] = None) -> None:
-        try:
-            ContextRegistry.get().get_error_handler().handle_exception(error, context, extra_context)
-        except Exception:
-            pass
-
-
-RichTracebackManager = _CoreExceptionHandlerAdapter
+def _handle_exception(
+    error: Exception,
+    context: str = "",
+    extra_context: Optional[dict[str, Any]] = None,
+) -> None:
+    """Helper to route exceptions to active runtime error handler safely."""
+    try:
+        ContextRegistry.get().get_error_handler().handle_exception(
+            error, context, extra_context
+        )
+    except Exception:
+        pass
 
 
 class ModelManager(ChatOllama):
@@ -135,7 +136,7 @@ class ModelManager(ChatOllama):
                         **{k: v for k, v in kwargs.items() if k != "model"},
                     )
                 except Exception as openai_error:
-                    RichTracebackManager.handle_exception(
+                    _handle_exception(
                         openai_error,
                         context="OpenAI Integration Setup",
                         extra_context={
@@ -161,7 +162,7 @@ class ModelManager(ChatOllama):
                         )
                     )
                 except Exception as ollama_error:
-                    RichTracebackManager.handle_exception(
+                    _handle_exception(
                         ollama_error,
                         context="Ollama Model Setup",
                         extra_context={
@@ -177,7 +178,7 @@ class ModelManager(ChatOllama):
                     )
                     raise
         except Exception as e:
-            RichTracebackManager.handle_exception(
+            _handle_exception(
                 e,
                 context="ModelManager Initialization",
                 extra_context={
@@ -216,7 +217,7 @@ class ModelManager(ChatOllama):
                     {"cleanup_type": "openai_integration", "status": "completed"},
                 )
             except Exception as openai_cleanup_error:
-                RichTracebackManager.handle_exception(
+                _handle_exception(
                     openai_cleanup_error,
                     context="OpenAI Integration Cleanup",
                     extra_context={"integration_status": "cleanup_failed"},
@@ -245,7 +246,7 @@ class ModelManager(ChatOllama):
                     {"cleanup_type": "model", "status": "completed"},
                 )
             except Exception as model_cleanup_error:
-                RichTracebackManager.handle_exception(
+                _handle_exception(
                     model_cleanup_error,
                     context="Ollama Model Cleanup",
                     extra_context={"current_model": cls.current_model},

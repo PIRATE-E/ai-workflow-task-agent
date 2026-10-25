@@ -297,22 +297,21 @@ def agent_node(state):
         return {"messages": [AIMessage(content=display_text)], "final_response_raw": final_response}
 
     except Exception as e:
-        # 🔧 FIX (BUG-4): RichTracebackManager was referenced here but never imported —
-        # this error path raised NameError instead of routing the exception. Import
-        # the core adapter alias (the same one model_manager.py exposes) lazily so
-        # the heavy model_manager import stays off the happy path.
-        from coldwind.core.utils.model_manager import RichTracebackManager
-
-        RichTracebackManager.handle_exception(
-            e,
-            context="Agent Node Processing",
-            extra_context={
-                "state_keys": list(state.keys()) if isinstance(state, dict) else "N/A",
-                "messages_count": len(state.get("messages", []))
-                if isinstance(state, dict)
-                else "N/A",
-            },
-        )
+        # WHAT: Routed exception directly to ContextRegistry error handler.
+        # WHY: Eliminates legacy RichTracebackManager adapter import from model_manager.
+        try:
+            ContextRegistry.get().get_error_handler().handle_exception(
+                e,
+                context="Agent Node Processing",
+                extra_context={
+                    "state_keys": list(state.keys()) if isinstance(state, dict) else "N/A",
+                    "messages_count": len(state.get("messages", []))
+                    if isinstance(state, dict)
+                    else 0,
+                },
+            )
+        except Exception:
+            pass
         # Provide a fallback response in case of critical failure
         fallback_response = "I encountered an unexpected error while processing your request. Please try rephrasing or breaking down your request into smaller steps."
         print_message(fallback_response, "ai")

@@ -238,10 +238,11 @@ async def prompt_gemini_for_triples_api(
         try:
             return model.generate_content(prompt_g)
         except Exception as e_G:  # pragma: no cover
-            # MIGRATED: settings.socket_con → ContextRegistry.get().get_socket_connection()
-            _socket_con = ContextRegistry.get().get_socket_connection()
-            if _socket_con is not None:
-                _socket_con.send_error(f"Error calling Gemini API: {e_G}")
+            ContextRegistry.get().get_logger().log_error(
+                "NEO4J_RAG • GEMINI_API_ERROR",
+                f"Error calling Gemini API: {e_G}",
+                {"error": str(e_G)},
+            )
             return None
 
     loop = asyncio.get_event_loop()
@@ -327,12 +328,11 @@ async def prompt_openai_for_triples(
         )
 
         if not response or response.text.strip() == "" or response.text.strip() == "[]":
-            # MIGRATED: settings.socket_con → ContextRegistry.get().get_socket_connection()
-            _socket_con = ContextRegistry.get().get_socket_connection()
-            if _socket_con is not None:
-                _socket_con.send_error(
-                    "[WARNING] No response or empty response from OpenAI API."
-                )
+            ContextRegistry.get().get_logger().log_warning(
+                "NEO4J_RAG • EMPTY_RESPONSE",
+                "No response or empty response from OpenAI API.",
+                {"chunk_preview": chunk.page_content[:30] if hasattr(chunk, "page_content") else ""},
+            )
             return {"chunk": chunk, "triples": []}
 
         parsed_response = ModelManager.convert_to_json(response)
@@ -366,21 +366,19 @@ async def prompt_openai_for_triples(
                     "triples": [parsed_response] if parsed_response else [],
                 }
         else:
-            # MIGRATED: settings.socket_con → ContextRegistry.get().get_socket_connection()
-            _socket_con = ContextRegistry.get().get_socket_connection()
-            if _socket_con is not None:
-                _socket_con.send_error(
-                    f"[WARNING] Unexpected response type: {type(parsed_response)}"
-                )
+            ContextRegistry.get().get_logger().log_warning(
+                "NEO4J_RAG • UNEXPECTED_RESPONSE_TYPE",
+                f"Unexpected response type: {type(parsed_response)}",
+                {"response_type": type(parsed_response).__name__},
+            )
             return {"chunk": chunk, "triples": []}
 
     except Exception as api_error:  # pragma: no cover
-        # MIGRATED: settings.socket_con → ContextRegistry.get().get_socket_connection()
-        _socket_con = ContextRegistry.get().get_socket_connection()
-        if _socket_con is not None:
-            _socket_con.send_error(
-                f"[ERROR] OpenAI API call failed: {api_error}"
-            )
+        ContextRegistry.get().get_logger().log_error(
+            "NEO4J_RAG • OPENAI_API_FAILED",
+            f"OpenAI API call failed: {api_error}",
+            {"error": str(api_error)},
+        )
         return {"chunk": chunk, "triples": [], "error": str(api_error)}
 
 
@@ -441,12 +439,11 @@ def clear_database():
         with driver.session() as session:  # type: ignore
             session.run("MATCH (n) DETACH DELETE n")
     except Exception as e:  # pragma: no cover
-        # MIGRATED: settings.socket_con → ContextRegistry.get().get_socket_connection()
-        _socket_con = ContextRegistry.get().get_socket_connection()
-        if _socket_con is not None:
-            _socket_con.send_error(f"Error clearing Neo4j database: {e}")
-        else:
-            print(f"Error clearing Neo4j database: {e}")
+        ContextRegistry.get().get_logger().log_error(
+            "NEO4J_RAG • CLEAR_DB_ERROR",
+            f"Error clearing Neo4j database: {e}",
+            {"error": str(e)},
+        )
     print("Database cleared successfully.")
 
 
