@@ -1,10 +1,10 @@
 """
 this only contains the orchestration logic for the browser tool to run as subprocess
 """
+
 from __future__ import annotations
 import asyncio
 from queue import Queue
-from threading import Thread
 
 from .config import BrowserRequiredConfig
 from .Handler import HandlerEnums, HandlerExceptionRaises, Handler
@@ -13,10 +13,12 @@ from .Handler import HandlerEnums, HandlerExceptionRaises, Handler
 # Without this import, Handler.enum_driver_map will have None for all events
 from .utils import events_drivers  # noqa: F401 - triggers metaclass registration
 
+
 class Runner:
     """
     this is not optimized for performance and parallelism yet
     """
+
     config: BrowserRequiredConfig
     instance = None
 
@@ -27,7 +29,7 @@ class Runner:
 
     def __init__(self, config: BrowserRequiredConfig):
         # Check if already initialized (not just if instance exists)
-        if hasattr(self, '_initialized'):
+        if hasattr(self, "_initialized"):
             return
         self._initialized = True
 
@@ -55,31 +57,50 @@ class Runner:
             self.event_handler = Handler()
 
             #### get returns the class of driver and then the execute method runs the class methods one by one and update the queue bus
-            await self.event_handler.get(self, HandlerEnums.ON_PRE_REQUIREMENTS).execute(moving_forward_bus)
+            await self.event_handler.get(
+                self, HandlerEnums.ON_PRE_REQUIREMENTS
+            ).execute(moving_forward_bus)
             # setup phase and custom logic during setup
-            await self.event_handler.get(self, HandlerEnums.SET_UP).execute(moving_forward_bus)
+            await self.event_handler.get(self, HandlerEnums.SET_UP).execute(
+                moving_forward_bus
+            )
             # start the agent and the browser process
-            await self.event_handler.get(self, HandlerEnums.ON_START).execute(moving_forward_bus)
+            await self.event_handler.get(self, HandlerEnums.ON_START).execute(
+                moving_forward_bus
+            )
 
-            await self.event_handler.get(self, HandlerEnums.ON_RUNNING).execute(moving_forward_bus)
+            await self.event_handler.get(self, HandlerEnums.ON_RUNNING).execute(
+                moving_forward_bus
+            )
 
-            await self.event_handler.get(self, HandlerEnums.ON_COMPLETE).execute(moving_forward_bus)
+            await self.event_handler.get(self, HandlerEnums.ON_COMPLETE).execute(
+                moving_forward_bus
+            )
 
         except asyncio.CancelledError:
             raise
-        except (HandlerExceptionRaises.CustomEventNotFound, HandlerExceptionRaises.DriverEventAlreadyRegistered) as e:
+        except (
+            HandlerExceptionRaises.CustomEventNotFound,
+            HandlerExceptionRaises.DriverEventAlreadyRegistered,
+        ) as e:
             # Store exception for ON_EXCEPTION driver to access
             self.last_exception = e
-            await self.event_handler.get(self, HandlerEnums.ON_EXCEPTION).execute(moving_forward_bus)
+            await self.event_handler.get(self, HandlerEnums.ON_EXCEPTION).execute(
+                moving_forward_bus
+            )
             moving_forward_bus.put({"error": str(e)})
         except Exception as e:
             # Store exception for ON_EXCEPTION driver to access
             self.last_exception = e
             # Catch any other exception and run ON_EXCEPTION handler
-            await self.event_handler.get(self, HandlerEnums.ON_EXCEPTION).execute(moving_forward_bus)
+            await self.event_handler.get(self, HandlerEnums.ON_EXCEPTION).execute(
+                moving_forward_bus
+            )
             moving_forward_bus.put({"error": str(e), "type": type(e).__name__})
         finally:
-            await self.event_handler.get(self, HandlerEnums.TEAR_DOWN).execute(moving_forward_bus)
+            await self.event_handler.get(self, HandlerEnums.TEAR_DOWN).execute(
+                moving_forward_bus
+            )
 
             # Collect ALL results from the queue (non-blocking)
             while not moving_forward_bus.empty():
@@ -95,6 +116,6 @@ class Runner:
                 "status": "completed",
                 "results": all_results,
                 "final_result": self.final_result,
-                "count": len(all_results)
+                "count": len(all_results),
             }
             return self.result

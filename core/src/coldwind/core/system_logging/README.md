@@ -92,7 +92,6 @@ Levels (`LogLevel`): `DEBUG` → `INFO` → `WARNING` → `ERROR` → `CRITICAL`
 | `handlers/handler_base.py` | `Handler` ABC + `TextHandler` (file writer with **rotation**) |
 | `formatter.py` | `OutPutFormater` ABC + `TextFormater` — makes entries readable |
 | `protocol.py` | Legacy protocol definitions (`LogLevel`, `LogCategory`, `LogEntry`) |
-| `adapter.py` | `ProtocolAdapter` — converts old-style debug JSON → `LogEntry` |
 
 ---
 

@@ -35,10 +35,10 @@ agents (tool mode) ──► tool_selector ──► ToolAssign (registry) ─�
 | `lggraph_tools/google_search_tool.py` | `search_google_tool(query)` — live Google results |
 | `lggraph_tools/run_shell_command_tool.py` | `run_shell_command(command)` — run shell commands |
 | `lggraph_tools/translate_tool.py` | `translate_text(message, target_language)` |
-| `lggraph_tools/rag_search_classifier_tool.py` | `rag_search_classifier_tool(query)` + `retrieve_knowledge_graph` — ask your stored knowledge |
+| `lggraph_tools/rag_search_classifier_tool.py` | *(FROZEN / LEGACY)* `rag_search_classifier_tool(query)` — legacy RAG lookup, pending Phase 2 rewrite |
 | `lggraph_tools/browser_tool_main.py` | `browser_use_tool(...)` + `BrowserHandler` — drive a real browser |
-| `lggraph_tools/tool_wrappers/` | One wrapper per tool (safety + normalization layer) |
-| `lggraph_tools/mcp_wrapper/` | `UniversalMCPWrapper` + `filesystem_wrapper` — MCP tools become normal tools |
+| `lggraph_tools/wrappers/` | One wrapper per tool (safety + normalization layer) |
+| `lggraph_tools/wrappers/mcp_wrapper/` | `UniversalMCPWrapper` (`uni_mcp_wrappers.py`) — MCP tools become normal tools |
 | `lggraph_tools/tool_schemas/` | `tools_structured_classes.py` — typed argument schemas |
 | `lggraph_tools/tool_response_manager.py` | Normalizes tool responses for the agents |
 | `lggraph_tools/tool_selector.py` | Helps pick the right tool for a request |
@@ -108,7 +108,7 @@ The `mcp/` package discovers external MCP servers and registers their tools via 
 
 ## ❓ FAQ
 
-- **What happened to `neo4j_tool` / `file_reader` / `code_executor` / `get_all_tools`?** They never existed here — old docs were fiction. Neo4j access lives in `RAG/neo4j_rag.py`, file reading in `mcp_wrapper/filesystem_wrapper.py`, and the registry is `ToolAssign`.
+- **What happened to `neo4j_tool` / `file_reader` / `code_executor` / `get_all_tools`?** They never existed here — old docs were fiction. Neo4j access lives in `RAG/neo4j_rag.py`, dynamic MCP tool execution in `wrappers/mcp_wrapper/uni_mcp_wrappers.py`, and the registry is `ToolAssign`.
 - **Is shell execution safe?** It runs in a subprocess with response management and logging — treat it like any shell access: be deliberate about what you run.
 
 ---

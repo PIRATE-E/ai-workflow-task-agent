@@ -24,6 +24,7 @@ from ...tools.lggraph_tools.tool_response_manager import ToolResponseManager
 from .pydantic_models import (
     TASK,
     REQUIRED_CONTEXT,
+    FAILURE_CONTEXT_STRATEGY,
     WorkflowStateModel,
 )
 
@@ -399,7 +400,6 @@ class AgentCoreHelpers:
             task: TASK, state: WorkflowStateModel
         ) -> tuple[bool, dict]:
             """Use LLM to intelligently repair the parameters of a failed task."""
-            # Check if we have enough context to attempt repair
             if not task.failure_context or not task.failure_context.failed_parameters:
                 ContextRegistry.get().get_logger().log_warning(
                     "Parameter Repair",
@@ -411,17 +411,11 @@ class AgentCoreHelpers:
                 )
                 return False, {}
 
-            # Get additional context that's now available
             tool_schema = AgentCoreHelpers.get_tool_schema(task.tool_name)
             error_message = task.failure_context.error_message
             error_type = task.failure_context.error_type or ""
             fail_count = task.failure_context.fail_count
             failed_params = task.failure_context.failed_parameters
-
-            # Get context from goal validator if available
-            validator_feedback = None
-            if error_type == "GoalValidationFailure":
-                validator_feedback = error_message
 
             ContextRegistry.get().get_logger().log_info(
                 "Parameter Repair",
@@ -434,7 +428,6 @@ class AgentCoreHelpers:
                 },
             )
 
-            # Use LLM to analyze the failure and suggest parameter repairs
             prompt_generator = HierarchicalAgentPrompt()
             system_prompt, human_prompt = (
                 prompt_generator.generate_enhanced_parameter_repair_prompt(
@@ -452,10 +445,31 @@ class AgentCoreHelpers:
                 )
                 repair_result = ModelManager.convert_to_json(response.content)
 
-                # Extract repaired parameters from LLM response
-                repaired_params = repair_result.get("repaired_parameters", {})
+                # Reject convert_to_json fallback wrapper or missing key
+                if (
+                    not isinstance(repair_result, dict)
+                    or "parsing_error" in repair_result
+                    or "repaired_parameters" not in repair_result
+                    or not isinstance(repair_result.get("repaired_parameters"), dict)
+                ):
+                    raise ValueError(
+                        f"LLM did not return a valid 'repaired_parameters' object: {repair_result}"
+                    )
 
-                # Validate that the repaired parameters meet the schema
+                repaired_params = repair_result["repaired_parameters"]
+
+                # Do not accept identical parameters that already failed
+                if repaired_params == failed_params:
+                    ContextRegistry.get().get_logger().log_warning(
+                        "Parameter Repair",
+                        f"LLM returned identical parameters that already failed for task {task.task_id}",
+                        metadata={
+                            "function_name": "attempt_parameter_repair",
+                            "task_id": task.task_id,
+                        },
+                    )
+                    return False, {}
+
                 is_valid, error_msg = (
                     AgentCoreHelpers.ParameterGeneratorHelpers.validate_params(
                         task.tool_name, repaired_params
@@ -473,17 +487,17 @@ class AgentCoreHelpers:
                         },
                     )
                     return True, repaired_params
-                else:
-                    ContextRegistry.get().get_logger().log_warning(
-                        "Parameter Repair",
-                        f"LLM-suggested parameters failed validation: {error_msg}",
-                        metadata={
-                            "function_name": "attempt_parameter_repair",
-                            "task_id": task.task_id,
-                            "validation_error": error_msg,
-                        },
-                    )
-                    return False, {}
+
+                ContextRegistry.get().get_logger().log_warning(
+                    "Parameter Repair",
+                    f"LLM-suggested parameters failed validation: {error_msg}",
+                    metadata={
+                        "function_name": "attempt_parameter_repair",
+                        "task_id": task.task_id,
+                        "validation_error": error_msg,
+                    },
+                )
+                return False, {}
 
             except Exception as e:
                 ContextRegistry.get().get_logger().log_error(
@@ -495,26 +509,22 @@ class AgentCoreHelpers:
                         "exception": str(e),
                     },
                 )
-                # Fallback to basic repair
                 required_keys = tool_schema.get("required", [])
                 missing_keys = [
                     key for key in required_keys if key not in failed_params
                 ]
 
                 if missing_keys:
-                    ContextRegistry.get().get_logger().log_warning(
-                        "Parameter Repair",
-                        f"Task {task.task_id} is missing required parameters: {missing_keys}. Attempting to add default values.",
-                        metadata={
-                            "function_name": "attempt_parameter_repair",
-                            "task_id": task.task_id,
-                        },
-                    )
-                    # Simple repair: Add empty strings for missing keys
                     repaired_params = failed_params.copy()
                     for key in missing_keys:
                         repaired_params[key] = ""
-                    return True, repaired_params
+                    is_valid, _ = (
+                        AgentCoreHelpers.ParameterGeneratorHelpers.validate_params(
+                            task.tool_name, repaired_params
+                        )
+                    )
+                    if is_valid:
+                        return True, repaired_params
 
                 return False, {}
 
@@ -522,11 +532,7 @@ class AgentCoreHelpers:
         def convert_decision_task(
             whole_context: list[str], available_tools_str: str, parent_task: TASK
         ) -> list[TASK] | None:
-            """
-            this convert that whole decision, error recovery strategy, parent failure context, original goal and create return lists of tasks
-            :return: list of tasks
-            """
-
+            """Convert recovery decision and parent failure context into a list of TASK objects."""
             hierarchy_prompt = HierarchicalAgentPrompt()
             system_prompt, human_prompt = (
                 hierarchy_prompt.generate_plan_to_tasks_prompt(
@@ -545,6 +551,8 @@ class AgentCoreHelpers:
                 if isinstance(task_list, list):
                     tasks = []
                     for idx, task_dict in enumerate(task_list):
+                        if not isinstance(task_dict, dict):
+                            continue
                         tasks.append(
                             TASK(
                                 task_id=str(f"{parent_task.task_id}_{idx}"),
@@ -560,16 +568,15 @@ class AgentCoreHelpers:
                             )
                         )
                     return tasks if tasks else None
-                else:
-                    ContextRegistry.get().get_logger().log_warning(
-                        "Task Conversion",
-                        "LLM response is not a list of tasks.",
-                        metadata={
-                            "function_name": "convert_decision_task",
-                            "response_content": response.content,
-                        },
-                    )
-                    return None
+                ContextRegistry.get().get_logger().log_warning(
+                    "Task Conversion",
+                    "LLM response is not a list of tasks.",
+                    metadata={
+                        "function_name": "convert_decision_task",
+                        "response_content": response.content,
+                    },
+                )
+                return None
             except Exception as e:
                 ContextRegistry.get().get_logger().log_error(
                     "Task Conversion",
@@ -584,7 +591,6 @@ class AgentCoreHelpers:
         @staticmethod
         def find_alternative_tool(task: TASK, state: WorkflowStateModel) -> str | None:
             """Use LLM to intelligently find a safer, alternative tool to accomplish the task's goal."""
-            # Check if we have enough context to attempt alternative tool selection
             if not task.failure_context or not task.failure_context.error_message:
                 ContextRegistry.get().get_logger().log_warning(
                     "Alternative Tool",
@@ -596,16 +602,9 @@ class AgentCoreHelpers:
                 )
                 return None
 
-            # Get error details
             error_message = task.failure_context.error_message
             error_type = task.failure_context.error_type or ""
             fail_count = task.failure_context.fail_count
-            failed_params = task.failure_context.failed_parameters or {}
-
-            # Get context from goal validator if available
-            validator_feedback = None
-            if error_type == "GoalValidationFailure":
-                validator_feedback = error_message
 
             ContextRegistry.get().get_logger().log_info(
                 "Alternative Tool",
@@ -618,13 +617,7 @@ class AgentCoreHelpers:
                 },
             )
 
-            # Get all available tools for more intelligent selection
             all_tools = AgentCoreHelpers.get_safe_tools_list()
-            available_tools_info = "\n".join(
-                [f"• {tool.name}: {tool.description}" for tool in all_tools]
-            )
-
-            # Use LLM to analyze the failure and suggest an alternative tool
             prompt_generator = HierarchicalAgentPrompt()
             system_prompt, human_prompt = (
                 prompt_generator.generate_enhanced_alternative_tool_prompt(
@@ -642,13 +635,21 @@ class AgentCoreHelpers:
                 )
                 alternative_result = ModelManager.convert_to_json(response.content)
 
-                # Extract alternative tool from LLM response
-                alternative_tool = alternative_result.get("alternative_tool")
+                if (
+                    not isinstance(alternative_result, dict)
+                    or "parsing_error" in alternative_result
+                    or "alternative_tool" not in alternative_result
+                ):
+                    raise ValueError(
+                        f"LLM did not return a valid 'alternative_tool' JSON object: {alternative_result}"
+                    )
 
-                # Validate that the alternative tool exists
-                if alternative_tool and alternative_tool in [
-                    tool.name for tool in all_tools
-                ]:
+                alternative_tool = alternative_result.get("alternative_tool")
+                valid_tool_names = [
+                    tool.name for tool in all_tools if tool.name != task.tool_name
+                ]
+
+                if alternative_tool and alternative_tool in valid_tool_names:
                     ContextRegistry.get().get_logger().log_info(
                         "Alternative Tool",
                         f"Selected alternative tool '{alternative_tool}' for task {task.task_id}",
@@ -662,17 +663,17 @@ class AgentCoreHelpers:
                         },
                     )
                     return alternative_tool
-                else:
-                    ContextRegistry.get().get_logger().log_warning(
-                        "Alternative Tool",
-                        f"LLM-suggested tool '{alternative_tool}' not found in available tools",
-                        metadata={
-                            "function name": "find_alternative_tool",
-                            "task_id": task.task_id,
-                            "suggested_tool": alternative_tool,
-                        },
-                    )
-                    return None
+
+                ContextRegistry.get().get_logger().log_warning(
+                    "Alternative Tool",
+                    f"LLM-suggested tool '{alternative_tool}' not valid or identical to current tool",
+                    metadata={
+                        "function name": "find_alternative_tool",
+                        "task_id": task.task_id,
+                        "suggested_tool": alternative_tool,
+                    },
+                )
+                return None
 
             except Exception as e:
                 ContextRegistry.get().get_logger().log_error(
@@ -684,20 +685,11 @@ class AgentCoreHelpers:
                         "exception": str(e),
                     },
                 )
-                # Fallback to basic pattern matching
                 error_message_lower = error_message.lower()
                 if (
                     "command not found" in error_message_lower
                     and task.tool_name == "run_shell_command"
                 ):
-                    ContextRegistry.get().get_logger().log_info(
-                        "Alternative Tool Finder",
-                        f"Suggesting google_search for 'command not found' error.",
-                        metadata={
-                            "function name": "find_alternative_tool",
-                            "task_id": task.task_id,
-                        },
-                    )
                     return "google_search"
 
                 if (
@@ -709,36 +701,59 @@ class AgentCoreHelpers:
                 return None
 
     class EnhancedErrorFallbackHelpers:
-        """Enhanced error fallback helpers with LLM-driven strategy selection."""
+        """Enhanced error fallback helpers with LLM-driven strategy selection and strict Pydantic contract enforcement."""
 
         @staticmethod
         def decide_recovery_strategy(task: TASK, state: WorkflowStateModel) -> dict:
-            """Use LLM to intelligently decide the best recovery strategy based on comprehensive context analysis."""
-
-            # Validate we have enough context to make a decision
+            """Decide the best recovery strategy and return a dictionary strictly validated against FAILURE_CONTEXT_STRATEGY."""
             if not task.failure_context:
                 ContextRegistry.get().get_logger().log_warning(
                     "Strategy Decision",
-                    f"Task {getattr(task, 'task_id', 'N/A')} has no failure context. Cannot decide strategy.",
+                    f"Task {getattr(task, 'task_id', 'N/A')} has no failure context. Defaulting to SKIP.",
                     metadata={
                         "function name": "decide_recovery_strategy",
                         "task_id": getattr(task, "task_id", "N/A"),
                     },
                 )
-                # Return a safe default strategy
-                return {
-                    "recovery_strategy": "PARAMETER_REPAIR",
-                    "reasoning": "No failure context available, starting with parameter repair as safest option.",
-                    "confidence_level": "LOW",
-                    "estimated_success_probability": 30,
-                    "next_steps": "Attempt to repair parameters with basic logic.",
-                }
+                return FAILURE_CONTEXT_STRATEGY(
+                    recovery_strategy="SKIP",
+                    reasoning="No failure context available; skipping task safely.",
+                    confidence_level="HIGH",
+                    estimated_success_probability=0,
+                    next_steps="Skip task and proceed.",
+                ).model_dump()
 
-            # Get all relevant context
-            error_message = task.failure_context.error_message
-            error_type = task.failure_context.error_type or ""
+            error_message = task.failure_context.error_message or "Unknown error"
+            error_type = task.failure_context.error_type or "UnknownError"
             fail_count = task.failure_context.fail_count
             failed_parameters = task.failure_context.failed_parameters or {}
+            prior_history = task.failure_context.strategy_history or []
+            attempted_strategies = {s.recovery_strategy for s in prior_history}
+            max_allowed_retries = max(getattr(task, "max_retries", 2), 2)
+
+            # Producer-level retry ceiling: if retries or strategy attempts are exhausted, return validated SKIP
+            if fail_count > max_allowed_retries or len(prior_history) >= max_allowed_retries:
+                ContextRegistry.get().get_logger().log_info(
+                    "Strategy Decision",
+                    f"Task {task.task_id} reached retry ceiling (fail_count={fail_count}, prior_attempts={len(prior_history)}). Selecting SKIP.",
+                    metadata={
+                        "function name": "decide_recovery_strategy",
+                        "task_id": task.task_id,
+                        "fail_count": fail_count,
+                        "prior_attempts": len(prior_history),
+                    },
+                )
+                return FAILURE_CONTEXT_STRATEGY(
+                    recovery_strategy="SKIP",
+                    reasoning=(
+                        f"Task failed {fail_count} time(s) and exhausted {len(prior_history)} recovery attempt(s) "
+                        f"({', '.join(s.recovery_strategy for s in prior_history) or 'none'}). "
+                        "Skipping task to preserve workflow progression."
+                    ),
+                    confidence_level="HIGH",
+                    estimated_success_probability=0,
+                    next_steps="Mark task as skipped and pass full failure diagnostics to finalizer.",
+                ).model_dump()
 
             ContextRegistry.get().get_logger().log_info(
                 "Strategy Decision",
@@ -751,10 +766,8 @@ class AgentCoreHelpers:
                 },
             )
 
-            # Get tool schema
             tool_schema = AgentCoreHelpers.get_tool_schema(task.tool_name)
 
-            # Get completed task history for context
             completed_tasks = [
                 t
                 for t in state.tasks
@@ -766,34 +779,29 @@ class AgentCoreHelpers:
                 "\n".join(
                     [
                         f"• Task {getattr(t, 'task_id', 'N/A')}: {getattr(t, 'description', 'N/A')} ({getattr(t, 'tool_name', 'N/A')}) -> {getattr(t.execution_context, 'analysis', 'No analysis') or 'No analysis'}"
-                        for t in completed_tasks[-3:]  # Last 3 completed tasks
+                        for t in completed_tasks[-3:]
                     ]
                 )
                 or "No recent completed tasks"
             )
 
-            # Get failed tasks with validator feedback
             failed_tasks_with_feedback = [
                 t
                 for t in state.tasks
-                if getattr(t, "status", "") == "failed"
+                if getattr(t, "status", "") in ("failed", "skip")
                 and hasattr(t, "failure_context")
                 and t.failure_context
-                and getattr(t.failure_context, "error_type", "")
-                == "GoalValidationFailure"
             ]
-
             failed_tasks_info = (
                 "\n".join(
                     [
-                        f"• Task {getattr(t, 'task_id', 'N/A')}: {getattr(t, 'description', 'N/A')} -> Validator Feedback: {getattr(t.failure_context, 'error_message', 'N/A')}"
-                        for t in failed_tasks_with_feedback  # Last 2 failed tasks with feedback
+                        f"• Task {getattr(t, 'task_id', 'N/A')}: {getattr(t, 'description', 'N/A')} -> Feedback: {getattr(t.failure_context, 'error_message', 'N/A')}"
+                        for t in failed_tasks_with_feedback[-3:]
                     ]
                 )
                 or "No recent failed tasks with validator feedback"
             )
 
-            # Get all available tools
             all_tools = (
                 AgentCoreHelpers.get_safe_tools_list()
                 if hasattr(AgentCoreHelpers, "get_safe_tools_list")
@@ -805,17 +813,16 @@ class AgentCoreHelpers:
                     for tool in all_tools
                 ]
             )
-            strategy_history = (
+            strategy_history_str = (
                 "\n".join(
                     [
-                        f"• Attempt {i + 1}: {s.recovery_strategy} - reasoning: {s.reasoning} - outcome: {s.outcome} \n\t "
-                        for i, s in enumerate(task.failure_context.strategy_history)
+                        f"• Attempt {i + 1}: {s.recovery_strategy} - reasoning: {s.reasoning} - outcome: {s.outcome}"
+                        for i, s in enumerate(prior_history)
                     ]
                 )
                 or "No previous recovery attempts."
             )
 
-            # Use LLM to analyze the failure and suggest the best recovery strategy
             prompt_generator = HierarchicalAgentPrompt()
             system_prompt, human_prompt = (
                 prompt_generator.generate_recovery_strategy_prompt(
@@ -830,7 +837,7 @@ class AgentCoreHelpers:
                     completed_tasks_context=recent_completed_tasks_info,
                     failed_tasks_context=failed_tasks_info,
                     available_tools=available_tools_info,
-                    strategy_hist=strategy_history,
+                    strategy_hist=strategy_history_str,
                 )
             )
 
@@ -844,163 +851,149 @@ class AgentCoreHelpers:
                 )
                 strategy_result = ModelManager.convert_to_json(response.content)
 
-                # Validate that we got a valid strategy
-                valid_strategies = [
-                    "PARAMETER_REPAIR",
-                    "ALTERNATIVE_TOOL",
-                    "TASK_DECOMPOSITION",
-                    "LLM_RECOVERY",
-                    "SKIP",
-                ]
-                recovery_strategy = (
-                    strategy_result.get("recovery_strategy", "PARAMETER_REPAIR")
-                    if isinstance(strategy_result, dict)
-                    else "PARAMETER_REPAIR"
+                # Reject convert_to_json error wrapper or non-dict payloads immediately
+                if (
+                    not isinstance(strategy_result, dict)
+                    or "parsing_error" in strategy_result
+                    or "recovery_strategy" not in strategy_result
+                ):
+                    raise ValueError(
+                        f"LLM response lacked structured strategy fields: {strategy_result}"
+                    )
+
+                # Validate against the canonical FAILURE_CONTEXT_STRATEGY Pydantic model at the producer source
+                validated_strategy = FAILURE_CONTEXT_STRATEGY(
+                    recovery_strategy=strategy_result["recovery_strategy"],
+                    reasoning=strategy_result.get(
+                        "reasoning", "Strategy selected by recovery LLM."
+                    ),
+                    confidence_level=strategy_result.get("confidence_level", "LOW"),
+                    estimated_success_probability=int(
+                        strategy_result.get("estimated_success_probability", 50)
+                    ),
+                    next_steps=strategy_result.get("next_steps", ""),
                 )
 
-                if not isinstance(strategy_result, dict):
-                    # Ensure a mutable dict for downstream updates
-                    strategy_result = {}
-
-                if recovery_strategy not in valid_strategies:
+                # Enforce the prompt's CRITICAL RULE: never repeat an already-attempted strategy (unless it is SKIP)
+                if (
+                    validated_strategy.recovery_strategy != "SKIP"
+                    and validated_strategy.recovery_strategy in attempted_strategies
+                ):
                     ContextRegistry.get().get_logger().log_warning(
                         "Strategy Decision",
-                        f"LLM suggested invalid strategy '{recovery_strategy}'. Falling back to PARAMETER_REPAIR.",
+                        f"LLM repeated previously attempted strategy '{validated_strategy.recovery_strategy}'. Delegating to history-aware fallback.",
                         metadata={
                             "function name": "decide_recovery_strategy",
-                            "task_id": getattr(task, "task_id", "N/A"),
-                            "suggested_strategy": recovery_strategy,
+                            "task_id": task.task_id,
+                            "repeated_strategy": validated_strategy.recovery_strategy,
+                            "attempted_strategies": list(attempted_strategies),
                         },
                     )
-                    recovery_strategy = "PARAMETER_REPAIR"
+                    return AgentCoreHelpers.EnhancedErrorFallbackHelpers._fallback_strategy_selection(
+                        task, state
+                    )
 
-                # FIX 3: Enhanced discovery logic - if LLM suggests multiple tools or discovery steps, force TASK_DECOMPOSITION
-                next_steps = strategy_result.get("next_steps", "")
-                if next_steps and isinstance(next_steps, str):
-                    # Count discovery-related tool mentions in next_steps
-                    discovery_tool_mentions = 0
-                    discovery_keywords = [
-                        "list_allowed_directories",
-                        "search_files",
-                        "list_directory",
-                        "find",
-                        "discover",
-                        "explore",
-                        "search",
-                        "investigate",
-                        "verify",
-                        "check",
-                        "examine",
-                        "analyze",
-                    ]
-                    for keyword in discovery_keywords:
-                        if keyword.lower() in next_steps.lower():
-                            discovery_tool_mentions += 1
-
-                    # # this is causing un intentional issues If LLM mentions multiple discovery tools/steps, force decomposition
-                    # if discovery_tool_mentions >= 5:
-                    #     ContextRegistry.get().get_logger().log_info("Strategy Decision",
-                    #                f"LLM suggested multi-step discovery approach, forcing TASK_DECOMPOSITION for task {getattr(task, 'task_id', 'N/A')}",
-                    #                metadata={"original_strategy": str(recovery_strategy), "next_steps": str(next_steps),
-                    #                          "discovery_mentions": str(discovery_tool_mentions)})
-                    #     recovery_strategy = "TASK_DECOMPOSITION"
-                    #     strategy_result["recovery_strategy"] = "TASK_DECOMPOSITION"
-                    #     strategy_result[
-                    #         "reasoning"] = f"Original: {strategy_result.get('reasoning', '')} | ENHANCED: Multi-step discovery approach detected, forcing decomposition to implement: {next_steps}"
-
+                validated_dict = validated_strategy.model_dump()
                 ContextRegistry.get().get_logger().log_info(
                     "Strategy Decision",
-                    f"Selected strategy '{recovery_strategy}' for task {getattr(task, 'task_id', 'N/A')}",
+                    f"Selected strategy '{validated_strategy.recovery_strategy}' for task {task.task_id}",
                     metadata={
                         "function name": "decide_recovery_strategy",
-                        "task_id": getattr(task, "task_id", "N/A"),
-                        "recovery_strategy": recovery_strategy,
-                        "confidence_level": strategy_result.get(
-                            "confidence_level", "UNKNOWN"
-                        ),
-                        "estimated_success_probability": strategy_result.get(
-                            "estimated_success_probability", 0
-                        ),
-                        "reasoning": strategy_result.get(
-                            "reasoning", "No reasoning provided"
-                        ),
+                        "task_id": task.task_id,
+                        "recovery_strategy": validated_strategy.recovery_strategy,
+                        "confidence_level": validated_strategy.confidence_level,
+                        "estimated_success_probability": validated_strategy.estimated_success_probability,
+                        "reasoning": validated_strategy.reasoning,
                     },
                 )
-
-                return strategy_result
+                return validated_dict
 
             except Exception as e:
-                ContextRegistry.get().get_logger().log_error(
+                ContextRegistry.get().get_logger().log_warning(
                     "Strategy Decision",
-                    f"Failed to decide recovery strategy with LLM: {e}",
+                    f"LLM strategy selection failed or returned invalid contract ({e}); using history-aware rule fallback.",
                     metadata={
                         "function name": "decide_recovery_strategy",
                         "task_id": getattr(task, "task_id", "N/A"),
                         "exception": str(e),
                     },
                 )
-                # Fallback to rule-based decision making
                 return AgentCoreHelpers.EnhancedErrorFallbackHelpers._fallback_strategy_selection(
                     task, state
                 )
 
         @staticmethod
         def _fallback_strategy_selection(task: TASK, state: WorkflowStateModel) -> dict:
-            """Fallback rule-based strategy selection when LLM fails."""
-
+            """History-aware rule-based strategy selection when LLM fails or repeats a strategy.
+            Strictly returns a dictionary validated by FAILURE_CONTEXT_STRATEGY.
+            """
             if not task.failure_context:
-                return {
-                    "recovery_strategy": "PARAMETER_REPAIR",
-                    "reasoning": "No failure context, starting with parameter repair.",
-                    "confidence_level": "LOW",
-                    "estimated_success_probability": 30,
-                    "next_steps": "Attempt basic parameter repair.",
-                }
+                return FAILURE_CONTEXT_STRATEGY(
+                    recovery_strategy="SKIP",
+                    reasoning="No failure context available; skipping task.",
+                    confidence_level="HIGH",
+                    estimated_success_probability=0,
+                    next_steps="Skip task and proceed.",
+                ).model_dump()
 
-            error_type = task.failure_context.error_type or ""
             fail_count = task.failure_context.fail_count
-            error_message = task.failure_context.error_message.lower()
+            error_message = (task.failure_context.error_message or "").lower()
+            prior_history = task.failure_context.strategy_history or []
+            attempted = {s.recovery_strategy for s in prior_history}
+            max_allowed_retries = max(getattr(task, "max_retries", 2), 2)
 
-            # Rule-based decision-making
-            if fail_count > 2:
-                # High fail count, time for decomposition
-                return {
-                    "recovery_strategy": "TASK_DECOMPOSITION",
-                    "reasoning": f"Task has failed {fail_count} times, suggesting inherent complexity. Decomposition recommended.",
-                    "confidence_level": "HIGH",
-                    "estimated_success_probability": 70,
-                    "next_steps": "Spawn sub-agent to break task into smaller steps.",
-                }
-            elif (
+            # 1. If retry limit reached or >= 2 strategies already attempted, gracefully SKIP
+            if fail_count > max_allowed_retries or len(prior_history) >= max_allowed_retries:
+                return FAILURE_CONTEXT_STRATEGY(
+                    recovery_strategy="SKIP",
+                    reasoning=(
+                        f"Exhausted recovery attempts (fail_count={fail_count}, "
+                        f"attempted={list(attempted)}). Skipping task to prevent infinite loop."
+                    ),
+                    confidence_level="HIGH",
+                    estimated_success_probability=0,
+                    next_steps="Mark task as skipped with full diagnostic history for finalizer.",
+                ).model_dump()
+
+            # 2. Pick preferred strategy from error pattern if not yet attempted
+            if (
                 "command not found" in error_message
                 or "file not found" in error_message
-            ):
-                # Common tool execution errors
-                return {
-                    "recovery_strategy": "ALTERNATIVE_TOOL",
-                    "reasoning": "Tool execution error (command/file not found), suggesting alternative tool needed.",
-                    "confidence_level": "MEDIUM",
-                    "estimated_success_probability": 60,
-                    "next_steps": "Find and switch to alternative tool.",
-                }
-            elif "parameter" in error_message or "missing" in error_message:
-                # Parameter-related errors
-                return {
-                    "recovery_strategy": "PARAMETER_REPAIR",
-                    "reasoning": "Parameter-related error, suggesting parameter repair needed.",
-                    "confidence_level": "HIGH",
-                    "estimated_success_probability": 65,
-                    "next_steps": "Repair missing or invalid parameters.",
-                }
-            else:
-                # Default to parameter repair for any other errors
-                return {
-                    "recovery_strategy": "PARAMETER_REPAIR",
-                    "reasoning": "Default strategy for unspecified errors.",
-                    "confidence_level": "LOW",
-                    "estimated_success_probability": 40,
-                    "next_steps": "Attempt parameter repair as starting point.",
-                }
+            ) and "ALTERNATIVE_TOOL" not in attempted:
+                return FAILURE_CONTEXT_STRATEGY(
+                    recovery_strategy="ALTERNATIVE_TOOL",
+                    reasoning="Tool execution error (command/file not found); attempting alternative tool.",
+                    confidence_level="MEDIUM",
+                    estimated_success_probability=60,
+                    next_steps="Find and switch to an alternative tool.",
+                ).model_dump()
+
+            if "PARAMETER_REPAIR" not in attempted:
+                return FAILURE_CONTEXT_STRATEGY(
+                    recovery_strategy="PARAMETER_REPAIR",
+                    reasoning="Attempting parameter repair as first-line recovery strategy.",
+                    confidence_level="MEDIUM",
+                    estimated_success_probability=50,
+                    next_steps="Repair missing or invalid parameters.",
+                ).model_dump()
+
+            if "ALTERNATIVE_TOOL" not in attempted:
+                return FAILURE_CONTEXT_STRATEGY(
+                    recovery_strategy="ALTERNATIVE_TOOL",
+                    reasoning="Parameter repair already attempted; trying alternative tool.",
+                    confidence_level="LOW",
+                    estimated_success_probability=40,
+                    next_steps="Switch to an alternative tool.",
+                ).model_dump()
+
+            # 3. All single-task repairs attempted -> SKIP cleanly
+            return FAILURE_CONTEXT_STRATEGY(
+                recovery_strategy="SKIP",
+                reasoning=f"All viable recovery strategies ({list(attempted)}) already attempted; skipping task.",
+                confidence_level="HIGH",
+                estimated_success_probability=0,
+                next_steps="Skip task and pass failure context to finalizer.",
+            ).model_dump()
 
     class ParameterGeneratorHelpers:
         @staticmethod

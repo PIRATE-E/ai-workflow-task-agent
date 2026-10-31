@@ -6,9 +6,7 @@ from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
 from coldwind.core.runtime.runtime_obj_enum import CoreRunTimeObjects
 from coldwind.core.prompts.system_prompt_tool_selector import get_tool_selector_prompt
 from coldwind.core.tools.lggraph_tools.tool_assign import ToolAssign
-# WHAT: Removed `from coldwind.desktop.ui.print_message_style import print_message`.
-# WHY: Violates layering direction ('Desktop imports Core; Core NEVER imports Desktop').
-#      Message display is now routed through context.get_message_display() interface.
+from coldwind.core.interfaces.ui_interface import print_message
 from coldwind.core.utils.argument_schema_util import get_tool_argument_schema
 from coldwind.core.utils.model_manager import ModelManager
 
@@ -26,15 +24,20 @@ class ToolSelection:
 
 def tool_selection_agent(state) -> dict:
     """Selects and invokes the most appropriate tool for the user's request, or returns a message if no tool is needed."""
-    # Grab the runtime handles once — console, logger, and the langchain message
+    # Grab the runtime handles once — logger and the langchain message
     # bundle all live on the active RuntimeContextInterface now (no settings.*).
     context = ContextRegistry.get()
-    console = context.get_console()
     logger = context.get_logger()
     HumanMessage, AIMessage, _BaseMessage = context.get_service(
         CoreRunTimeObjects.message_classes
     )
-    console.print("\t\t----[bold][green]Node is tool_agent[/bold][/green]")
+    # -------------------------------------------------------------------------
+    # WHAT CHANGED & WHY:
+    # Replaced console.print with print_message(sender="system") contract.
+    # WHY: Purges direct console dependency so node executes cleanly across all
+    # platforms (Desktop, GUI, Server) via MessageDisplayInterface.
+    # -------------------------------------------------------------------------
+    print_message("----Node is tool_agent", sender="system")
 
     # Access state directly from LangGraph parameter (no sync needed)
     messages = state.get("messages", [])
@@ -73,13 +76,22 @@ def tool_selection_agent(state) -> dict:
             top_p=1.0,  # Focus on most likely tokens for better accuracy
         )
 
-        with console.status("[bold green]Thinking...[/bold green]", spinner="dots"):
-            response = llm.invoke(
-                [
-                    HumanMessage(content=system_prompt),
-                    HumanMessage(content=content),
-                ],
-            )
+        # ---------------------------------------------------------------------
+        # WHAT CHANGED & WHY:
+        # Removed nested console.status context manager; emitted standard STATUS log.
+        # WHY: Core is headless. Platform handler owns terminal status displays.
+        # ---------------------------------------------------------------------
+        ContextRegistry.get().get_logger().log_info(
+            heading="STATUS",
+            body="Selecting appropriate tool...",
+            metadata={"node": "tool_selector"},
+        )
+        response = llm.invoke(
+            [
+                HumanMessage(content=system_prompt),
+                HumanMessage(content=content),
+            ],
+        )
 
         # Use the new JSON conversion method
         selection_json = ModelManager.convert_to_json(response)

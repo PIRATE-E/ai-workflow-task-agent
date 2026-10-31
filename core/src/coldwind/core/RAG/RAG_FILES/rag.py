@@ -27,8 +27,8 @@ import pathlib
 # genai, Chroma, OllamaEmbeddings, ChatOllama) are deferred to function level
 # and imported only when needed.
 
-# Socket connection lives on the active runtime context
-# (ContextRegistry.get().get_socket_connection()) — no module-level import needed.
+# Logging and error handling route through ContextRegistry.get().get_logger()
+# and ContextRegistry.get().get_error_handler().
 
 
 # ✅ HELPER FUNCTION: Lazy loading for rich prompts
@@ -487,16 +487,11 @@ async def process_chunks_with_immediate_saving(
 
                 return result
             except Exception as e:
-                # MIGRATED: settings.socket_con → ContextRegistry.get().get_socket_connection()
-                _socket_con = ContextRegistry.get().get_socket_connection()
-                if _socket_con is not None:
-                    _socket_con.send_error(
-                        f"❌ Error processing chunk, active taskc count {active_task}: {e}"
-                    )
-                else:
-                    print(
-                        f"❌ Error processing chunk, active taskc count {active_task}: {e}"
-                    )
+                ContextRegistry.get().get_logger().log_error(
+                    "RAG • CHUNK_PROCESSING_ERROR",
+                    f"Error processing chunk (active tasks: {active_task}): {e}",
+                    {"active_task": active_task, "error": str(e)},
+                )
                 return {"chunk": chunk, "triples": []}
 
             finally:
@@ -534,16 +529,11 @@ async def process_chunks_with_immediate_saving(
                         triples, hashlib.sha256(chunk.page_content.encode()).hexdigest()
                     )
                 except Exception as e:
-                    # MIGRATED: settings.socket_con → ContextRegistry.get().get_socket_connection()
-                    _socket_con = ContextRegistry.get().get_socket_connection()
-                    if _socket_con is not None:
-                        _socket_con.send_error(
-                            f"❌ Error saving triples: {e} chunk : {chunk.page_content[:20]}"
-                        )
-                    else:
-                        print(
-                            f"❌ Error saving triples: {e} chunk : {chunk.page_content[:20]}"
-                        )
+                    ContextRegistry.get().get_logger().log_error(
+                        "RAG • SAVE_TRIPLES_ERROR",
+                        f"Error saving triples: {e} chunk: {chunk.page_content[:20]}",
+                        {"chunk_preview": chunk.page_content[:20], "error": str(e)},
+                    )
             else:
                 print(
                     "⚠️ No triples found in this chunk, skipping save. for chunk: ",
@@ -568,18 +558,16 @@ async def process_chunks_with_immediate_saving(
                 try:
                     neo4j_rag.insert_triples([(subject, predicate, object_val)])
                 except Exception as e:
-                    # MIGRATED: settings.socket_con → ContextRegistry.get().get_socket_connection()
-                    _socket_con = ContextRegistry.get().get_socket_connection()
-                    if _socket_con is not None:
-                        _socket_con.send_error(
-                            f"❌ Error inserting triples to Neo4j:"
-                            f" {e} \n subject: {subject}, predicate: {predicate}, object: {object_val}"
-                        )
-                    else:
-                        print(
-                            f"❌ Error inserting triples to Neo4j:"
-                            f" {e} \n subject: {subject}, predicate: {predicate}, object: {object_val}"
-                        )
+                    ContextRegistry.get().get_logger().log_error(
+                        "RAG • INSERT_NEO4J_ERROR",
+                        f"Error inserting triples to Neo4j: {e}",
+                        {
+                            "subject": subject,
+                            "predicate": predicate,
+                            "object": object_val,
+                            "error": str(e),
+                        },
+                    )
 
         #   # Show progress
     elapsed = asyncio.get_event_loop().time() - start_time
@@ -882,12 +870,11 @@ def text_rag_search_using_llm(query: str, chunks: list[Document]) -> dict:
             )
         return result
     except Exception as e:
-        # MIGRATED: settings.socket_con → ContextRegistry.get().get_socket_connection()
-        _socket_con = ContextRegistry.get().get_socket_connection()
-        if _socket_con is not None:
-            _socket_con.send_error(f"Error during RAG search: {e}")
-        else:
-            print(f"Error during RAG search: {e}")
+        ContextRegistry.get().get_logger().log_error(
+            "RAG • SEARCH_ERROR",
+            f"Error during RAG search: {e}",
+            {"error": str(e)},
+        )
         return {"answer": "An error occurred during the search.", "source_chunks": []}
 
 

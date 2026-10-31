@@ -1,6 +1,6 @@
 # 🚂 Engine Package (`coldwind.core.engine`)
 
-> The boot sequence and the main loop: builds the graph, registers everything, runs the chat — and cleans up on the way out.
+> Headless execution engine: compiles the agent graph, initializes core subsystems, processes execution tickets, and coordinates graceful shutdown.
 
 **Part of:** `coldwind-core` · **Last Updated:** October 2026
 
@@ -9,21 +9,22 @@
 ## 🗺️ Where This Fits
 
 ```text
-desktop/main_orchestrator ──► ChatInitializer ──► GraphBuilder ──► LangGraph
-   (entry point,                (boot + chat loop)    (wiring)      (compiled graph)
-    desktop layer)                     │
-                                       └──► ChatDestructor (graceful shutdown)
+desktop/main_orchestrator ──► ColdWindEngine ──► GraphBuilder ──► LangGraph
+   (host platform /               (headless facade)   (wiring)      (compiled graph)
+    turn loop)                           │
+                                         └──► ChatDestructor (graceful shutdown)
 ```
 
-> ⚠️ The old docs placed `main_orchestrator` here — it actually lives in the **desktop** layer now (`desktop/src/coldwind/desktop/main_orchestrator.py`). Core never imports desktop.
+> ⚠️ Legacy `ChatInitializer` and in-memory listeners have been **purged**. Core runs headlessly via `ColdWindEngine.boot()` and processes turns via `process_ticket(ticket: TicketIn) -> TicketOut`.
 
 ---
 
 ## 🎯 Why This Exists
 
-- Somebody has to **boot everything in the right order** — settings, graph, tools, MCP, logging, slash commands.
-- The chat loop must **react to signals** (Ctrl+C) instead of dying mid-write.
-- Shutdown must **release resources** (models, MCP servers, browser, Neo4j) — that's the destructor's job.
+- **Headless Facade**: Core provides a stateless `process_ticket(TicketIn)` interface that any host (Desktop CLI, Slint native GUI, FastAPI server) can drive.
+- **Deterministic Boot**: Boots core dependencies in strict order — message classes, Neo4j, tool registries, logging, MCP servers, and compiled LangGraph.
+- **Stateless Turn Processing**: Turns take structured `TicketIn` models and return `TicketOut` results, keeping Core independent of terminal UI loops.
+- **Graceful Shutdown**: Coordinates teardown across models, MCP servers, browser workers, and drivers via `ChatDestructor`.
 
 ---
 
@@ -31,28 +32,26 @@ desktop/main_orchestrator ──► ChatInitializer ──► GraphBuilder ─�
 
 | File | Plain-English job |
 |------|-------------------|
-| `chat_initializer.py` | `ChatInitializer` — boots the app and runs the chat loop |
+| `coldwind_engine.py` | `ColdWindEngine` — headless facade for booting and executing tickets |
 | `chat_destructor.py` | `ChatDestructor` — registers + runs every cleanup function |
 | `graphs/node_assign.py` | `GraphBuilder` — wires agent nodes into a compiled LangGraph graph |
 
 ---
 
-## 🏗️ Boot Sequence (`ChatInitializer`)
+## 🏗️ Boot Sequence (`ColdWindEngine.boot`)
 
 ```text
-desktop calls ChatInitializer
+Host calls ColdWindEngine.boot()
         │
-        ▼  1. _set_core_classes()        runtime context, message classes, listeners
-        ▼  2. initialize_neo4j()         graph database driver
-        ▼  3. tools_register()           every tool → ToolAssign registry
-        ▼  4. _register_slash_commands() /exit, /agent, … (desktop layer supplies them)
-        ▼  5. _register_logging_handlers()  text handlers → basic_logs/*.txt
-        ▼  6. _initialize_mcp_servers_sync() external MCP servers + tool discovery
-        ▼  7. set_graph()                GraphBuilder(state).compile_graph()
-        ▼  8. set_exit() + on_exit()     wire the exit tickets
-        ▼  9. save_graph_png()           optional graph picture (png_file_path)
+        ▼  1. _set_core_classes()        LangChain message classes → dynamic context
+        ▼  2. _initialize_neo4j()        Neo4j graph database driver
+        ▼  3. _tools_register()          register core tools → ToolAssign registry
+        ▼  4. _register_logging()        logging handlers & text formatters
+        ▼  5. _initialize_mcp_servers()  external MCP servers + tool discovery
+        ▼  6. compile_graph()            GraphBuilder(state).compile_graph()
+        ▼  7. save_graph_png()           optional graph visualization (png_file_path)
         │
-        ▼  run_chat()                    ◄── THE MAIN LOOP lives here
+        ▼  Engine ready for tickets: engine.process_ticket(ticket)
 ```
 
 ---
@@ -61,50 +60,54 @@ desktop calls ChatInitializer
 
 ```text
 GraphBuilder(state)
-   ├── _assigning_nodes()   classifier, router, chat, tool, agent nodes…
-   ├── _assigning_edges()   who points to whom (routing table)
-   └── compile_graph()      → runnable LangGraph, handed back via set_graph()
+   ├── _assigning_nodes()   classifier, router, chatBot, tool_agent, agent_node
+   ├── _assign_edges()      routing table and conditional edges
+   └── compile_graph()      → runnable LangGraph compiled Pregel graph
 ```
 
-The **nodes themselves** live in `agents/` — engine only decides how they connect. Behavior (agents) vs wiring (engine) stays cleanly split.
+The **nodes themselves** live in `../agents/` — engine only decides how they connect. Behavior (agents) vs wiring (engine) stays cleanly split.
 
 ---
 
 ## 👋 Graceful Shutdown (`ChatDestructor`)
 
 ```text
-Ctrl+C or /exit
+Ctrl+C or Host Exit
       │
-      ▼  register_cleanup_handlers() had already installed a signal handler
-      ▼  call_all_cleanup_functions()   runs every registered destroyer in order:
+      ▼  ChatDestructor.call_all_cleanup_functions() runs destroyers in order:
             • ModelManager.cleanup_all_models()
             • MCP_Manager.stop_all_servers() / cleanup()
             • BrowserHandler cleanup
-            • ExitListener final ticket
-      ▼  process exits — no dangling processes, no orphaned temp files
+            • Neo4j driver close
+      ▼  Process exits cleanly — no dangling subprocesses or locks
 ```
 
-Anyone can add cleanup: `chat_destructor.add_destroyer_function(my_cleanup)` — the desktop entry point uses exactly that for its resources.
+Host platforms register teardown callbacks via `ChatDestructor.add_destroyer_function(fn)`.
 
 ---
 
 ## 🚀 Quick Start
 
 ```python
-# This is what the desktop entry point does (simplified):
-from coldwind.core.engine.chat_initializer import ChatInitializer
+from coldwind.core.engine.coldwind_engine import ColdWindEngine
+from coldwind.core.models.ticket_in import TicketIn
 
-chat = ChatInitializer(context)      # boots steps 1–8 above
-chat.run_chat()                     # main loop until /exit
+# Boot engine inside active context
+engine = ColdWindEngine.boot()
+
+# Execute a turn
+ticket = TicketIn(user_prompt="Hello ColdWind", session_state={})
+ticket_out = engine.process_ticket(ticket)
+print(ticket_out.content)
 ```
 
 ---
 
 ## ❓ FAQ
 
-- **Why is the entry point not here?** Layering rule: desktop imports core, never the reverse. The desktop layer owns process-level concerns; engine owns boot **inside** core.
-- **Where do logs about boot go?** `basic_logs/` — see the system_logging README.
+- **Where did `ChatInitializer` go?** It was purged. The chat loop belongs to host platforms (e.g. `desktop/src/coldwind/desktop/main_orchestrator.py`); Core is headless.
+- **How do status updates reach the UI?** Presenters subscribe to Core's `OnTimeRegistry` (e.g. `DesktopStatusHandler`), which receives `LogEntry` streams during execution.
 
 ---
 
-**Cold Wind AI · `coldwind-core` · Updated in the v2.0.0 docs pass (old paths predate the workspace restructure; reallocated main_orchestrator to the desktop layer).**
+**Cold Wind AI · `coldwind-core` · Updated to reflect headless facade and purged legacy boot modules.**

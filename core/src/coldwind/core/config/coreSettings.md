@@ -201,7 +201,7 @@ class DesktopConfig(CoreSettinngs):
 
     project_root: Path                                 # desktop-only, REQUIRED
     mcp_config_path: Path                              # computed in __init__
-    rag_example_file_path: Path                        # computed in __init__
+    png_file_path: Path                                # computed in __init__
     # … more desktop paths …
 
     def __init__(self, project_root: Path, **kwargs):

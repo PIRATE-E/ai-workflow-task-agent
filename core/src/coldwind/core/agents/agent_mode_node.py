@@ -106,8 +106,13 @@ def agent_node(state):
             pass  # Ignore if reconfigure is not available
 
         context = ContextRegistry.get()
-        console = context.get_console()
-        console.print("\t\t----Node is agent_node")
+        # ---------------------------------------------------------------------
+        # WHAT CHANGED & WHY:
+        # Replaced console.print with print_message(sender="system") contract.
+        # WHY: Purges direct console dependency so node executes cleanly across all
+        # platforms (Desktop, GUI, Server) via MessageDisplayInterface.
+        # ---------------------------------------------------------------------
+        print_message("----Node is agent_node", sender="system")
 
         # Access state directly from LangGraph parameter (no sync needed)
         messages = state.get("messages", [])
@@ -144,12 +149,17 @@ def agent_node(state):
                 "context": "hierarchical_graph_execution",
             },
         )
-        from coldwind.core.utils.listeners.rich_status_listen import RichStatusListener
-        rich_evaluation_listener = RichStatusListener(context.get_console())
-        rich_evaluation_listener.start_status('Evaluating workflow quality with simplified structure...',
-                                              spinner='dots')
-        # Register listener on the context's slot (previously: settings.listeners['eval'])
-        context.register_listener('eval', rich_evaluation_listener)
+        # ---------------------------------------------------------------------
+        # WHAT CHANGED & WHY:
+        # Replaced legacy RichStatusListener instantiation with standard logger.log_info.
+        # WHY: Core is headless. Emits LogEntry milestones through system_logging
+        # instead of hijacking terminal Console.status or registering monolithic event listeners.
+        # ---------------------------------------------------------------------
+        context.get_logger().log_info(
+            heading="AGENT_MODE • EVALUATION",
+            body="Evaluating workflow quality with simplified structure...",
+            metadata={"context": "hierarchical_graph_execution"},
+        )
 
         # Execute the AgentGraphCore workflow
         # Ensure these are defined so they are available even if graph invocation fails
@@ -283,9 +293,6 @@ def agent_node(state):
         })
 
         print_message(display_text, "ai")
-        # Stop the rich status listener
-        if 'rich_evaluation_listener' in locals():
-            rich_evaluation_listener.stop_status_display()
         # Unpack the langchain message bundle to construct the AIMessage return value
         # (previously: settings.AIMessage — the legacy global is no longer set).
         _HumanMessage, AIMessage, _BaseMessage = context.get_service(
@@ -295,22 +302,21 @@ def agent_node(state):
         return {"messages": [AIMessage(content=display_text)], "final_response_raw": final_response}
 
     except Exception as e:
-        # 🔧 FIX (BUG-4): RichTracebackManager was referenced here but never imported —
-        # this error path raised NameError instead of routing the exception. Import
-        # the core adapter alias (the same one model_manager.py exposes) lazily so
-        # the heavy model_manager import stays off the happy path.
-        from coldwind.core.utils.model_manager import RichTracebackManager
-
-        RichTracebackManager.handle_exception(
-            e,
-            context="Agent Node Processing",
-            extra_context={
-                "state_keys": list(state.keys()) if isinstance(state, dict) else "N/A",
-                "messages_count": len(state.get("messages", []))
-                if isinstance(state, dict)
-                else "N/A",
-            },
-        )
+        # WHAT: Routed exception directly to ContextRegistry error handler.
+        # WHY: Eliminates legacy RichTracebackManager adapter import from model_manager.
+        try:
+            ContextRegistry.get().get_error_handler().handle_exception(
+                e,
+                context="Agent Node Processing",
+                extra_context={
+                    "state_keys": list(state.keys()) if isinstance(state, dict) else "N/A",
+                    "messages_count": len(state.get("messages", []))
+                    if isinstance(state, dict)
+                    else 0,
+                },
+            )
+        except Exception:
+            pass
         # Provide a fallback response in case of critical failure
         fallback_response = "I encountered an unexpected error while processing your request. Please try rephrasing or breaking down your request into smaller steps."
         print_message(fallback_response, "ai")

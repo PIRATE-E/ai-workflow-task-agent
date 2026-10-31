@@ -1,0 +1,18 @@
+[project]
+name = "coldwind-slint-gui"
+version = "0.0.1"
+description = "Cold Wind AI — native Slint GUI platform integration layer"
+requires-python = ">=3.13"
+
+[tool.uv.sources]
+coldwind-core = { workspace = true }
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/coldwind/slint_gui"]
+[tool.hatch.build.targets.wheel.sources]
+src = ""  # suggested by the ai because the hatching .pth file is not pointing to the correct location.  it must be pointed above the namespace directory which is 'src'
+
+#
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

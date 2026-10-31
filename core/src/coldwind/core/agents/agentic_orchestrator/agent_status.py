@@ -65,17 +65,9 @@ class AgentStatusUpdater:
     }
 
     @classmethod
-    def update_status(cls, category: str, task_id: int = None, extra_info: str = ""):
-        """Update user status with funny quotes and request count info"""
+    def update_status(cls, category: str, task_id: int | None = None, extra_info: str = ""):
+        """Update user status with funny quotes and request count info."""
         try:
-            # The eval listener lives on the active context's listener slot
-            # (previously: settings.listeners). The listener itself is a desktop
-            # runtime object, accessed through the platform-neutral context.
-            eval_listener = ContextRegistry.get().get_listeners().get("eval", None)
-            if eval_listener is None:
-                return
-
-            # Get a random funny quote for the category
             import random
 
             quotes = cls.FUNNY_QUOTES.get(category, ["🤖 Working on it..."])
@@ -90,29 +82,34 @@ class AgentStatusUpdater:
                 base_message += f" {extra_info}"
 
             # Get current request count from OpenAI integration
-            from ...utils.open_ai_integration import OpenAIIntegration
+            from coldwind.core.utils.open_ai_integration import OpenAIIntegration
 
             current_requests = OpenAIIntegration.requests_count
 
             # Format final message with request count
             final_message = f"{base_message} @ API calls: {current_requests}"
 
-            # Update status via the eval listener
-            eval_listener.emit_on_variable_change(
-                cls,
-                "agent_status",
-                (
-                    eval_listener.get_last_event().meta_data.get("new_value", "")
-                    if eval_listener.get_last_event()
-                    else ""
-                ),
-                final_message,
+            # -----------------------------------------------------------------
+            # WHAT CHANGED & WHY:
+            # Replaced legacy eval_listener.emit_on_variable_change with standard
+            # logger.log_info(heading="STATUS", body=final_message).
+            # WHY: Headless core emits status milestones through system_logging
+            # pipeline so registered platform handlers (DesktopStatusHandler,
+            # GUI sinks) receive and present them directly without in-memory event buses.
+            # -----------------------------------------------------------------
+            ContextRegistry.get().get_logger().log_info(
+                heading="STATUS",
+                body=final_message,
+                metadata={
+                    "category": category,
+                    "task_id": task_id,
+                    "extra_info": extra_info,
+                    "api_calls": current_requests,
+                },
             )
 
         except Exception as e:
             # Fail silently - status updates shouldn't break the workflow
-            # WHAT: Replaced undefined standalone debug_warning with ContextRegistry.get().get_logger().log_warning.
-            # WHY: Adheres to the modern DebugLoggerInterface and avoids NameError during exception handling.
             ContextRegistry.get().get_logger().log_warning(
                 heading="Status Updater",
                 body=f"Failed to update status: {e}",

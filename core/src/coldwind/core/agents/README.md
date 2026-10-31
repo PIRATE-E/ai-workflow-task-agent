@@ -40,8 +40,6 @@ classify_agent ──► "what type of message is this?"
 | `chat_llm.py` | `generate_llm_response(state)` — plain chat reply |
 | `tool_selector.py` | `tool_selection_agent(state)` + `ToolSelection` — chooses a tool for tool-mode |
 | `agent_mode_node.py` | `agent_node(state)` — the `/agent` entry; hands big tasks to the orchestrator |
-| `node_factory.py` | `NodeFactory` + `create_*_node()` helpers — builds graph nodes |
-| `agents_schema/agents_schema.py` | `ToolSelection`, `message_classifier` — typed Pydantic outputs |
 | `agentic_orchestrator/` | The hierarchical multi-agent engine → **has its own README** |
 
 ---

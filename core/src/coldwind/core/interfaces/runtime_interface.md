@@ -149,24 +149,21 @@ messages arrive out of order.
 ## 🧩 Pillar 4 — Mutable Runtime Slots (the non-CLI survival guide)
 
 > ⚠️ This is the part the platform-integration audit flagged as undocumented:
-> "No guide exists on how non-CLI platforms satisfy mutable console/socket
+> "No guide exists on how non-CLI platforms satisfy mutable console
 > slots." This section is that guide.
 
-Eight abstract methods wrap **four optional value slots**. They exist because
-the desktop platform historically kept a rich `Console`, a debug `Console`, a
-raw socket, and a listener dict as mutable globals — the contract makes them
-explicit, platform-owned state.
+Four abstract methods wrap **two optional value slots**. They exist because
+the desktop platform historically kept a rich `Console` and a debug `Console`
+as mutable globals — the contract makes them explicit, platform-owned state.
 
 | Slot | Getter / Setter | Born as |
 |------|-----------------|---------|
 | Primary console | `get_console()` / `set_console()` | `None` |
 | Debug console | `get_debug_console()` / `set_debug_console()` | `None` |
-| Socket connection | `get_socket_connection()` / `set_socket_connection()` | `None` |
-| Listeners | `get_listeners()` / `register_listener()` | empty dict |
 
 ### The MUTABILITY CONTRACT
 
-- **Slots are born empty and filled late.** Declare them `None` (or `{}`) in
+- **Slots are born empty and filled late.** Declare them `None` in
   `__init__`; the orchestrator fills them **post-construction** via the
   `set_*` methods at boot. Building them eagerly in `__init__` and letting the
   orchestrator overwrite them is wasted work.
@@ -176,20 +173,17 @@ explicit, platform-owned state.
 - **A platform that does not need a slot may stub it forever.** A headless
   server `get_console()` may `return None` for the whole process lifetime and
   no-op its setter. The contract is satisfied either way.
-- **`get_listeners()` always returns the dict** (never `None`); callers add
-  entries via `register_listener(key, listener)`, which overwrites on key
-  clash.
 - **Slots are NOT services.** This is the subtle one: the dynamic service store
   (Pillar 2) *raises* on missing keys; slots *return None* on missing values.
   Services are registry-mandatory; slots are optional values.
 
 ### Slot strategy per platform type
 
-| Platform | Consoles | Socket | Listeners |
-|----------|----------|--------|-----------|
-| **Desktop CLI** | Real rich `Console` objects, filled at boot | Real socket from `SocketManager` | Real dict (seeded with `eval`/`exit`) |
-| **Native GUI** (Slint + Rust) | `return None` + no-op setters | GUI's own channel instead | Empty dict or event-bus bridge |
-| **Headless server** | `return None` + no-op setters | `return None` (server owns transport) | Empty dict |
+| Platform | Consoles |
+|----------|----------|
+| **Desktop CLI** | Real rich `Console` objects, filled at boot |
+| **Native GUI** (Slint + Rust) | `return None` + no-op setters |
+| **Headless server** | `return None` + no-op setters |
 
 ### The canonical pattern (from the desktop implementation)
 
@@ -200,8 +194,6 @@ def __init__(self, settings: DesktopConfig):
     # MUTABLE slots — born None, filled post-construction by the orchestrator
     self._console = None
     self._debug_console = None
-    self._socket_con = None
-    self._listeners = {"eval": None, "exit": None}
     self._dynamic_services: dict[type, Any] = {}
 
 def get_console(self):
@@ -232,7 +224,6 @@ class HeadlessContext(PlatformRuntimeContextInterface):
     def __init__(self, settings: CoreSettinngs):
         self._settings = settings
         self._services: dict[Any, Any] = {}
-        self._listeners: dict[str, Any] = {}
         self._is_exiting = False
         self._logger = StdoutLogger()          # DebugLoggerInterface impl
         self._error = JsonErrorHandler()       # ExceptionHandlerInterface impl
@@ -265,10 +256,6 @@ class HeadlessContext(PlatformRuntimeContextInterface):
     def set_console(self, console): pass
     def get_debug_console(self): return None
     def set_debug_console(self, console): pass
-    def get_socket_connection(self): return None
-    def set_socket_connection(self, conn): pass
-    def get_listeners(self): return self._listeners
-    def register_listener(self, key, listener): self._listeners[key] = listener
 ```
 
 Register it once at the entry point and Core can never tell it isn't a

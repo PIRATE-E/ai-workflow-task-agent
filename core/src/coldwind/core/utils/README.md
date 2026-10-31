@@ -1,6 +1,6 @@
 # 🔧 Utils Package (`coldwind.core.utils`)
 
-> The shared toolbox — model access, cloud API calls, event listeners, and small helpers.
+> The shared toolbox — model access, cloud API calls, and cross-cutting helpers.
 
 **Part of:** `coldwind-core` · **Last Updated:** October 2026
 
@@ -15,8 +15,6 @@ tools/  ──────►     └── openai_chat ──► OpenAIIntegrat
 
 system_logging/ ──► timestamp_util (log timestamps)
 agents/tools ────► argument_schema_util (tool schemas)
-
-anyone ◄────────── listeners/ (events, exit tickets, status spinners)
 ```
 
 ---
@@ -25,7 +23,7 @@ anyone ◄────────── listeners/ (events, exit tickets, statu
 
 - **One door to every AI model** — local Ollama or cloud OpenAI/NVIDIA/Kimi, same API.
 - **One place for cross-cutting helpers** instead of copy-pasted snippets everywhere.
-- **Event listeners** let far-apart code talk without importing each other.
+- **Structured schema extraction** via `argument_schema_util`.
 
 ---
 
@@ -37,11 +35,8 @@ anyone ◄────────── listeners/ (events, exit tickets, statu
 | `open_ai_integration.py` | `OpenAIIntegration` — cloud API client with rate limiting + circuit breaker |
 | `argument_schema_util.py` | `get_tool_argument_schema(tool)` — read a tool's parameter schema |
 | `timestamp_util.py` | `get_formatted_timestamp()` — consistent timestamps for logs |
-| `listeners/event_listener.py` | `EventListener` — the event hub everything else plugs into |
-| `listeners/exit_listener.py` | `ExitListener` — two-ticket exit: one "get ready", one "go" |
-| `listeners/rich_status_listen.py` | `RichStatusListener` — animated status spinner in the terminal |
 
-> 💡 The old `socket_manager.py` and `error_transfer.py` are **gone** (removed in the v2.0.0 purge). For logging, see `system_logging/debug_protocol/debug_callers_api.py`.
+> 💡 Legacy in-memory listeners (`listeners/`) and raw socket managers (`socket_manager.py`) were **purged**. Presentation events use Core's `Dispatcher` and `OnTimeRegistry`, and logging uses `system_logging/debug_protocol/debug_callers_api.py`.
 
 ---
 
@@ -63,6 +58,7 @@ anyone ◄────────── listeners/ (events, exit tickets, statu
 ```
 
 ```python
+from langchain_core.messages import HumanMessage
 from coldwind.core.utils.model_manager import ModelManager
 
 model = ModelManager(model="qwen2.5:32b-instruct")   # local Ollama
@@ -107,27 +103,12 @@ for chunk in ai.generate_text("Tell a story", stream=True):  # streaming
 
 ---
 
-## 📡 Listeners — how far-apart code talks
-
-```text
-┌──────────────────────────────────────────────────┐
-│                 EventListener (hub)               │
-│                                                   │
-│  RichStatusListener ── "status changed!" ──► 🌀 spinner updates │
-│  ExitListener ─────── two exit tickets ──► 👋 graceful shutdown │
-└──────────────────────────────────────────────────┘
-```
-
-- **`ExitListener`** requires **two tickets** before shutting down (first `emit_exit_ticket()` = warn everyone, second = actually exit) — no accidental quits.
-- **`RichStatusListener`** starts/stops an animated spinner: `start_status("Working…")` → `stop_status_display()`, and can read `get_last_event()`.
-
----
-
 ## ❓ FAQ
 
 - **Where did the socket debug logging go?** → `system_logging/debug_protocol/debug_callers_api.py` (`debug_info`, `debug_error`, …).
-- **Why singletons?** One model manager, one API client, one event hub — they own resources that must not be duplicated.
+- **Where did listeners go?** → Purged. Presentation handlers register into Core's `OnTimeRegistry` directly.
+- **Why singletons?** One model manager, one API client — they own stateful resources that must not be duplicated.
 
 ---
 
-**Cold Wind AI · `coldwind-core` · Updated in the v2.0.0 docs pass (removed deleted socket_manager/error_transfer chapters; documented the real 7 modules).**
+**Cold Wind AI · `coldwind-core` · Updated to reflect purged legacy listeners.**

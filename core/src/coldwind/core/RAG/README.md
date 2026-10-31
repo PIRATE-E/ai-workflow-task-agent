@@ -1,5 +1,9 @@
 # 📚 RAG Package (`coldwind.core.RAG`)
 
+> [!WARNING]
+> **FROZEN & DEPRECATED SUBSYSTEM (DO NOT TOUCH)**
+> The entire legacy RAG package (`coldwind.core.RAG.*` and `rag_search_classifier_tool.py`) is legacy code slated for full replacement in Phase 2. Agents MUST NOT suggest, import, or refactor legacy RAG files during active development.
+
 > Give the AI long-term memory: turn documents and spreadsheets into knowledge it can search.
 
 **Part of:** `coldwind-core` · **Last Updated:** October 2026
@@ -96,7 +100,7 @@ documents = sheets_rag.get_structured_documents_for_kg()   # → knowledge-graph
 
 ## 🔗 Where Paths Are Configured
 
-The RAG file paths live on `DesktopConfig` (not hardcoded): `rag_example_file_path`, `rag_hash_file_path`, `rag_triples_file_path`.
+Core RAG files live under `coldwind/core/RAG/RAG_FILES/` (`processed_hash_chunks.txt`, `processed_triple.json`).
 
 **Who consumes this package?** The `rag_search_classifier_tool` in `tools/` — it decides whether your query needs a vector search, a knowledge-graph lookup, or plain LLM.
 
