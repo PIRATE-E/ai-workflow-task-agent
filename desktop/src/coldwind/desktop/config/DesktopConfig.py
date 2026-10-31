@@ -1,7 +1,7 @@
 from pathlib import Path
 
-from pydantic import Field
 from coldwind.core.config.coreSettings import CoreSettinngs
+from pydantic import Field
 
 
 class DesktopConfig(CoreSettinngs):

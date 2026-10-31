@@ -1,5 +1,5 @@
-from .handlers.handler_base import Handler
 from .debug_protocol import LogCategory, LogEntry
+from .handlers.handler_base import Handler
 
 
 class Router:

@@ -1,5 +1,5 @@
-from ...protocol import SlashCommand, CommandOption, CommandResult
 from ...on_run_time_register import OnRunTimeRegistry
+from ...protocol import CommandOption, CommandResult, SlashCommand
 
 
 def register_agent_command():
@@ -22,7 +22,6 @@ def register_agent_command():
     except registry.CommandAlreadyRegisteredError:
         # Command is already registered; we can choose to log this or ignore it.
         pass
-    pass
 
 def agent_handler(command: SlashCommand | None, options: CommandOption | None) -> CommandResult:
     """Handler function to invoke a specific agent to perform a task.

@@ -1,9 +1,10 @@
+from typing import ClassVar
+
 from langchain_core.tools.structured import StructuredTool
-from typing import List, ClassVar
 
 
 class ToolAssign(StructuredTool):
-    tool_list: ClassVar[List["ToolAssign"]] = []
+    tool_list: ClassVar[list["ToolAssign"]] = []
 
     def __init__(self, name: str, description: str, func=None, args_schema=None):
         """
@@ -39,7 +40,7 @@ class ToolAssign(StructuredTool):
         return cls._tool_list
 
     @classmethod
-    def append_tools_list(cls, tools: List["ToolAssign"]):
+    def append_tools_list(cls, tools: list["ToolAssign"]):
         """
         Append a new tool to the existing list of tools.
 

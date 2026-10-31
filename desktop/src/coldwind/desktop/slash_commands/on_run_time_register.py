@@ -16,9 +16,7 @@ class OnRunTimeRegistry(Registry):
         """Register a handler for the given command metadata.
         :raise CommandAlreadyRegisteredError: if the command is already registered
         """
-        if slash_command in self._registered_commands:
-            raise Registry.CommandAlreadyRegisteredError(slash_command)
-        elif any(cmd for cmd in self._registered_commands if cmd.command == slash_command.command):
+        if slash_command in self._registered_commands or any(cmd for cmd in self._registered_commands if cmd.command == slash_command.command):
             raise Registry.CommandAlreadyRegisteredError(slash_command)
         self._registered_commands.append(slash_command)
 
@@ -77,6 +75,6 @@ class OnRunTimeRegistry(Registry):
 
         with cls._lock:
             if cls.instance is None:
-                cls.instance = super(OnRunTimeRegistry, cls).__new__(cls)
+                cls.instance = super().__new__(cls)
                 cls.instance._registered_commands = []
         return cls.instance

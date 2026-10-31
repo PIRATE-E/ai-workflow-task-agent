@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Dict, Optional
 
+
 class LogLevel(Enum):
     DEBUG = "DEBUG"
     INFO = "INFO"
@@ -36,7 +37,7 @@ class LogEntry:
     LOG_LEVEL: LogLevel
     TIME_STAMP: str
     MESSAGE: str  # main message body
-    METADATA: Optional[Dict[str, Any]] = None
+    METADATA: dict[str, Any] | None = None
 
     # =========================================================================
     # SERIALIZATION & DESERIALIZATION METHODS
@@ -47,7 +48,7 @@ class LogEntry:
     #      decoding, preventing JSON serialization crashes across the IPC socket boundary.
     # =========================================================================
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """
         Convert the LogEntry dataclass instance into a JSON-serializable dictionary.
         Enums (LOG_TYPE and LOG_LEVEL) are converted to their underlying string values.
@@ -60,14 +61,14 @@ class LogEntry:
             "METADATA": self.METADATA,
         }
 
-    def to_json(self, indent: Optional[int] = None) -> str:
+    def to_json(self, indent: int | None = None) -> str:
         """
         Serialize the LogEntry instance into a JSON formatted string.
         """
         return json.dumps(self.to_dict(), indent=indent)
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "LogEntry":
+    def from_dict(cls, data: dict[str, Any]) -> "LogEntry":
         """
         Construct a LogEntry instance from a dictionary, safely restoring
         string representations of LOG_TYPE and LOG_LEVEL back to their respective Enums.
@@ -96,15 +97,14 @@ class LogEntry:
         return cls.from_dict(data)
 
 
-from .debug_callers_api import debug_info, debug_critical, debug_error, debug_warning
-
+from .debug_callers_api import debug_critical, debug_error, debug_info, debug_warning
 
 __all__ = [
-    "LogEntry",
     "LogCategory",
+    "LogEntry",
     "LogLevel",
-    "debug_error",
-    "debug_warning",
     "debug_critical",
+    "debug_error",
     "debug_info",
+    "debug_warning",
 ]

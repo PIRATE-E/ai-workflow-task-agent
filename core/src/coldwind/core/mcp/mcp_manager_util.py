@@ -15,11 +15,10 @@ Classes:
     Utils: Utility class extending MCP_Manager with timeout and async capabilities
 """
 
-from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
-from coldwind.core.mcp.manager import MCP_Manager
 import asyncio
 
-
+from coldwind.core.mcp.manager import MCP_Manager
+from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
 
 
 class Utils(MCP_Manager):
@@ -104,9 +103,9 @@ class Utils(MCP_Manager):
             return await asyncio.wait_for(
                 asyncio.to_thread(super().start_server, name), timeout=time
             )
-        except asyncio.TimeoutError:
+        except TimeoutError:
             ContextRegistry.get().get_logger().log_error(
-                f"MCP * START ERROR",
+                "MCP * START ERROR",
                 f"Server '{name}' failed to start within {time} seconds.",
             )
             return False

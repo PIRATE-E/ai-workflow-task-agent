@@ -1,15 +1,16 @@
-from pydantic import BaseModel, Field
-from typing import Literal, Any, TYPE_CHECKING
 import uuid
+from typing import TYPE_CHECKING, Any, Literal
+
+from pydantic import BaseModel, Field
+
 from ...utils.timestamp_util import get_formatted_timestamp
 
 # Forward reference for TASK to avoid circular import issues
 
 
 if TYPE_CHECKING:
-    from typing import List
 
-    TaskListType = List["TASK"]
+    TaskListType = list["TASK"]
 else:
     TaskListType = list["TASK"]
 

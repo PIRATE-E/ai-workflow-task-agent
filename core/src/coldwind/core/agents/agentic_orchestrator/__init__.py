@@ -7,6 +7,6 @@ Triggered by: module `coldwind.core.agents.agent_mode_node.py`
 """
 
 from .graphCore import AgentGraphCore
-from .pydantic_models import WorkflowStateModel, TASK, AgentState
+from .pydantic_models import TASK, AgentState, WorkflowStateModel
 
-__all__ = ["AgentGraphCore", "WorkflowStateModel", "TASK", "AgentState"]
+__all__ = ["TASK", "AgentGraphCore", "AgentState", "WorkflowStateModel"]

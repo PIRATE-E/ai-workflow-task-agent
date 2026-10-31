@@ -3,16 +3,16 @@ import gc
 import json
 import threading
 import time
-from typing import Any, Optional, Iterator, Union, overload, List, Dict
+from collections.abc import Iterator
+from typing import Any, Optional, overload
 
 try:
     import winsound
 except ImportError:
     winsound = None  # Not available on Linux/Mac
 
-from openai import OpenAI, AsyncOpenAI
-
 from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
+from openai import AsyncOpenAI, OpenAI
 
 # Legacy direct imports removed — config values now accessed via ContextRegistry.get().get_settings()
 # OPENAI_API_KEY → ContextRegistry.get().get_settings().openai_api_key
@@ -31,14 +31,14 @@ class OpenAIIntegration:
     """
 
     instance: Optional["OpenAIIntegration"] = None
-    _async_lock: Optional[AsyncOpenAI] = None
+    _async_lock: AsyncOpenAI | None = None
     requests_count: int = 0
-    _last_request_time: Optional[float] = None
+    _last_request_time: float | None = None
 
     # 🔧 FIX: Add error handling attributes for circuit breaker pattern
     _failure_count: int = 0
     _circuit_open: bool = False
-    _circuit_open_until: Optional[float] = None
+    _circuit_open_until: float | None = None
     _max_failures: int = 5  # Changed from 3 to 5 to match test expectations
     _circuit_timeout: int = 10  # seconds
 
@@ -54,7 +54,7 @@ class OpenAIIntegration:
         return cls.instance
 
     def __init__(
-            self, api_key: Optional[str] = None, model: Optional[str] = None
+            self, api_key: str | None = None, model: str | None = None
     ) -> None:
         """
         Initialize the OpenAIIntegration instance.
@@ -133,10 +133,10 @@ class OpenAIIntegration:
 
     def generate_text(
             self,
-            prompt: Optional[str] = None,
-            messages: Optional[list[dict[str, str]]] = None,
+            prompt: str | None = None,
+            messages: list[dict[str, str]] | None = None,
             stream: bool = False,
-    ) -> Union[str, Iterator[str]]:
+    ) -> str | Iterator[str]:
         """
         Generate text from the OpenAI API.
 
@@ -328,7 +328,7 @@ class OpenAIIntegration:
         return self._get_fallback_response("max_attempts")
 
     async def generate_text_async(
-            self, prompt: str = None, messages: Optional[List[Dict[str, str]]] = None
+            self, prompt: str = None, messages: list[dict[str, str]] | None = None
     ) -> str:
         """
         Asynchronously generate text from the OpenAI API with enhanced error handling.
@@ -404,7 +404,7 @@ class OpenAIIntegration:
             raise Exception(f"OpenAI async API call failed: {e}")
 
     async def generate_text_async_streaming(
-            self, prompt: str, messages: Optional[List[Dict[str, str]]] = None
+            self, prompt: str, messages: list[dict[str, str]] | None = None
     ) -> Iterator[str]:
         """
         Asynchronously generate streaming text from the OpenAI API.
@@ -668,7 +668,7 @@ class OpenAIIntegration:
         if content and str(content).strip():
             ContextRegistry.get().get_logger().log_info(
                 heading="OPENAI • CONTENT_FOUND",
-                body=f"Standard content found: {str(content)}",
+                body=f"Standard content found: {content!s}",
                 metadata={
                     "content_type": "standard_content",
                     "content_length": len(str(content)),
@@ -739,7 +739,7 @@ class OpenAIIntegration:
         return '{"error": "No content available", "fallback": true}'
 
     @staticmethod
-    def _extract_json_from_reasoning(reasoning_content: str) -> Optional[str]:
+    def _extract_json_from_reasoning(reasoning_content: str) -> str | None:
         """
         Extract JSON from reasoning_content using LLM.
         Only called when NVIDIA API returns reasoning_content but no regular content.
@@ -866,7 +866,7 @@ class OpenAIIntegration:
 
             ContextRegistry.get().get_logger().log_warning(
                 heading="OPENAI • JSON_EXTRACTION_ERROR",
-                body=f"JSON extraction failed: {str(extraction_error)}",
+                body=f"JSON extraction failed: {extraction_error!s}",
                 metadata={
                     "error_type": type(extraction_error).__name__,
                     "fallback_action": "return_none",

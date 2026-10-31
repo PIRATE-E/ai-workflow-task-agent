@@ -3,8 +3,9 @@ from typing import override
 
 from coldwind.core.system_logging.debug_protocol import LogEntry
 from coldwind.core.system_logging.handlers.handler_base import Handler
-from .dashboard_transport import SocketManager
 from coldwind.desktop.dashboard.dashboard_transport import DesktopDashboardManager
+
+from .dashboard_transport import SocketManager
 
 
 class DashBoardHandler(Handler):

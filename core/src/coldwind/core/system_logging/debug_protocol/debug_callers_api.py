@@ -6,13 +6,14 @@ TODO:- would be Expendable through the desktop and platforms definitions too !!
 
 """
 
-from typing import Dict, Optional, Any
+from typing import Any
 
-from . import LogCategory, LogEntry, LogLevel
 from coldwind.core.utils.timestamp_util import get_formatted_timestamp
 
+from . import LogCategory, LogEntry, LogLevel
 
-def debug_info(heading: str, body: str, metadata: Optional[Dict[str, Any]] = None) -> None:
+
+def debug_info(heading: str, body: str, metadata: dict[str, Any] | None = None) -> None:
     from ..dispatcher import Dispatcher
     log_dispatcher = Dispatcher()
     log_dispatcher.dispatch_v2(
@@ -26,7 +27,7 @@ def debug_info(heading: str, body: str, metadata: Optional[Dict[str, Any]] = Non
     )
 
 
-def debug_warning(heading: str, body: str, metadata: Optional[Dict[str, Any]] = None) -> None:
+def debug_warning(heading: str, body: str, metadata: dict[str, Any] | None = None) -> None:
     from ..dispatcher import Dispatcher
     log_dispatcher = Dispatcher()
     log_dispatcher.dispatch_v2(
@@ -40,7 +41,7 @@ def debug_warning(heading: str, body: str, metadata: Optional[Dict[str, Any]] = 
     )
 
 
-def debug_error(heading: str, body: str, metadata: Optional[Dict[str, Any]] = None) -> None:
+def debug_error(heading: str, body: str, metadata: dict[str, Any] | None = None) -> None:
     from ..dispatcher import Dispatcher
     log_dispatcher = Dispatcher()
     log_dispatcher.dispatch_v2(
@@ -54,7 +55,7 @@ def debug_error(heading: str, body: str, metadata: Optional[Dict[str, Any]] = No
     )
 
 
-def debug_critical(heading: str, body: str, metadata: Optional[Dict[str, Any]] = None) -> None:
+def debug_critical(heading: str, body: str, metadata: dict[str, Any] | None = None) -> None:
     from ..dispatcher import Dispatcher
     log_dispatcher = Dispatcher()
     log_dispatcher.dispatch_v2(

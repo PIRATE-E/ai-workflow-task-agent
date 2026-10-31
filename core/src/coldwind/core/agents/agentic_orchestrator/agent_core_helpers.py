@@ -13,18 +13,20 @@ WHY:
 """
 import json
 import re
+
 from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
+
 from ...tools.lggraph_tools.tool_assign import ToolAssign
+from ...tools.lggraph_tools.tool_response_manager import ToolResponseManager
 from ...utils.argument_schema_util import get_tool_argument_schema
 from ...utils.model_manager import ModelManager
 from .hierarchical_agent_prompts import (
     HierarchicalAgentPrompt,
 )
-from ...tools.lggraph_tools.tool_response_manager import ToolResponseManager
 from .pydantic_models import (
-    TASK,
-    REQUIRED_CONTEXT,
     FAILURE_CONTEXT_STRATEGY,
+    REQUIRED_CONTEXT,
+    TASK,
     WorkflowStateModel,
 )
 
@@ -1043,9 +1045,7 @@ class AgentCoreHelpers:
                     if expected_python_types is None:
                         continue
                     # Special-cases for number/integer
-                    if expected_type == "number" and isinstance(value, (int, float)):
-                        pass
-                    elif (
+                    if expected_type == "number" and isinstance(value, (int, float)) or (
                         expected_type == "integer"
                         and isinstance(value, int)
                         and not isinstance(value, bool)
@@ -1213,7 +1213,7 @@ class AgentCoreHelpers:
             except Exception as e:
                 ContextRegistry.get().get_logger().log_error(
                     "Tool Executor",
-                    f"Exception during tool execution: {str(e)}",
+                    f"Exception during tool execution: {e!s}",
                     metadata={
                         "function name": "__tool_executor",
                         "tool_name": tool_name,
@@ -1275,7 +1275,7 @@ class AgentCoreHelpers:
                 executor.shutdown(wait=True)
                 ContextRegistry.get().get_logger().log_error(
                     "Tool Executor",
-                    f"Exception during tool execution: {str(e)}",
+                    f"Exception during tool execution: {e!s}",
                     metadata={
                         "function name": "exeCuteTool",
                         "tool_name": tool_name,

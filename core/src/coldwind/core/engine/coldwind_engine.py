@@ -22,16 +22,6 @@ from typing import Any, cast
 
 from coldwind.core.engine.chat_destructor import ChatDestructor
 from coldwind.core.engine.graphs.node_assign import GraphBuilder
-from coldwind.core.mcp.load_config import McpConfigFile
-from coldwind.core.mcp.manager import MCP_Manager
-from coldwind.core.mcp.mcp_manager_util import Utils
-from coldwind.core.models import StateAccessor
-from coldwind.core.models.state import State
-from coldwind.core.models.ticket_in import TicketIn
-from coldwind.core.models.ticket_out import TicketOut
-from coldwind.core.runtime import ContextRegistry, CoreRunTimeObjects
-from coldwind.core.tools.lggraph_tools.tools.browser_tool import BrowserHandler
-from coldwind.core.utils.model_manager import ModelManager
 
 # -------------------------------------------------------------------------
 # WHAT CHANGED & WHY:
@@ -46,6 +36,16 @@ from coldwind.core.utils.model_manager import ModelManager
 from coldwind.core.interfaces.exception_interface import (
     rich_exception_handler,
 )
+from coldwind.core.mcp.load_config import McpConfigFile
+from coldwind.core.mcp.manager import MCP_Manager
+from coldwind.core.mcp.mcp_manager_util import Utils
+from coldwind.core.models import StateAccessor
+from coldwind.core.models.state import State
+from coldwind.core.models.ticket_in import TicketIn
+from coldwind.core.models.ticket_out import TicketOut
+from coldwind.core.runtime import ContextRegistry, CoreRunTimeObjects
+from coldwind.core.tools.lggraph_tools.tools.browser_tool import BrowserHandler
+from coldwind.core.utils.model_manager import ModelManager
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
 from langgraph.graph.state import CompiledStateGraph
 
@@ -329,8 +329,8 @@ class ColdWindEngine:
 
     def _register_logging_handlers(self):
         """Register logging handlers for the chat application."""
-        from ..system_logging.on_time_registry import OnTimeRegistry
         from ..system_logging.handlers.handler_base import TextHandler
+        from ..system_logging.on_time_registry import OnTimeRegistry
 
         async def register_handlers():
             ##### this is the place which register the all logging handlers #####

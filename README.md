@@ -24,6 +24,9 @@
 
 ## 🧭 Table of Contents
 
+- [🧩 Quick Mental Model](#-quick-mental-model-the-brain--the-bodies)
+- [🧠 The Brain & Body Architecture](#-the-brain--body-architecture)
+- [🌐 Multi-Platform Ecosystem Matrix](#-multi-platform-ecosystem-matrix)
 - [🚀 What's New](#-whats-new)
 - [✨ Current Status](#-current-status)
 - [🌟 What Makes This Special](#-what-makes-this-special)
@@ -31,7 +34,7 @@
 - [🛠️ Tool Ecosystem](#️-tool-ecosystem)
 - [🔧 Dynamic MCP Integration](#-dynamic-mcp-integration)
 - [⚙️ Configuration](#️-configuration)
-- [🚀 Quick Start](#-quick-start)
+- [🚀 Quick Start & Installation](#-quick-start--installation)
 - [🧊 uv Workspace & Platform Layering](#-uv-workspace--platform-layering)
 - [🗺️ Project Architecture](#️-project-architecture)
   - [🚀 Entry Points](#-entry-points)
@@ -54,15 +57,23 @@
 
 ---
 
-## 🧩 Quick Mental Model (1-minute)
+## 🧩 Quick Mental Model: The Brain & The Bodies
 
-If you remember only _one_ picture, remember this:
+Cold Wind AI decouples cognitive intelligence from presentation runtimes:
 
 ```text
-┌───────────────────────────────────────────────────────────────────────┐
-│  You type in CLI  →  Router decides  →  Agent/Tool/MCP runs  → Output  │
-│     (prompt_toolkit)       (core)            (tools/mcp)        (ui)   │
-└───────────────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────────┐
+│                        THE BRAIN: coldwind-core                        │
+│      LangGraph Agents • Tool Orchestrator • MCP • Ticket Lifecycle     │
+└───────────────────────────────────┬────────────────────────────────────┘
+                                    │ PlatformRuntimeContextInterface
+        ┌───────────────────────────┼───────────────────────────┐
+        ▼                           ▼                           ▼
+┌───────────────┐           ┌───────────────┐           ┌───────────────┐
+│  BODY 1 (CLI) │           │ BODY 2 (GUI)  │           │ BODY 3 (Cloud)│
+│  prompt_tk    │           │ Slint + Rust  │           │ FastAPI (SSE) │
+│  & Rich CLI   │           │ 60 FPS Native │           │ (Planned)     │
+└───────────────┘           └───────────────┘           └───────────────┘
 ```
 
 ---
@@ -110,17 +121,81 @@ If you remember only _one_ picture, remember this:
 
 ## ✨ **Current Status**
 
-| Component           | Status | Details                                                       |
-| ------------------- | ------ | ------------------------------------------------------------- |
-| 🧊 **uv Workspace** | ✅     | `coldwind-core` + `coldwind-desktop`; `server` member planned |
-| 🤖 **Agent Mode**   | ✅     | Hierarchical multi-agent orchestration                        |
-| 🔌 **MCP**          | ✅     | Dynamic via `.mcp.json`                                       |
-| 🌐 **Browser**      | ✅     | browser-use integration                                       |
-| ⌨️ **CLI Input**    | ✅     | Modern autocomplete via prompt_toolkit                        |
-| 📝 **Logging**      | ✅     | Multi-file with dynamic routing + rotation                    |
-| 🐳 **Docker**       | ⏳     | Dockerfile ready, compose WIP                                 |
-| 🧪 **Tests**        | 🚧     | **Unmaintained — regeneration planned (TODO)**                |
-| 🐍 **Python**       | 3.13+  | Managed by `uv` (no legacy 3.11 support)                      |
+| Component           | Status | Details                                                                            |
+| ------------------- | ------ | ---------------------------------------------------------------------------------- |
+| 🧊 **uv Workspace** | ✅     | `coldwind-core` + `coldwind-desktop` + `coldwind-slint-gui` (v0.0.1); `server` WIP |
+| 🤖 **Agent Mode**   | ✅     | Hierarchical multi-agent orchestration                                             |
+| 🔌 **MCP**          | ✅     | Dynamic via `.mcp.json`                                                            |
+| 🌐 **Browser**      | ✅     | browser-use integration                                                            |
+| ⌨️ **CLI Input**    | ✅     | Modern autocomplete via prompt_toolkit                                             |
+| 📝 **Logging**      | ✅     | Multi-file with dynamic routing + rotation                                         |
+| 🐳 **Docker**       | ⏳     | Dockerfile ready, compose WIP                                                      |
+| 🧪 **Tests**        | 🚧     | **Unmaintained — regeneration planned (TODO)**                                     |
+| 🐍 **Python**       | 3.13+  | Managed by `uv` (no legacy 3.11 support)                                           |
+
+---
+
+## 🧠 The Brain & Body Architecture
+
+Cold Wind AI strictly separates **cognitive intelligence** from the **presentation runtime**:
+
+- **The Brain (`coldwind-core`)**: The shared, headless cognitive microkernel. It owns LangGraph multi-agent orchestration, dynamic MCP server integration, tool execution, session state, and ticket lifecycle (`TicketIn` / `TicketOut`). It contains **zero UI dependencies** and **zero console printing**.
+- **The Bodies (Platform Presentation Layers)**: Pluggable presentation interfaces that consume the Brain through the `PlatformRuntimeContextInterface`:
+  - **Platform 1 — Desktop CLI (`coldwind-desktop`)**: Full-featured terminal interface built with `prompt_toolkit` and `rich`.
+  - **Platform 2 — Native Slint Desktop GUI (`coldwind-slint-gui` + Rust Companion)**: High-performance GPU-accelerated desktop client built with Rust and Slint UI.
+  - **Platform 3 — Cloud Backend (`coldwind-server`)**: Planned headless FastAPI service.
+  - **Platform 4 — Mobile Client**: Planned Flutter client.
+
+```mermaid
+flowchart TD
+    subgraph Brain ["THE BRAIN: Headless Agent Engine (coldwind-core)"]
+        CE["ColdWindEngine (TicketIn / TicketOut)"]
+        LG["LangGraph Agent Workflows"]
+        MCP["Dynamic MCP Protocol Manager"]
+        INF["Platform Runtime Contracts (Interfaces)"]
+        CE --- LG
+        CE --- MCP
+        CE --- INF
+    end
+
+    subgraph Body1 ["BODY 1: Desktop CLI (coldwind-desktop)"]
+        CLI["prompt_toolkit + Rich Terminal UI"]
+        DC["DesktopRunTimeContext"]
+        CLI --- DC
+    end
+
+    subgraph Body2 ["BODY 2: Native Desktop GUI (Rust + Slint)"]
+        direction TB
+        REPO["Repository: PIRATE-E/RUST_GUI-AI_TASK_WORKFLOW"]
+        SLINT["Slint UI (Thread 0: 60 FPS ListView)"]
+        RUST["Rust Worker Thread (Thread N: PyO3)"]
+        SC["SlintRuntimeContext (coldwind-slint-gui)"]
+        REPO --- SLINT
+        SLINT <-->|"sync_channel / invoke_from_event_loop"| RUST
+        RUST --- SC
+    end
+
+    subgraph Body3 ["BODY 3: Cloud & Mobile (Planned)"]
+        SRV["coldwind-server (FastAPI SSE)"]
+        MOB["Mobile Client (Flutter)"]
+    end
+
+    DC -->|"Implements Contract"| INF
+    SC -->|"Implements Contract"| INF
+    SRV -.->|"Implements Contract"| INF
+    MOB -.->|"Implements Contract"| INF
+```
+
+---
+
+## 🌐 Multi-Platform Ecosystem Matrix
+
+| Platform Target | Tech Stack | Status | Repository / Package |
+| :--- | :--- | :--- | :--- |
+| **Platform 1: Terminal CLI** | Python 3.13+, Rich, `prompt_toolkit` | **Production (v2.0.0)** | Local: `desktop/` (`coldwind-desktop`) |
+| **Platform 2: Native Desktop GUI** | Rust 2024, Slint UI, PyO3 FFI | **Milestone 0.0.1 Shipped** | External: [RUST_GUI-AI_TASK_WORKFLOW](https://github.com/PIRATE-E/RUST_GUI-AI_TASK_WORKFLOW.git) |
+| **Platform 3: Cloud Backend** | Python, FastAPI, SSE streaming | **Planned Skeleton** | Local: `server/` (`coldwind-server`) |
+| **Platform 4: Mobile Client** | Dart, Flutter | **Planned Roadmap** | Dedicated mobile client |
 
 ---
 
@@ -144,6 +219,9 @@ If you remember only _one_ picture, remember this:
 ```
 
 ---
+
+> [!NOTE]
+> **Documentation Scope Notice:** This README repository primarily details the shared **Brain (`coldwind-core`)** and the **Desktop CLI Body (`coldwind-desktop`)**. For the native desktop GUI implementation, visit the companion repository: [**`RUST_GUI-AI_TASK_WORKFLOW`**](https://github.com/PIRATE-E/RUST_GUI-AI_TASK_WORKFLOW.git).
 
 ## ⚡ **Slash Commands**
 
@@ -290,24 +368,45 @@ SOCKET_PORT=5390
 
 ---
 
-## 🚀 **Quick Start**
+## 🚀 **Quick Start & Installation**
+
+### Option A: Launch Platform 1 (Terminal CLI)
+The terminal interface runs directly from this monorepo:
 
 ```bash
-# 1. Clone
+# 1. Clone this repository
 git clone https://github.com/PIRATE-E/ai-workflow-task-agent.git
 cd ai-workflow-task-agent
 
-# 2. Install — uv workspace (creates .venv, installs coldwind-core + coldwind-desktop)
-uv sync
+# 2. Sync workspace dependencies via uv (installs coldwind-core, coldwind-desktop, and coldwind-slint-gui)
+uv sync --all-packages
 
-# 3. Activate
-# source .venv/bin/activate
-# uv doesnt need this !!
+# 3. Configure your API keys in .env (see Configuration above)
+cp .env.example .env
 
-# 4. Configure — create a .env file in the project root (see Configuration above)
-
-# 5. Run
+# 4. Launch the CLI application
 uv run --package coldwind-desktop coldwind
+```
+
+---
+
+### Option B: Launch Platform 2 (Native Rust + Slint Desktop GUI)
+The native GUI is built in Rust using Slint UI and embeds `coldwind-core` via PyO3:
+
+```bash
+# 1. Ensure ai-workflow-task-agent is cloned and synced (provides the Python Brain)
+cd /path/to/ai-workflow-task-agent
+uv sync --all-packages
+
+# 2. Clone the companion Rust GUI repository
+git clone https://github.com/PIRATE-E/RUST_GUI-AI_TASK_WORKFLOW.git
+cd RUST_GUI-AI_TASK_WORKFLOW
+
+# 3. Configure GUI environment (.env.slint)
+cp .env.slint.example .env.slint
+
+# 4. Compile and launch the native desktop application
+cargo run
 ```
 
 ---
@@ -318,18 +417,23 @@ This is a **uv workspace monorepo** with namespace packages under `coldwind.*`:
 
 ```text
 ai-workflow-task-agent/
-├── core/      → coldwind-core      Shared agent layer: config, state, MCP protocol,
-│                                  tools, RAG, logging, engine, agents, interfaces
-├── desktop/   → coldwind-desktop   Desktop CLI layer: entry point, slash commands,
-│                                  UI (prompt_toolkit + rich), dashboard, runtime context
-└── server/    → planned            Cloud backend (declared workspace member, not yet created)
+├── core/         → coldwind-core       The Brain: Shared headless engine (Tickets, LangGraph, Tools, MCP)
+├── desktop/      → coldwind-desktop    Body 1: Desktop CLI layer (prompt_toolkit + rich, DesktopRunTimeContext)
+├── slint_gui/    → coldwind-slint-gui  Body 2: Native GUI Python bridge (SlintRuntimeContext, PyO3 FFI sinks)
+└── server/       → planned             Body 3: Cloud backend (declared workspace member skeleton)
+
+Paired Companion Workspace:
+RUST_GUI-AI_TASK_WORKFLOW (https://github.com/PIRATE-E/RUST_GUI-AI_TASK_WORKFLOW.git)
+└── Native Rust binary + Slint GPU rendering (Thread 0) embedding coldwind-core via PyO3 (Thread N)
 ```
 
-**Layering invariant (enforced):** Desktop imports Core. **Core never imports Desktop.** Core only knows the abstract contracts defined in `core/interfaces/` — never concrete platform implementations.
+**Layering invariant (enforced):** Platform packages (`desktop`, `slint_gui`, `server`) import Core. **Core never imports any Platform package.** Core only knows the abstract contracts defined in `core/interfaces/` — never concrete platform implementations.
+
+**Zero Presentation Leak Invariant:** Core workflow nodes must never call direct platform presentation APIs (`console.print`). All node progress, routing notices, and slash command diagnostics route through `print_message(content, sender="system")` on the active `MessageDisplayInterface`.
 
 **Config vs runtime split:**
 
-- **Pure configuration** → pydantic-settings classes (`CoreSettinngs` → `DesktopConfig`).
+- **Pure configuration** → pydantic-settings classes (`CoreSettings` → `DesktopConfig`).
 - **Live runtime objects** → the active runtime context, obtained via `ContextRegistry.get()`, with core services registered/retrieved through the dynamic enum-keyed store: `context.register_service(CoreRunTimeObjects.<name>, value)` / `context.get_service(CoreRunTimeObjects.<name>)`.
 
 ---

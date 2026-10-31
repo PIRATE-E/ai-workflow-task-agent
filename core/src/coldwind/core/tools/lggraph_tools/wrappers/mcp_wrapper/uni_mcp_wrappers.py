@@ -6,7 +6,6 @@ It allows seamless integration with any MCP server, regardless of the specific t
 By using this wrapper, developers can avoid creating and maintaining separate wrappers for each unique MCP server implementation.
 """
 import json
-from typing import Any
 
 
 class UniversalMCPWrapper:
@@ -16,11 +15,13 @@ class UniversalMCPWrapper:
     """
 
     def __init__(self, **kwargs):
-        from coldwind.core.tools.lggraph_tools.tool_response_manager import ToolResponseManager
+        from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
+        from coldwind.core.tools.lggraph_tools.tool_response_manager import (
+            ToolResponseManager,
+        )
         from coldwind.core.tools.lggraph_tools.tools.mcp_integrated_tools.universal import (
             universal_tool,
         )
-        from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
 
         self.server_url = kwargs.get("server_url", None)
         self.action = kwargs.get("tool_name", None)

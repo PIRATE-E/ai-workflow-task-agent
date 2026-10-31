@@ -13,7 +13,6 @@ import subprocess
 import sys
 import uuid
 from pathlib import Path
-from typing import List
 
 # Ensure project root is on sys.path for correct module resolution in the subprocess
 if __package__ is None:
@@ -54,7 +53,7 @@ class BrowserHandler:
     # would mask the bug (subprocess.wait(timeout=0) silently times out).
     time_out: int
     enabled: bool
-    running_processes: List[subprocess.Popen] = []
+    running_processes: list[subprocess.Popen] = []
 
     # Flag to switch between legacy subprocess and new Runner-based execution
 
@@ -365,6 +364,6 @@ if __name__ == "__main__":
         query=test_query, head_less_mode=False, log=True, keep_alive=True
     )
 
-    print(f"\n--- Standalone Execution Result ---")
+    print("\n--- Standalone Execution Result ---")
     print(final_response)
     print("------------------------------------")

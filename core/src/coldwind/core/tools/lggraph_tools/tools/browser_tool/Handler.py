@@ -2,11 +2,10 @@ from __future__ import annotations
 
 import asyncio
 import sys
+from collections.abc import Awaitable, Callable
 from enum import Enum
 from queue import Queue
-from typing import TYPE_CHECKING, Callable, Awaitable
-from io import StringIO
-from contextlib import redirect_stdout, redirect_stderr
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from .runner import Runner
@@ -23,7 +22,7 @@ class HandlerEnums(Enum):
 
 
 class HandlerMeta(type):
-    enum_driver_map: dict[HandlerEnums, type['Handler'] | None] = {}
+    enum_driver_map: dict[HandlerEnums, type[Handler] | None] = {}
 
     @classmethod
     def __prepare__(metacls, name, bases):
@@ -71,7 +70,7 @@ class HandlerMeta(type):
 
         # For driver classes: check if THIS class has enum_value
         if hasattr(cls, 'enum_value'):
-            enum_value = getattr(cls, 'enum_value')
+            enum_value = cls.enum_value
 
             # Validate it's a HandlerEnums member
             if not isinstance(enum_value, HandlerEnums):
@@ -92,7 +91,7 @@ class HandlerMeta(type):
             Handler.enum_driver_map[enum_value] = cls
 
             # Inject execute method into this driver class
-            setattr(cls, 'execute', Handler.execute_method)
+            cls.execute = Handler.execute_method
 
             print(f"[MetaClass] ✅ Registered {cls.__name__} for {enum_value.name}")
 
@@ -109,7 +108,7 @@ class HandlerExceptionRaises(Exception):
             if missing_events is None:
                 super().__init__(f"The custom event you are trying to access is not found in the {HandlerEnums}.")
                 return
-            super().__init__(f"provided event are not registered :- " + ", ".join(missing_events))
+            super().__init__("provided event are not registered :- " + ", ".join(missing_events))
 
     class DriverEventAlreadyRegistered(RuntimeError):
         """Raised when a driver event is already registered."""
@@ -124,7 +123,7 @@ class Handler(metaclass=HandlerMeta):
     """
 
     # Type hint for IDE - execute is injected by metaclass at runtime
-    execute: 'Callable[[Queue], Awaitable[dict]]'
+    execute: Callable[[Queue], Awaitable[dict]]
 
     async def execute_method(self, moving_forward_bus: Queue, *args, **kwargs):
         """
@@ -176,7 +175,7 @@ class Handler(metaclass=HandlerMeta):
             except Exception as e:
                 print(f"[Handler]   ❌ {attr_name} raised an exception: {e}")
                 # check if that attr class does have huge error or not if it is true stop the execution raise the error !!
-                if hasattr(self, "huge_error") and getattr(self, "huge_error"):
+                if hasattr(self, "huge_error") and self.huge_error:
                     print(f"[Handler]   ⛔ Huge error detected in {attr_name}, stopping execution.")
                     raise e
                 moving_forward_bus.put({'attr_name': attr_name, 'result': None, 'error': str(e)})
@@ -184,7 +183,7 @@ class Handler(metaclass=HandlerMeta):
         print(f"[Handler] 🎉 {driver_class_name} completed with {len(results)} methods executed")
         return results
 
-    def get(self, runner_self: 'Runner', enum_event: HandlerEnums) -> Handler:
+    def get(self, runner_self: Runner, enum_event: HandlerEnums) -> Handler:
         """
         Get the driver instance for a specific lifecycle event.
 

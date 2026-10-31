@@ -1,16 +1,12 @@
-from abc import abstractmethod
-from collections import deque
-from dataclasses import asdict
-from dataclasses import dataclass
-import json
 import os
-from pathlib import Path
 import select
 import shutil
 import socket
 import subprocess
 import sys
-import time
+from collections import deque
+from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, override
 
 from coldwind.core.mcp.mcp_register_structure import ServerConfig
@@ -19,7 +15,6 @@ from coldwind.core.system_logging.debug_protocol import LogEntry
 from coldwind.core.system_logging.debug_protocol.dashboard_transport import (
     DashboardManager,
 )
-from coldwind.desktop.runtime.DesktopContext import DesktopRunTimeContext
 
 
 class SocketManager:
@@ -129,7 +124,7 @@ class SocketManager:
                 while self.client_socket and self.connection_alive:
                     try:
                         data = self.client_socket.recv(config.BAND_WIDTH)
-                    except (socket.timeout, BlockingIOError):
+                    except (TimeoutError, BlockingIOError):
                         continue
                     except (ConnectionResetError, BrokenPipeError, OSError):
                         self.connection_alive = False

@@ -8,6 +8,7 @@ from typing import Any
 
 from .debug_protocol import LogEntry
 
+
 #=========================================
 # Define the OutPutFormater interface
 #=========================================

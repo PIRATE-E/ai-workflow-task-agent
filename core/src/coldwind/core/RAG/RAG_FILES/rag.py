@@ -3,25 +3,25 @@ import asyncio
 import hashlib
 import json
 import os
+import pathlib
 from asyncio import Semaphore
-from typing import Awaitable
+from collections.abc import Awaitable
 from pathlib import Path
 
 import dotenv
-
-# ✅ LIGHTWEIGHT LANGCHAIN IMPORTS
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_community.document_loaders import PyPDFLoader
-from langchain_core.documents import Document
-# MIGRATED: direct langchain import for HumanMessage (was settings.HumanMessage).
-from langchain_core.messages import HumanMessage
 
 # ✅ LOCAL IMPORTS (lightweight)
 from coldwind.core.RAG.RAG_FILES import neo4j_rag
 from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
 from coldwind.core.utils.model_manager import ModelManager
-import pathlib
 
+# ✅ LIGHTWEIGHT LANGCHAIN IMPORTS
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_community.document_loaders import PyPDFLoader
+from langchain_core.documents import Document
+
+# MIGRATED: direct langchain import for HumanMessage (was settings.HumanMessage).
+from langchain_core.messages import HumanMessage
 
 # ✅ LAZY LOADING: heavy imports (Google Sheets RAG, torch, cosine_similarity,
 # genai, Chroma, OllamaEmbeddings, ChatOllama) are deferred to function level
@@ -768,7 +768,6 @@ def extract_triples_process_query():
     like if query is "who is Elon Musk?" then we will return the llm response of the triples related to Elon Musk
     :return:
     """
-    pass
 
 
 def get_all_triples_from_file() -> list:
@@ -891,4 +890,3 @@ async def _clear_rag_files_async():
 if __name__ == "__main__":
     # print(search_similar_chunks_genai("kafka", load_pdf_document()))
     load_pdf_document(r"C:\Users\pirat\PycharmProjects\AI_llm\RAG_FILES\tech.txt")
-    pass

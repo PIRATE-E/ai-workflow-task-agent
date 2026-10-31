@@ -1,8 +1,3 @@
-from langchain_core.messages import HumanMessage
-
-from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
-from coldwind.core.models.state import StateAccessor
-from coldwind.core.tools.lggraph_tools.tool_assign import ToolAssign
 # -----------------------------------------------------------------------------
 # WHAT CHANGED & WHY:
 # Route slash command status and user messages through ui_interface.print_message
@@ -11,7 +6,10 @@ from coldwind.core.tools.lggraph_tools.tool_assign import ToolAssign
 # rich Console dependencies (e.g. inside FastAPI server or Slint GUI).
 # -----------------------------------------------------------------------------
 from coldwind.core.interfaces.ui_interface import print_message
+from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
+from coldwind.core.tools.lggraph_tools.tool_assign import ToolAssign
 from coldwind.core.utils.model_manager import ModelManager
+from langchain_core.messages import HumanMessage
 
 
 def classify_message_type(state) -> dict:

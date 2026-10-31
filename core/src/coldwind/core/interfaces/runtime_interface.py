@@ -8,16 +8,15 @@ rather than importing platform-specific implementations directly.
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, Optional
+from typing import Any
 
-
-from coldwind.core.interfaces.logging_interface import DebugLoggerInterface
-from coldwind.core.interfaces.exception_interface import ExceptionHandlerInterface
-from coldwind.core.interfaces.ui_interface import (
-    MessageDisplayInterface,
-    CommandParserInterface,
-)
 from coldwind.core.config.coreSettings import CoreSettinngs
+from coldwind.core.interfaces.exception_interface import ExceptionHandlerInterface
+from coldwind.core.interfaces.logging_interface import DebugLoggerInterface
+from coldwind.core.interfaces.ui_interface import (
+    CommandParserInterface,
+    MessageDisplayInterface,
+)
 
 
 class PlatformRuntimeContextInterface(ABC):
@@ -33,27 +32,22 @@ class PlatformRuntimeContextInterface(ABC):
     @abstractmethod
     def get_logger(self) -> DebugLoggerInterface:
         """Get the application-wide diagnostic logger."""
-        pass
 
     @abstractmethod
     def get_error_handler(self) -> ExceptionHandlerInterface:
         """Get the platform-specific exception handler (e.g., RichTracebackManager equivalent)."""
-        pass
 
     @abstractmethod
     def get_message_display(self) -> MessageDisplayInterface:
         """Get the service responsible for presenting chat messages and outputs."""
-        pass
 
     @abstractmethod
     def get_command_parser(self) -> CommandParserInterface:
         """Get the service responsible for parsing inputs and slash commands."""
-        pass
 
     @abstractmethod
     def get_settings(self) -> CoreSettinngs:
         """Get the read-only core configuration settings."""
-        pass
 
     @abstractmethod
     def get_service(self, service_type: type) -> Any:
@@ -67,7 +61,6 @@ class PlatformRuntimeContextInterface(ABC):
         Callers must handle the ``RuntimeError`` for optional services (e.g. Neo4j
         being unavailable at boot) rather than relying on a silent ``None``.
     """
-        pass
 
     @abstractmethod
     def register_service(self, service_type: type, service: Any) -> None:
@@ -75,7 +68,6 @@ class PlatformRuntimeContextInterface(ABC):
         Register a dynamic service implementation against an interface type.
         This is typically called by the platform initialization code.
         """
-        pass
 
     @abstractmethod
     def is_exiting(self) -> bool:
@@ -83,7 +75,6 @@ class PlatformRuntimeContextInterface(ABC):
         Query if the application has been requested to shut down.
         Replaces the direct read of `settings.exit_flag`.
         """
-        pass
 
     @abstractmethod
     def request_exit(self) -> None:
@@ -91,7 +82,6 @@ class PlatformRuntimeContextInterface(ABC):
         Command the application to shut down safely.
         Replaces direct assignment to `ContextRegistry.get().request_exit()`.
         """
-        pass
 
     @abstractmethod
     def reset_exit_request(self) -> None:
@@ -100,7 +90,6 @@ class PlatformRuntimeContextInterface(ABC):
         arrives after an exit was previously requested, so the app keeps running.
         Replaces direct assignment `settings.exit_flag = False`.
         """
-        pass
 
     # ── Platform-optional mutable slots (abstractmethods — implemented per platform) ──
     # These wrap *platform-optional* MUTABLE runtime slots (rich Console, raw
@@ -136,19 +125,15 @@ class PlatformRuntimeContextInterface(ABC):
     @abstractmethod
     def get_console(self) -> Any:
         """Return the primary rich Console (or None if unset / no terminal)."""
-        pass
 
     @abstractmethod
     def set_console(self, console: Any) -> None:
         """Fill the primary Console slot post-construction (boot)."""
-        pass
 
     @abstractmethod
     def get_debug_console(self) -> Any:
         """Return the debug rich Console (or None if unset / no terminal)."""
-        pass
 
     @abstractmethod
     def set_debug_console(self, console: Any) -> None:
         """Fill the debug Console slot post-construction."""
-        pass

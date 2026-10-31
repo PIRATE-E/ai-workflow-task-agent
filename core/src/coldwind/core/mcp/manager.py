@@ -37,30 +37,28 @@ Warning:
 import json
 import os
 import subprocess
-from typing import Any, Callable, Optional
-
-from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
-from coldwind.core.mcp.dynamically_tool_register import DynamicToolRegister
-from coldwind.core.mcp.mcp_register_structure import (
-    ServerConfig,
-    Command,
-    MPC_TOOL_SERVER_MAPPING,
-)
+from collections.abc import Callable
+from typing import Any
 
 # ✅ Structured Debug Helpers
-
-
 # WHAT: Route exception handling through core exception_interface contract.
 # WHY: Eliminates illegal Core -> Desktop import, preserving the Layering Invariant.
 # WHAT: Route exception handling through core exception_interface contract.
 # WHY: Eliminates legacy _CoreExceptionHandlerAdapter and fake RichTracebackManager aliases.
 from coldwind.core.interfaces.exception_interface import rich_exception_handler
+from coldwind.core.mcp.dynamically_tool_register import DynamicToolRegister
+from coldwind.core.mcp.mcp_register_structure import (
+    MPC_TOOL_SERVER_MAPPING,
+    Command,
+    ServerConfig,
+)
+from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
 
 
 def _handle_exception(
     error: Exception,
     context: str = "",
-    extra_context: Optional[dict[str, Any]] = None,
+    extra_context: dict[str, Any] | None = None,
 ) -> None:
     """Helper to route exceptions to active runtime error handler safely."""
     try:
@@ -223,7 +221,7 @@ class MCP_Manager:
         name: str,
         runner: Command,
         # TODO: legacy this is not currently latest now all the module name are getting passed from command !!
-        package: Optional[str],
+        package: str | None,
         args: list[str],
         func: Callable,
     ):
@@ -857,7 +855,7 @@ class MCP_Manager:
     @classmethod
     def call_mcp_server(
         cls, name: str, tool_name: str, args: dict
-    ) -> Optional[dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """Send a JSON-RPC tool invocation request to a running MCP server.
 
         This method constructs and sends a "tools/call" JSON-RPC request to the

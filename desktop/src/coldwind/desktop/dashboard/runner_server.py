@@ -1,5 +1,5 @@
-from coldwind.desktop.dashboard.dashboard_transport import SocketManager
 from coldwind.desktop.dashboard.dashboard_printer import Printer, console
+from coldwind.desktop.dashboard.dashboard_transport import SocketManager
 
 if __name__ == "__main__":
     # WHAT: Print startup banner and pass Printer.process_log callable to recieve_raw_log.

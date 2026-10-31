@@ -5,7 +5,6 @@ description:
 """
 
 from __future__ import annotations
-from typing import Optional, List, Union
 
 # Langchain message classes are imported directly — this module is the storage
 # manager that holds concrete langchain BaseMessage instances, so it needs the
@@ -14,12 +13,12 @@ from typing import Optional, List, Union
 # created a load-order trap (settings.HumanMessage started as None until
 # chat_initializer._set_core_classes ran). Importing from langchain_core is
 # both correct and decoupled from the runtime-context wiring.
-from langchain_core.messages import HumanMessage, AIMessage, BaseMessage
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
 
 
 class ToolResponseManager:
     instance = None
-    _tool_response: Optional[List[Union[HumanMessage, AIMessage]]] = (
+    _tool_response: list[HumanMessage | AIMessage] | None = (
         None  # because the response always be human or AI message list
     )
 
@@ -30,7 +29,7 @@ class ToolResponseManager:
         :return: The single instance of ToolResponseManager.
         """
         if cls.instance is None:
-            cls.instance = super(ToolResponseManager, cls).__new__(cls)
+            cls.instance = super().__new__(cls)
             cls.instance._tool_response = None
 
         return cls.instance
@@ -105,7 +104,7 @@ class ToolResponseManager:
         """
         self._tool_response = None
 
-    def get_last_human_message(self) -> Optional[HumanMessage]:
+    def get_last_human_message(self) -> HumanMessage | None:
         """
         Get the last human message from the tool response.
 
@@ -120,7 +119,7 @@ class ToolResponseManager:
                     continue
         return None
 
-    def get_last_ai_message(self) -> Optional[AIMessage]:
+    def get_last_ai_message(self) -> AIMessage | None:
         """
         Get the last AI message from the tool response.
 

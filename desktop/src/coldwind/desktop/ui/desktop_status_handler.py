@@ -18,12 +18,12 @@ WHAT CHANGED & WHY:
 import re
 import threading
 from typing import final, override
-from rich.console import Console
-from rich.status import Status
 
 from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
 from coldwind.core.system_logging.debug_protocol import LogCategory, LogEntry
 from coldwind.core.system_logging.handlers.handler_base import Handler
+from rich.console import Console
+from rich.status import Status
 
 
 @final

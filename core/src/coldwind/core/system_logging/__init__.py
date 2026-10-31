@@ -5,7 +5,7 @@ from .router import Router
 
 __all__ = [
     "Dispatcher",
-    "OutPutFormater",
     "OnTimeRegistry",
+    "OutPutFormater",
     "Router",
 ]

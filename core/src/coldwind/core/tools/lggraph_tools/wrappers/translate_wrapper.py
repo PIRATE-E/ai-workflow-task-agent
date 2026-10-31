@@ -1,7 +1,5 @@
-from langchain_core.messages import AIMessage
-
-from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
 from coldwind.core.tools.lggraph_tools.tool_response_manager import ToolResponseManager
+from langchain_core.messages import AIMessage
 
 
 class TranslateToolWrapper:
@@ -11,7 +9,9 @@ class TranslateToolWrapper:
     """
 
     def __init__(self, message: str, target_language: str):
-        from coldwind.core.tools.lggraph_tools.tools.translate_tool import translate_text
+        from coldwind.core.tools.lggraph_tools.tools.translate_tool import (
+            translate_text,
+        )
 
         """
         Initialize the TranslateToolWrapper with a message and target language.

@@ -54,15 +54,9 @@ def main():
         if str(project_root) not in sys.path:
             sys.path.insert(0, str(project_root))
 
-        from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
-        from coldwind.core.utils.model_manager import ModelManager
 
         # Import the BrowserUseCompatibleLLM from the parent module
         # We need to be careful here - let's inline it to avoid import issues
-        from browser_use.llm.messages import BaseMessage, UserMessage, SystemMessage, AssistantMessage
-        from browser_use.llm.views import ChatInvokeCompletion
-        from pydantic import BaseModel
-        from typing import List, Optional, TypeVar, overload
 
         async def run_browser_agent():
             """Execute the browser agent and return the result."""
@@ -75,8 +69,12 @@ def main():
             # HumanMessage/AIMessage inline at call sites — so this module has no
             # need to publish langchain message classes onto any global.
 
-            from coldwind.core.tools.lggraph_tools.tools.browser_tool.runner import Runner
-            from coldwind.core.tools.lggraph_tools.tools.browser_tool.config import BrowserRequiredConfig
+            from coldwind.core.tools.lggraph_tools.tools.browser_tool.config import (
+                BrowserRequiredConfig,
+            )
+            from coldwind.core.tools.lggraph_tools.tools.browser_tool.runner import (
+                Runner,
+            )
             runner = Runner(BrowserRequiredConfig(
                 query=query,
                 headless=headless,
@@ -97,7 +95,7 @@ def main():
         try:
             runner = asyncio.Runner()
             main_result = runner.run(run_browser_agent())
-            print(f"[SUBPROCESS] Runner completed successfully, extracting results...", flush=True)
+            print("[SUBPROCESS] Runner completed successfully, extracting results...", flush=True)
 
             # Safer extraction with explicit error handling
             browser_close = False

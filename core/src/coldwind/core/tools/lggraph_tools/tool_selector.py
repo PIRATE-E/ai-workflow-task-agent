@@ -13,8 +13,8 @@ WHY:
   calls were obsolete artifacts from the pre-workspace codebase that bypassed the logging pipeline.
 """
 
-from typing import Any
 import inspect
+from typing import Any
 
 from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
 from coldwind.core.runtime.runtime_obj_enum import CoreRunTimeObjects

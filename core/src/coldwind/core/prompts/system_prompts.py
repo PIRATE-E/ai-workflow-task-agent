@@ -459,7 +459,9 @@ class PromptManager:
     ) -> str:
         """Get tool selector prompt."""
         # Import here to avoid circular imports
-        from coldwind.core.prompts.system_prompt_tool_selector import get_tool_selector_prompt
+        from coldwind.core.prompts.system_prompt_tool_selector import (
+            get_tool_selector_prompt,
+        )
 
         return get_tool_selector_prompt(tools_context, history, content)
 

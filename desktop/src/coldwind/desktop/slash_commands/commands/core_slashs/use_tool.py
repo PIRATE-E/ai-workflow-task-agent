@@ -4,7 +4,11 @@ todo we can also implement option here like :-
 [CommandOption(name="tool_name", description="Name of the tool to use"), CommandOption(name="input", description="Input for the tool")]
 """
 from coldwind.desktop.slash_commands.on_run_time_register import OnRunTimeRegistry
-from coldwind.desktop.slash_commands.protocol import SlashCommand, CommandResult, CommandOption
+from coldwind.desktop.slash_commands.protocol import (
+    CommandOption,
+    CommandResult,
+    SlashCommand,
+)
 
 
 def register_slash_command_use_tool():

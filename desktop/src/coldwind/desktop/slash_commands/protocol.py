@@ -3,10 +3,12 @@
 plus lightweight data classes representing commands and their options.
 """
 from __future__ import annotations
+
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any
 from enum import Enum
+from typing import Any
+
 
 class SlashOptionValueType(Enum):
     """

@@ -10,7 +10,6 @@ def universal_tool(**kwargs):
 from the specific MCP tool operation
     """
     from coldwind.core.mcp.manager import MCP_Manager
-    
     from coldwind.core.mcp.mcp_register_structure import MPC_TOOL_SERVER_MAPPING
 
     # 🔧 FIX: Enhanced tool_name extraction with validation
@@ -84,7 +83,7 @@ from the specific MCP tool operation
         )
         return {
             "success": False,
-            "error": f"Server call failed: {str(call_error)}",
+            "error": f"Server call failed: {call_error!s}",
             "server": server_name,
             "tool": tool_name,
         }
@@ -122,7 +121,6 @@ from the specific MCP tool operation
                     return resolved_uri
                 else:
                     return {"success": False, "error": f"Failed to resolve URI: {uri}"}
-            pass
         ContextRegistry.get().get_logger().log_info(
             heading="MCP_UNIVERSAL • SUCCESS",
             body="Response received from MCP server",

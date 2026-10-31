@@ -1,8 +1,13 @@
 """
 this is routing slash command to move make user chat with llm
 """
-from coldwind.desktop.slash_commands.protocol import SlashCommand, CommandResult, CommandOption
 from coldwind.desktop.slash_commands.on_run_time_register import OnRunTimeRegistry
+from coldwind.desktop.slash_commands.protocol import (
+    CommandOption,
+    CommandResult,
+    SlashCommand,
+)
+
 
 def register_chat_llm_command():
     chat_llm_command = SlashCommand(

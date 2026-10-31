@@ -1,10 +1,9 @@
 import json
-from typing import List
 
-from coldwind.core.system_logging.handlers.handler_base import Handler
-from coldwind.core.system_logging.router import Router
-from coldwind.core.system_logging.on_time_registry import OnTimeRegistry
 from coldwind.core.system_logging.debug_protocol import LogEntry
+from coldwind.core.system_logging.handlers.handler_base import Handler
+from coldwind.core.system_logging.on_time_registry import OnTimeRegistry
+from coldwind.core.system_logging.router import Router
 from coldwind.core.utils.timestamp_util import get_formatted_timestamp
 
 
@@ -56,7 +55,7 @@ class Dispatcher:
         """
         registry = OnTimeRegistry()
         try:
-            handlers: List[Handler] = registry.get_all_handlers()
+            handlers: list[Handler] = registry.get_all_handlers()
         except OnTimeRegistry.RegistryError:
             # No Handlers registered yet -
             return
@@ -83,12 +82,12 @@ class Dispatcher:
         metadata = data[metadata]
 
         """
-        from .debug_protocol import LogLevel, LogCategory
+        from .debug_protocol import LogCategory, LogLevel
 
         try:
             json_data = json.loads(message)
         except json.JSONDecodeError as e:
-            raise Dispatcher.DispatchError(f"Invalid JSON format: {str(e)}")
+            raise Dispatcher.DispatchError(f"Invalid JSON format: {e!s}")
 
         try:
 
@@ -114,7 +113,7 @@ class Dispatcher:
                 TIME_STAMP=json_data["TIME_STAMP"],
                 METADATA=json_data.get("METADATA", {}),
             )
-        except (KeyError, ValueError) as e:
+        except (KeyError, ValueError):
             ## fallback log_entry with minimal data
             log_entry = LogEntry(
                 LOG_TYPE=LogCategory.OTHER,

@@ -12,9 +12,9 @@ ARCHITECTURAL STATUS: PROTOTYPE / DEMONSTRATOR ONLY — NOT USED AT RUNTIME
 =============================================================================
 """
 
+import threading
 from collections import deque
 from collections.abc import Callable
-import threading
 from typing import Any, override
 
 from coldwind.core.system_logging.debug_protocol import LogEntry

@@ -20,23 +20,22 @@ from typing import Dict
 # WHY: Invariant: "Core NEVER imports Desktop". Removed former monkey-patching of
 # `coldwind.desktop.ui.diagnostics.*` into `sys.modules["coldwind.core.utils.*"]`
 # and removed legacy `socket_manager` which moved to desktop dashboard transport.
-from coldwind.core.utils import timestamp_util
-from coldwind.core.utils import argument_schema_util
+from coldwind.core.utils import argument_schema_util, timestamp_util
 
 __all__ = [
-    "open_ai_integration",
-    "model_manager",
-    "timestamp_util",
     "argument_schema_util",
+    "model_manager",
+    "open_ai_integration",
+    "timestamp_util",
 ]
 
-_LAZY_MODULES: Dict[str, str] = {
+_LAZY_MODULES: dict[str, str] = {
     "open_ai_integration": "coldwind.core.utils.open_ai_integration",
     "model_manager": "coldwind.core.utils.model_manager",
 }
 
 
-def __getattr__(name: str) -> ModuleType:  # noqa: D401
+def __getattr__(name: str) -> ModuleType:
     """Lazily load registered heavy utility submodules."""
     if name in _LAZY_MODULES:
         path = _LAZY_MODULES[name]

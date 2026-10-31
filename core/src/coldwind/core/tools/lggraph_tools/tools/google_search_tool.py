@@ -4,9 +4,10 @@ from typing import Any
 # this is tools for making searches on Google using google search api
 def search_google_tool(query: str) -> Any | None:
     # make simple request to google search api
+    import os
+
     import requests
     from dotenv import load_dotenv
-    import os
 
     load_dotenv()
 

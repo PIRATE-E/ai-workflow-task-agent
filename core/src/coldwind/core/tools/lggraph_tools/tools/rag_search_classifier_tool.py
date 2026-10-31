@@ -5,13 +5,13 @@ try:
 except ImportError:
     winsound = None  # Not available on Linux/Mac
 
-from rich.prompt import Prompt
-
 import coldwind.core.prompts.rag_search_classifier_prompts
-
-from coldwind.core.RAG.RAG_FILES import neo4j_rag
-from coldwind.core.RAG.RAG_FILES import rag
+from coldwind.core.models.state import StateAccessor  # Import the global state object
+from coldwind.core.RAG.RAG_FILES import neo4j_rag, rag
 from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
+from coldwind.core.tools.lggraph_tools.tool_response_manager import ToolResponseManager
+from coldwind.core.utils.model_manager import ModelManager
+
 # MIGRATED: the legacy `settings` import is removed. Runtime objects are now
 # sourced via ContextRegistry:
 #   - HumanMessage → direct langchain_core import (this module constructs
@@ -21,9 +21,7 @@ from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
 # Pure config values (gpt_model, DEFAULT_RAG_EXAMPLE_FILE_PATH,
 # enable_sound_notifications) are accessed via get_settings().<field>.
 from langchain_core.messages import HumanMessage
-from coldwind.core.models.state import StateAccessor  # Import the global state object
-from coldwind.core.tools.lggraph_tools.tool_response_manager import ToolResponseManager
-from coldwind.core.utils.model_manager import ModelManager
+from rich.prompt import Prompt
 
 
 def retrieve_knowledge_graph(query: str) -> str:
@@ -335,7 +333,7 @@ def rag_search_classifier_tool(query: str) -> str:
             return f"[ERROR] LLM response is not a valid JSON object: {llm_response.content}"
 
     except Exception as e:
-        return f"[ERROR] Failed to parse LLM response as JSON: {llm_response.content}. Error: {str(e)}"
+        return f"[ERROR] Failed to parse LLM response as JSON: {llm_response.content}. Error: {e!s}"
 
     selected_rag_type = response_json.get("selected_rag_type")
     reasoning = response_json.get("reasoning", "No reasoning provided.")
