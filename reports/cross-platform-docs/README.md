@@ -21,6 +21,19 @@ Cold Wind AI separates headless agent intelligence from presentation layers acro
 | **`desktop/` (`coldwind-desktop`)** | Reference terminal implementation (`DesktopContext.py`, `main_orchestrator.py`) proving the 5 runtime contracts. | Imports `coldwind.core.interfaces.*`. | `VERIFIED ✅` |
 | **`shared` / `ai-workflow-gui`** | Native Rust + Slint binary embedding CPython via PyO3 (`Bound<'py, T>`, `Py<T>`, `#[pyclass]` callbacks). | Embeds `coldwind-core` over PyO3 FFI boundary. | `VERIFIED ✅` |
 
+## 🚦 Active Learning Progress Tracker
+
+| Stage ID | Focus Domain & Concept Note | Target Hands-On Code | Status |
+| :--- | :--- | :--- | :---: |
+| **Stage 1.1** | [01-gil-and-interpreter-boot.md](./01_pyo3_core_mechanics/01-gil-and-interpreter-boot.md) | Initialize CPython interpreter & acquire GIL (`py`) | 🟢 **COMPLETE** |
+| **Stage 1.2** | [02-bound-vs-py-pointers.md](./01_pyo3_core_mechanics/02-bound-vs-py-pointers.md) | `Bound<'py, T>` vs `.unbind()` into `Py<T>` struct | 🟢 **COMPLETE** |
+| **Stage 2.1** | [01-importing-and-calling-python.md](./02_rust_driving_python/01-importing-and-calling-python.md) | Module imports & 1-tuple `call_method1` | 🟡 **IN PROGRESS** |
+| **Stage 2.2** | [02-python-exceptions-and-tracebacks.md](./02_rust_driving_python/02-python-exceptions-and-tracebacks.md) | Extracting formatted `PyErr` tracebacks | ⚪ PENDING |
+| **Stage 3.1** | [01-exposing-rust-to-python-pyclass.md](./03_python_driving_rust/01-exposing-rust-to-python-pyclass.md) | Rust struct exposed via `#[pyclass]` | ⚪ PENDING |
+| **Stage 3.2** | [02-pycell-borrows-and-reentrancy.md](./03_python_driving_rust/02-pycell-borrows-and-reentrancy.md) | Shared `&self` receivers + `mpsc` channel sink | ⚪ PENDING |
+| **Stage 4.1** | [01-why-gui-windows-freeze-and-weak-handles.md](./04_slint_concurrency_bridge/01-why-gui-windows-freeze-and-weak-handles.md) | `slint::Weak<AppWindow>` cross-thread transfer | ⚪ PENDING |
+| **Stage 4.2** | [02-event-loop-dispatch-and-shutdown.md](./04_slint_concurrency_bridge/02-event-loop-dispatch-and-shutdown.md) | `upgrade_in_event_loop` tokens & clean shutdown | ⚪ PENDING |
+
 ## Overview
 
 The **Cross-Platform Integration System** bridges two fundamentally different runtime models: **CPython 3.13+** (reference-counted `PyObject` heap allocations serialized by a global mutex, the GIL) and **Rust + Slint** (compile-time ownership, thread-affine GPU/window handles, and a 60 FPS reactive event loop).
@@ -138,15 +151,23 @@ Complexity ▲
 
 | Path (Relative) | Document Title | Artifact Type | Verification |
 | :--- | :--- | :--- | :--- |
-| [`./00_pyo3_slint_architecture_report.md`](./00_pyo3_slint_architecture_report.md) | Architecture Report & Tier 0 Master Guide: Non-Blocking PyO3 & Slint Integration | Design Report + Master Guide (M1–M8) | `VERIFIED ✅` |
+| [`./00_pyo3_slint_architecture_report.md`](./00_pyo3_slint_architecture_report.md) | Architecture Report & Master Guide: Non-Blocking PyO3 & Slint Integration | Design Report + Master Guide (M1–M8) | `VERIFIED ✅` |
 | [`./cheat_sheet.md`](./cheat_sheet.md) | Master Cheat Sheet & War Chest — PyO3 + Slint Cross-Platform Integration | Tier 1 War Chest (C1–C12) | `VERIFIED ✅` |
-| [`./01_pyo3_core_mechanics/README.md`](./01_pyo3_core_mechanics/README.md) | Subdomain 01 Concept Guide: PyO3 Core Mechanics & GIL Lifetime Model | Subdomain README + Concept Note | `VERIFIED ✅` |
-| [`./01_pyo3_core_mechanics/cheat_sheet.md`](./01_pyo3_core_mechanics/cheat_sheet.md) | Subdomain 01 Cheat Sheet: `Python<'py>`, `Bound<'py, T>` & `Py<T>` | Tier 1 Cheat Sheet (C1–C12) | `VERIFIED ✅` |
-| [`./02_rust_driving_python/README.md`](./02_rust_driving_python/README.md) | Subdomain 02 Concept Guide: Rust Driving Python Execution Engine | Subdomain README + Concept Note | `VERIFIED ✅` |
-| [`./02_rust_driving_python/cheat_sheet.md`](./02_rust_driving_python/cheat_sheet.md) | Subdomain 02 Cheat Sheet: Module Imports, `call_method1` & `PyErr` | Tier 1 Cheat Sheet (C1–C12) | `VERIFIED ✅` |
-| [`./03_python_driving_rust/README.md`](./03_python_driving_rust/README.md) | Subdomain 03 Concept Guide: Python Driving Rust Platform Context & Sinks | Subdomain README + Concept Note | `VERIFIED ✅` |
-| [`./03_python_driving_rust/cheat_sheet.md`](./03_python_driving_rust/cheat_sheet.md) | Subdomain 03 Cheat Sheet: `#[pyclass]`, `#[pymethods]` & Borrow Safety | Tier 1 Cheat Sheet (C1–C12) | `VERIFIED ✅` |
-| [`./04_slint_concurrency_bridge/README.md`](./04_slint_concurrency_bridge/README.md) | Subdomain 04 Concept Guide: Slint Concurrency Bridge & Event Loop Mechanics | Subdomain README + Concept Note | `VERIFIED ✅` |
-| [`./04_slint_concurrency_bridge/cheat_sheet.md`](./04_slint_concurrency_bridge/cheat_sheet.md) | Subdomain 04 Cheat Sheet: `Weak<AppWindow>` & `invoke_from_event_loop` | Tier 1 Cheat Sheet (C1–C12) | `VERIFIED ✅` |
+| [`./01_pyo3_core_mechanics/README.md`](./01_pyo3_core_mechanics/README.md) | Subdomain 01 Domain Guide: PyO3 Core Mechanics & GIL Lifetime Model | Subdomain README + Overview | `VERIFIED ✅` |
+| [`./01_pyo3_core_mechanics/01-gil-and-interpreter-boot.md`](./01_pyo3_core_mechanics/01-gil-and-interpreter-boot.md) | Concept 01: Why Rust Needs a Permission Slip (Interpreter Boot & GIL) | Root-Cause Concept Note | `VERIFIED ✅` |
+| [`./01_pyo3_core_mechanics/02-bound-vs-py-pointers.md`](./01_pyo3_core_mechanics/02-bound-vs-py-pointers.md) | Concept 02: `Bound<'py, T>` vs `Py<T>` (Corded Drills vs Portable Cases) | Root-Cause Concept Note | `VERIFIED ✅` |
+| [`./01_pyo3_core_mechanics/cheat_sheet.md`](./01_pyo3_core_mechanics/cheat_sheet.md) | Subdomain 01 War Chest: `Python<'py>`, `Bound<'py, T>` & `Py<T>` | Tier 1 Cheat Sheet (C1–C12) | `VERIFIED ✅` |
+| [`./02_rust_driving_python/README.md`](./02_rust_driving_python/README.md) | Subdomain 02 Domain Guide: Rust Driving Python Execution Engine | Subdomain README + Overview | `VERIFIED ✅` |
+| [`./02_rust_driving_python/01-importing-and-calling-python.md`](./02_rust_driving_python/01-importing-and-calling-python.md) | Concept 01: Importing `coldwind-core` & 1-Tuple Arguments (`call_method1`) | Root-Cause Concept Note | `VERIFIED ✅` |
+| [`./02_rust_driving_python/02-python-exceptions-and-tracebacks.md`](./02_rust_driving_python/02-python-exceptions-and-tracebacks.md) | Concept 02: Python Exceptions & Formatting Multi-Line `PyErr` Tracebacks | Root-Cause Concept Note | `VERIFIED ✅` |
+| [`./02_rust_driving_python/cheat_sheet.md`](./02_rust_driving_python/cheat_sheet.md) | Subdomain 02 War Chest: Module Imports, `call_method1` & `PyErr` | Tier 1 Cheat Sheet (C1–C12) | `VERIFIED ✅` |
+| [`./03_python_driving_rust/README.md`](./03_python_driving_rust/README.md) | Subdomain 03 Domain Guide: Python Driving Rust Platform Context & Sinks | Subdomain README + Overview | `VERIFIED ✅` |
+| [`./03_python_driving_rust/01-exposing-rust-to-python-pyclass.md`](./03_python_driving_rust/01-exposing-rust-to-python-pyclass.md) | Concept 01: Exposing Rust Structs to Python via `#[pyclass]` & `#[pymethods]` | Root-Cause Concept Note | `VERIFIED ✅` |
+| [`./03_python_driving_rust/02-pycell-borrows-and-reentrancy.md`](./03_python_driving_rust/02-pycell-borrows-and-reentrancy.md) | Concept 02: `PyCell` Interior Mutability & Preventing `PyBorrowMutError` | Root-Cause Concept Note | `VERIFIED ✅` |
+| [`./03_python_driving_rust/cheat_sheet.md`](./03_python_driving_rust/cheat_sheet.md) | Subdomain 03 War Chest: `#[pyclass]`, `#[pymethods]` & Borrow Safety | Tier 1 Cheat Sheet (C1–C12) | `VERIFIED ✅` |
+| [`./04_slint_concurrency_bridge/README.md`](./04_slint_concurrency_bridge/README.md) | Subdomain 04 Domain Guide: Slint Concurrency Bridge & Event Loop Mechanics | Subdomain README + Overview | `VERIFIED ✅` |
+| [`./04_slint_concurrency_bridge/01-why-gui-windows-freeze-and-weak-handles.md`](./04_slint_concurrency_bridge/01-why-gui-windows-freeze-and-weak-handles.md) | Concept 01: Why GUI Windows Freeze & Why `AppWindow` is `!Send` | Root-Cause Concept Note | `VERIFIED ✅` |
+| [`./04_slint_concurrency_bridge/02-event-loop-dispatch-and-shutdown.md`](./04_slint_concurrency_bridge/02-event-loop-dispatch-and-shutdown.md) | Concept 02: `upgrade_in_event_loop`, Safe Shutdown & `py.allow_threads` | Root-Cause Concept Note | `VERIFIED ✅` |
+| [`./04_slint_concurrency_bridge/cheat_sheet.md`](./04_slint_concurrency_bridge/cheat_sheet.md) | Subdomain 04 War Chest: `Weak<AppWindow>` & `invoke_from_event_loop` | Tier 1 Cheat Sheet (C1–C12) | `VERIFIED ✅` |
 | [`../urgent_development/platform-integration-spec.md`](../urgent_development/platform-integration-spec.md) | Upstream Prerequisite: Core Platform Integration & Engine Decoupling Spec | Upstream Contract Spec | `VERIFIED ✅` |
 | [`../README.md`](../README.md) | Parent Library Index: Cold Wind AI Reports Library | Root Reports Index | `VERIFIED ✅` |

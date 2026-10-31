@@ -31,11 +31,42 @@ This architecture report governs the cross-language boundary between the existin
 
 Cold Wind AI (`cold-wind-ai` v2.0.0) is architected around a strict layering invariant: **presentation platforms import Core; Core never imports presentation platforms**. While the terminal client (`coldwind-desktop`) runs in pure Python using `prompt_toolkit` and `rich`, the native desktop GUI (`ai-workflow-gui`) uses **Slint** (a declarative GPU-accelerated UI toolkit in Rust) paired with **PyO3** (Rust bindings for the CPython C-API) to drive `coldwind-core`.
 
+### 1.1 The PyO3 Module Architecture (Mapping Python to Rust)
+
+> PyO3 separates its API into **`prelude`**, **`types`**, and **`exceptions`** to prevent namespace collisions with Rust's own native primitives (**`Vec`**, **`HashMap`**, **`String`**). If you know Python, think of **`prelude`** as Python's language keywords and **`types`** as the built-in container types (**`list`**, **`dict`**, **`tuple`**).
+
+```text
+Title: Mapping Python Builtins to PyO3 Modules
+
+In Pure Python                          In PyO3 (Rust)
+┌────────────────────────────────┐      ┌──────────────────────────────────────────────┐
+│ Python Keywords & Runtime      │ ───► │ use pyo3::prelude::*;                        │
+│ (def, class, try, RuntimeError)│      │ • Python, Bound, Py, PyResult, #[pyclass]    │
+└────────────────────────────────┘      └──────────────────────────────────────────────┘
+┌────────────────────────────────┐      ┌──────────────────────────────────────────────┐
+│ Built-in Data Types            │ ───► │ use pyo3::types::{PyList, PyDict, PyAny};    │
+│ (list, dict, tuple, str)       │      │ • Isolated to avoid colliding with Vec/String│
+└────────────────────────────────┘      └──────────────────────────────────────────────┘
+┌────────────────────────────────┐      ┌──────────────────────────────────────────────┐
+│ Exception Classes              │ ───► │ use pyo3::exceptions::{PyValueError, ...};   │
+│ (ValueError, TypeError)        │      │ • Used when raising Python errors from Rust  │
+└────────────────────────────────┘      └──────────────────────────────────────────────┘
+```
+
+#### Why the Separation Exists:
+1. **`pyo3::prelude::*` — The Daily Pocket Kit:** Universal runtime mechanics: `Python<'py>`, `Bound<'py, T>`, `Py<T>`, `PyResult<T>`, and macros (`#[pyclass]`, `#[pymethods]`).
+2. **`pyo3::types::*` — Concrete Python Data Structures:** `PyList`, `PyDict`, `PyTuple`, `PyAny`, `PyModule`. Isolated to prevent name collisions with Rust's standard `Vec`, `HashMap`, and `String`.
+3. **`pyo3::exceptions::*` — The Error Hierarchy:** `PyValueError`, `PyTypeError`, `PyKeyError`, `PyRuntimeError`.
+
+---
+
+### 1.2 The Four Critical Systems Hazards
+
 Combining a native 60 FPS GUI with an embedded Python agent engine introduces four critical systems hazards. If any one of these hazards is mishandled, the application either fails to compile, panics at runtime, or freezes the operating system window.
 
 | Hazard # | Architectural Hazard | What Fails If Unchecked | Architectural Resolution | Owning Subdomain |
 | :--- | :--- | :--- | :--- | :--- |
-| **Hazard 1** | **GIL vs UI Thread Deadlock** | Acquiring `Python::with_gil` on Thread 0 blocks Slint's 16.6ms frame budget during 10s LLM turns. | Dedicate Thread 0 strictly to Slint; spawn Thread N as the persistent PyO3 engine worker. | [`01_pyo3_core_mechanics`](./01_pyo3_core_mechanics/README.md) & [`04_slint_concurrency_bridge`](./04_slint_concurrency_bridge/README.md) |
+| **Hazard 1** | **GIL / Thread State Deadlock** | Calling `Python::attach` on Thread 0 blocks Slint's 16.6ms frame budget during 10s LLM turns. | Dedicate Thread 0 strictly to Slint; spawn Thread N as the persistent PyO3 engine worker. | [`01_pyo3_core_mechanics`](./01_pyo3_core_mechanics/README.md) & [`04_slint_concurrency_bridge`](./04_slint_concurrency_bridge/README.md) |
 | **Hazard 2** | **Blocking CLI Loop (`run_chat`)** | `ChatInitializer.run_chat()` blocks infinitely on `get_user_input()`, starving event-driven GUIs. | Bypass `run_chat()`; invoke discrete turns (`graph.invoke(state)`) per channel message. | [`02_rust_driving_python`](./02_rust_driving_python/README.md) |
 | **Hazard 3** | **Inversion of Control (`#[pyclass]`)** | Core calls `ContextRegistry.get()` during turns; `&mut self` Rust receivers panic on re-entrant logs. | Expose a Rust `#[pyclass]` sink using shared `&self` methods backed by an `mpsc::Sender`. | [`03_python_driving_rust`](./03_python_driving_rust/README.md) |
 | **Hazard 4** | **`!Send` Window Handle Panics** | `AppWindow` holds internal `Rc` pointers (`!Send`); worker threads cannot touch UI properties directly. | Pass `slint::Weak<AppWindow>` to Thread N and marshal updates via `slint::invoke_from_event_loop`. | [`04_slint_concurrency_bridge`](./04_slint_concurrency_bridge/README.md) |
@@ -46,7 +77,7 @@ Combining a native 60 FPS GUI with an embedded Python agent engine introduces fo
 Think of the application as a high-end restaurant divided by a soundproof swing door:
 1. **Thread 0 (The Front-of-House Maître D' — Slint UI):** Greets guests, renders menus, and animates plates at 60 frames per second (one frame every `16.6ms`). If the Maître D' walks into the kitchen and waits 15 seconds for soup to boil, the front door locks up and guests walk out.
 2. **The Order Ticket Chute (`mpsc::channel`):** When a user clicks "Send", the Maître D' drops a paper ticket into a one-way pneumatic tube (`prompt_tx.send(prompt)`) in `0.2 microseconds` and immediately goes back to greeting guests.
-3. **Thread N (The Single-Chef Kitchen — CPython GIL Worker):** Inside the kitchen, there is only **one stove** (the Global Interpreter Lock, `Python<'py>`). The worker chef grabs the ticket, turns on the stove (`Python::with_gil`), runs the LangGraph recipe (`coldwind-core`), and whenever a dish course (a streamed token or tool status) is ready, rings the pass-window bell (`slint::invoke_from_event_loop`) so the Maître D' places it on the table during the next frame tick.
+3. **Thread N (The Single-Chef Kitchen — CPython Runtime Worker):** Inside the kitchen, there is only **one stove** (the CPython runtime, `Python<'py>`). The worker chef grabs the ticket, turns on the stove (`Python::attach`), runs the LangGraph recipe (`coldwind-core`), and whenever a dish course (a streamed token or tool status) is ready, rings the pass-window bell (`slint::invoke_from_event_loop`) so the Maître D' places it on the table during the next frame tick.
 
 **Title:** End-to-End Cross-Platform Runtime Topology  
 *How to read this:* Follow the numbered steps `(1)` through `(6)` clockwise from the Slint UI user action down into `coldwind-core` and back up to the Slint event queue.
