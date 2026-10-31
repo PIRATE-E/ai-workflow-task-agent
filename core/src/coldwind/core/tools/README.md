@@ -35,7 +35,7 @@ agents (tool mode) ──► tool_selector ──► ToolAssign (registry) ─�
 | `lggraph_tools/google_search_tool.py` | `search_google_tool(query)` — live Google results |
 | `lggraph_tools/run_shell_command_tool.py` | `run_shell_command(command)` — run shell commands |
 | `lggraph_tools/translate_tool.py` | `translate_text(message, target_language)` |
-| `lggraph_tools/rag_search_classifier_tool.py` | `rag_search_classifier_tool(query)` + `retrieve_knowledge_graph` — ask your stored knowledge |
+| `lggraph_tools/rag_search_classifier_tool.py` | *(FROZEN / LEGACY)* `rag_search_classifier_tool(query)` — legacy RAG lookup, pending Phase 2 rewrite |
 | `lggraph_tools/browser_tool_main.py` | `browser_use_tool(...)` + `BrowserHandler` — drive a real browser |
 | `lggraph_tools/wrappers/` | One wrapper per tool (safety + normalization layer) |
 | `lggraph_tools/wrappers/mcp_wrapper/` | `UniversalMCPWrapper` (`uni_mcp_wrappers.py`) — MCP tools become normal tools |

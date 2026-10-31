@@ -3,10 +3,9 @@ try:
 except ImportError:
     winsound = None  # Not available on Linux/Mac
 
+from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
 from rich.align import Align
 from rich.panel import Panel
-
-from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
 
 # MIGRATED: settings.console removed; console now sourced via ContextRegistry.get().get_console().
 # Config values are accessed via: ContextRegistry.get().get_settings().<field>
@@ -15,6 +14,37 @@ from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
 def print_message(msg: str, sender="user"):
     # MIGRATED: settings.console → ContextRegistry.get().get_console()
     console = ContextRegistry.get().get_console()
+    if not console:
+        raise RuntimeError("console is not defined to print messages !!")
+
+        # -------------------------------------------------------------------------
+        # System Messages: Node progress, slash commands, routing notifications
+        # Print directly to console with Rich markup instead of wrapping in a panel!
+        # -------------------------------------------------------------------------
+    if sender == "system":
+        clean = msg.strip()
+        if clean.startswith("----Node is"):
+            # Node execution marker (indented green)
+            console.print(
+                f"\t\t----[bold green]{clean.replace('----Node is ', 'Node is ')}[/bold green]"
+            )
+        elif clean.startswith("Slash command executed:"):
+            console.print(
+                f"[u][red]Slash command executed:[/u][/red] {clean.replace('Slash command executed: ', '')}"
+            )
+        elif clean.startswith("Slash command execution failed:") or clean.startswith(
+            "Invalid slash command:"
+        ):
+            console.print(f"[u][red]{clean}[/u][/red]")
+        elif clean.startswith("Message classified as:"):
+            console.print(
+                f"[u][red]Message classified as[/u][/red]: {clean.replace('Message classified as: ', '')}"
+            )
+        else:
+            # General system notification
+            console.print(f"[dim]{clean}[/dim]")
+        return
+
     if sender == "user":
         icon = "👤"
         style = "bold cyan"

@@ -12,8 +12,13 @@ def generate_llm_response(state) -> dict:
     """Generates a response using the LLM based on the conversation history and the latest user message.
     Shows a spinner while generating the response.
     """
-    console = ContextRegistry.get().get_console()
-    console.print("\t\t----[bold][green]Node is chatBot[/bold][/green]")
+    # -------------------------------------------------------------------------
+    # WHAT CHANGED & WHY:
+    # Replaced console.print with print_message(sender="system") contract.
+    # WHY: Purges direct console dependency so node executes cleanly across all
+    # platforms (Desktop, GUI, Server) via MessageDisplayInterface.
+    # -------------------------------------------------------------------------
+    print_message("----Node is chatBot", sender="system")
     # Access state directly from LangGraph parameter
     messages = state.get("messages", [])
     history = "\n".join(f"{msg.type}: {msg.content}" for msg in messages[:-1])

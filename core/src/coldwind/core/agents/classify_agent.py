@@ -3,7 +3,14 @@ from langchain_core.messages import HumanMessage
 from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
 from coldwind.core.models.state import StateAccessor
 from coldwind.core.tools.lggraph_tools.tool_assign import ToolAssign
-
+# -----------------------------------------------------------------------------
+# WHAT CHANGED & WHY:
+# Route slash command status and user messages through ui_interface.print_message
+# and debug logger instead of raw console.print.
+# WHY: Preserves Core headless contract so engine can execute without terminal
+# rich Console dependencies (e.g. inside FastAPI server or Slint GUI).
+# -----------------------------------------------------------------------------
+from coldwind.core.interfaces.ui_interface import print_message
 from coldwind.core.utils.model_manager import ModelManager
 
 
@@ -15,13 +22,11 @@ def classify_message_type(state) -> dict:
     Routing is based on slash command prefixes. Supported commands are:
         /llm, /tool, and /agent. If no valid command is detected, the default route is /llm.
     """
-    print("\t\t----Node is classify_message")
     ContextRegistry.get().get_logger().log_info(
         heading="STATUS",
         body="Analyzing request and routing...",
         metadata={"node": "classify_message"},
     )
-    console = ContextRegistry.get().get_console()
 
     # Access state directly from LangGraph parameter (no sync needed)
     messages = state.get("messages", [])
@@ -37,15 +42,16 @@ def classify_message_type(state) -> dict:
             command_parser = ContextRegistry.get().get_command_parser()
             result = command_parser.parse_and_execute(content)
             if result and getattr(result, "success", False):
-                console.print(f"[u][red]Slash command executed:[/u][/red] {content}")
+                print_message(f"Slash command executed: {content}", sender="system")
             else:
-                console.print(f"[u][red]Slash command execution failed:[/u][/red] {result.message}")
+                err_msg = result.message if result else "Unknown error"
+                print_message(f"Slash command execution failed: {err_msg}", sender="system")
         except ValueError as ve:
-            console.print(f"[u][red]Invalid slash command:[/u][/red] {ve}")
+            print_message(f"Invalid slash command: {ve}", sender="system")
             message = HumanMessage(content=f"Invalid slash command: {ve}")
             state["messages"].append(message)
         except Exception as e:
-            console.print(f"[u][red]Error processing slash command:[/u][/red] {e}")
+            print_message(f"Error processing slash command: {e}", sender="system")
             message = HumanMessage(content=f"Error processing slash command: {e}")
             state["messages"].append(message)
         # -------------------------------------------------------------------------
@@ -66,7 +72,7 @@ def classify_message_type(state) -> dict:
                 )
             )
             state["messages"].append(message)
-            console.print("[u][red]Defaulting to LLM response for non-routing slash command.[/u][/red]")
+            print_message("Defaulting to LLM response for non-routing slash command.", sender="system")
 
             return {"message_type": "llm"}
 
@@ -177,5 +183,11 @@ Classify thoughtfully based on true user intent, not just keywords."""
         message_type=result_json.get("message_type", "llm"),
         reasoning=result_json.get("reasoning", ""),
     )
-    console.print(f"[u][red]Message classified as[/u][/red]: {result.message_type}")
+    # -------------------------------------------------------------------------
+    # WHAT CHANGED & WHY:
+    # Replaced console.print with print_message(sender="system") contract.
+    # WHY: Headless presentation abstraction — delegates display to host platform
+    # (Desktop, Slint GUI, Server) via MessageDisplayInterface.
+    # -------------------------------------------------------------------------
+    print_message(f"Message classified as: {result.message_type}", sender="system")
     return {"message_type": result.message_type}

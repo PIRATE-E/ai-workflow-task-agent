@@ -106,8 +106,13 @@ def agent_node(state):
             pass  # Ignore if reconfigure is not available
 
         context = ContextRegistry.get()
-        console = context.get_console()
-        console.print("\t\t----Node is agent_node")
+        # ---------------------------------------------------------------------
+        # WHAT CHANGED & WHY:
+        # Replaced console.print with print_message(sender="system") contract.
+        # WHY: Purges direct console dependency so node executes cleanly across all
+        # platforms (Desktop, GUI, Server) via MessageDisplayInterface.
+        # ---------------------------------------------------------------------
+        print_message("----Node is agent_node", sender="system")
 
         # Access state directly from LangGraph parameter (no sync needed)
         messages = state.get("messages", [])
