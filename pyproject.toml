@@ -7,7 +7,7 @@ requires-python = ">=3.13"
 # dependencies = # Root has no runtime dependencies of its own — each member declares its own.
 
 [tool.uv.workspace]
-members = ["core", "desktop", "server"]
+members = ["core", "desktop", "server", "slint_gui"]
 
 [tool.uv.sources]
 coldwind-core = { workspace = true }
@@ -24,10 +24,10 @@ coldwind-core = { workspace = true }
 # Undo = delete this table; pyrightconfig.json users are unaffected.
 # ─────────────────────────────────────────────────────────────────────
 [tool.ty.environment]
-root = ["./core/src", "./desktop/src"]
+root = ["./core/src", "./desktop/src", "./slint_gui/src"]
 
 [tool.ruff]
-lint.select = ["PTH", "ASYNC", "UP028"]
+lint.extend-select = ["PTH", "ASYNC", "UP028"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

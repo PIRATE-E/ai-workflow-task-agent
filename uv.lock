@@ -11,6 +11,7 @@ members = [
     "cold-wind-ai",
     "coldwind-core",
     "coldwind-desktop",
+    "coldwind-slint-gui",
 ]
 
 [[package]]
@@ -479,6 +480,11 @@ requires-dist = [
     { name = "rich", specifier = ">=14.1.0" },
     { name = "wcwidth", specifier = ">=0.2.13" },
 ]
+
+[[package]]
+name = "coldwind-slint-gui"
+version = "0.0.1"
+source = { editable = "slint_gui" }
 
 [[package]]
 name = "colorama"
