@@ -29,7 +29,7 @@ class AgentGraphCore:
     - Hierarchical parent-child task relationship management
 
     🔄 WORKFLOW ORCHESTRATION:
-    - 7-node LangGraph workflow with conditional routing
+    - 9-node LangGraph workflow with conditional routing
     - State-machine-based execution with comprehensive error handling
     - Tool execution with safe bounds checking and validation
     - Schema-aware parameter generation for optimal tool usage
@@ -359,13 +359,10 @@ class AgentGraphCore:
     def __subAGENT_classifier(cls, state: "WorkflowStateModel") -> dict:
         """🎯 DECISION POINT: Analyzes current task and decides next workflow step.
 
-        This is a critical routing node that determines whether to:
-        - Proceed with normal task execution (AGENT_PERFORM_TASK)
-        - Trigger error recovery procedures (AGENT_PERFORM_ERROR_FALLBACK)
-        - Skip tasks marked in pre-flight check (status='skip')
-
-        The decision is based on task failure count and retry limits, implementing
-        a graduated response system for handling task failures.
+        Strict Separation of Concerns:
+        - status == 'skip'    -> AGENT_PERFORM_TASK (rides Skip Bypass Conveyor Belt to planner/finalizer)
+        - status == 'pending' -> cascade check, then AGENT_PERFORM_TASK (to parameter_generator/executor)
+        - status == 'failed'  -> AGENT_PERFORM_ERROR_FALLBACK (to error_fallback, which owns all recovery/skip strategy)
         """
         current_task_id = state.current_task_id
         AgentStatusUpdater.update_status(
@@ -379,7 +376,7 @@ class AgentGraphCore:
         tasks = state.tasks
         current_task = next((t for t in tasks if t.task_id == current_task_id), None)
 
-        # Handle pre-flight skipped tasks - create execution context and mark as ready for task_planner
+        # 1. Handle skipped tasks (pre-flight OR error_fallback skipped)
         if current_task and current_task.status == "skip":
             skip_reason = "No reason provided"
             skip_probability = 0
@@ -398,7 +395,7 @@ class AgentGraphCore:
 
             ContextRegistry.get().get_logger().log_info(
                 "Classifier - Skip Handler",
-                f"Task {current_task_id} was PRE-FLIGHT SKIPPED (prob: {skip_probability}%): {skip_reason}",
+                f"Task {current_task_id} is SKIPPED (prob: {skip_probability}%): {skip_reason}",
                 metadata={
                     "task_id": current_task_id,
                     "skip_reason": skip_reason,
@@ -407,7 +404,7 @@ class AgentGraphCore:
                 },
             )
 
-            # Create minimal execution context so task appears "complete" to workflow
+            # Preserve rich execution_context if error_fallback already populated it
             if not current_task.execution_context:
                 current_task.execution_context = EXECUTION_CONTEXT(
                     tool_name=current_task.tool_name,
@@ -417,17 +414,14 @@ class AgentGraphCore:
                     goal_achieved=False,
                 )
 
-            # Task remains in skip status and has execution_context, so it will be treated as "done"
-            # The workflow will route to task_planner to select next pending task
-            # We still set persona to allow normal flow through router
             return {
                 "tasks": tasks,
                 "executed_nodes": state.executed_nodes + ["subAGENT_classifier"],
-                "persona": "AGENT_PERFORM_TASK",  # Use normal persona so router works
+                "persona": "AGENT_PERFORM_TASK",
             }
 
-        # handle that if the previous task got skipped and this task is depend on that (cascade skip effect)
-        elif current_task.status == "pending":
+        # 2. Handle pending tasks (check cascade skip dependency first)
+        elif current_task and current_task.status == "pending":
             skipped_tasks = [t for t in tasks if t.status == "skip"]
             should_skip, reason = AgentCoreHelpers.evaluate_skip_cascade(
                 current_task, skipped_tasks
@@ -443,7 +437,6 @@ class AgentGraphCore:
                     },
                 )
 
-                # Create minimal execution context so task appears "complete" to workflow
                 if not current_task.execution_context:
                     current_task.execution_context = EXECUTION_CONTEXT(
                         tool_name=current_task.tool_name,
@@ -453,64 +446,31 @@ class AgentGraphCore:
                         goal_achieved=False,
                     )
 
-                current_task.status = "skip"  # Mark task as skipped
+                current_task.status = "skip"
 
                 return {
                     "tasks": tasks,
                     "executed_nodes": state.executed_nodes + ["subAGENT_classifier"],
-                    "persona": "AGENT_PERFORM_TASK",  # Use normal persona so router works
+                    "persona": "AGENT_PERFORM_TASK",
                 }
-        # 🔍 CRITICAL DECISION: Determine execution persona based on task readiness and failure history
+
+        # 3. Route based purely on current_task.status
         persona = "AGENT_PERFORM_TASK"
+        if current_task and current_task.status == "failed":
+            persona = "AGENT_PERFORM_ERROR_FALLBACK"
 
-        # Priority 1: If task is pending AND already has execution parameters, force execution next
-        if (
-            current_task
-            and current_task.status == "pending"
-            and current_task.execution_context
-            and isinstance(current_task.execution_context.parameters, dict)
-            and current_task.execution_context.parameters
-        ):
-            # We have updated parameters (possibly from recovery) ready to execute — do not bounce back to fallback
-            persona = "AGENT_PERFORM_TASK"
-        elif current_task and current_task.failure_context:
-            # Check if we've exceeded retry limits to prevent infinite loops
-            if current_task.failure_context.fail_count > 3:
-                AgentStatusUpdater.update_status(
-                    "complexity_analysis",
-                    task_id=current_task_id,
-                    extra_info="FAILED: Exceeded retry limit",
-                )
-                ContextRegistry.get().get_logger().log_error(
-                    "Classifier",
-                    f"Task {current_task_id} has failed {current_task.failure_context.fail_count} times. Exceeded retry limit of 2 attempts. Marking as permanently failed.",
-                    metadata={
-                        "function name": "__subAGENT_classifier",
-                        "task_id": current_task_id,
-                        "fail_count": current_task.failure_context.fail_count,
-                        "max_retries": current_task.max_retries,
-                    },
-                )
-                current_task.status = "failed"
-                persona = "AGENT_PERFORM_ERROR_FALLBACK"
-            elif current_task.failure_context.fail_count >= 2:
-                persona = "AGENT_PERFORM_ERROR_FALLBACK"
-            elif current_task.failure_context.fail_count >= current_task.max_retries:
-                # if the task got more failures than max retries, we skip it
-                persona = "AGENT_PERFORM_ERROR_FALLBACK"
-                current_task.status = "skip"
-
-        # print_log_message(f"Task ID: {current_task_id}, Persona: {persona}", "Classifier")
         ContextRegistry.get().get_logger().log_info(
             "Classifier",
-            f"Task ID: {current_task_id}, Persona: {persona}",
+            f"Task ID: {current_task_id}, Status: {getattr(current_task, 'status', 'N/A')}, Persona: {persona}",
             metadata={
                 "function name": "__subAGENT_classifier",
                 "task_id": current_task_id,
+                "task_status": getattr(current_task, "status", None),
                 "persona": persona,
             },
         )
         return {
+            "tasks": tasks,
             "executed_nodes": state.executed_nodes + ["subAGENT_classifier"],
             "persona": persona,
         }
@@ -591,7 +551,7 @@ class AgentGraphCore:
                 if t.execution_context and t.execution_context.analysis
             ]
 
-            # Build validator feedback context from failed tasks
+            # Build validator and fallback feedback context from failed/skipped tasks
             validator_feedback_summary = []
             for failed_task in failed_tasks_with_feedback:
                 if (
@@ -601,6 +561,11 @@ class AgentGraphCore:
                 ):
                     validator_feedback_summary.append(
                         f"VALIDATOR REJECTED Task {failed_task.task_id} ({failed_task.tool_name}): {failed_task.failure_context.error_message}"
+                        f"\n FAILED Parameters: {failed_task.failure_context.failed_parameters if failed_task.failure_context.failed_parameters else 'N/A'}"
+                    )
+                elif failed_task.failure_context:
+                    validator_feedback_summary.append(
+                        f"PREVIOUS FAILED/SKIPPED Task {failed_task.task_id} ({failed_task.tool_name}): {failed_task.failure_context.error_message}"
                         f"\n FAILED Parameters: {failed_task.failure_context.failed_parameters if failed_task.failure_context.failed_parameters else 'N/A'}"
                     )
 
@@ -1188,17 +1153,20 @@ class AgentGraphCore:
                     f"Task {current_task.tool_name} completed successfully."
                 )
 
-        # 🔥 SKIP HANDLER: Generate analysis for skipped tasks
+        # 🔥 SKIP HANDLER: Preserve rich fallback analysis if already populated by error_fallback
         elif (
-            current_task.status == "skip"
+            current_task
+            and current_task.status == "skip"
             and current_task.execution_context
             and current_task.execution_context.result
         ):
-            # Handle skipped tasks by summarizing the skip reason
-            skip_summary = (
-                f"Task was skipped. Reason: {current_task.execution_context.result}"
-            )
-            current_task.execution_context.analysis = skip_summary
+            if not current_task.execution_context.analysis:
+                skip_summary = (
+                    f"Task was skipped. Reason: {current_task.execution_context.result}"
+                )
+                current_task.execution_context.analysis = skip_summary
+            else:
+                skip_summary = current_task.execution_context.analysis
             ContextRegistry.get().get_logger().log_info(
                 "Context Synthesizer - Skip Handler",
                 f"Generated analysis for SKIPPED Task {current_task_id}: '{skip_summary}'",
@@ -1382,9 +1350,101 @@ class AgentGraphCore:
         }
 
     @classmethod
+    def __mark_task_unrecoverable_and_skip(
+        cls,
+        current_task: TASK,
+        strategy_name: Literal[
+            "PARAMETER_REPAIR",
+            "ALTERNATIVE_TOOL",
+            "TASK_DECOMPOSITION",
+            "NO_STRATEGY",
+            "SKIP",
+        ],
+        reasoning: str,
+        outcome: Literal["FAILURE", "APPLIED", "NOT_APPLIED"] = "APPLIED",
+        recovery_decision: dict | None = None,
+        extra_details: dict | None = None,
+    ) -> None:
+        """Enriches task execution_context and failure_context when a task cannot be recovered
+        (or is intentionally skipped) and flips status to 'skip' so the workflow's
+        Skip Bypass Conveyor Belt carries the full context into subAGENT_task_planner / subAGENT_finalizer.
+        """
+        recovery_decision = recovery_decision or {}
+        if not current_task.failure_context:
+            current_task.failure_context = FAILURE_CONTEXT(
+                error_message=reasoning,
+                fail_count=1,
+                last_failure_timestamp=get_formatted_timestamp(),
+                error_type="UnrecoverableTaskError",
+                failed_parameters=(
+                    current_task.execution_context.parameters
+                    if current_task.execution_context
+                    else {}
+                ),
+                strategy_history=[],
+            )
+
+        details_payload = {
+            "description": current_task.description,
+            "error_message": current_task.failure_context.error_message,
+        }
+        if extra_details:
+            details_payload.update(extra_details)
+
+        current_task.failure_context.strategy_history.append(
+            FAILURE_CONTEXT_STRATEGY(
+                recovery_strategy=strategy_name,
+                reasoning=reasoning,
+                confidence_level=recovery_decision.get("confidence_level", "LOW"),
+                estimated_success_probability=recovery_decision.get(
+                    "estimated_success_probability", 0
+                ),
+                next_steps=recovery_decision.get(
+                    "next_steps", "Task marked as skipped to allow workflow progression."
+                ),
+                outcome=outcome,
+                details=details_payload,
+            )
+        )
+
+        fail_count = current_task.failure_context.fail_count
+        error_type = current_task.failure_context.error_type or "UnknownError"
+        error_msg = current_task.failure_context.error_message or "Unknown error"
+        failed_params = current_task.failure_context.failed_parameters or {}
+        strategy_summary = "; ".join(
+            f"[{idx + 1}] {s.recovery_strategy} ({s.outcome}): {s.reasoning}"
+            for idx, s in enumerate(current_task.failure_context.strategy_history)
+        )
+
+        rich_skip_result = (
+            f"⏭️ Task skipped after {fail_count} failure(s) ({error_type}): {error_msg} "
+            f"| Fallback decision ({strategy_name}): {reasoning}"
+        )
+        rich_skip_analysis = (
+            f"Task {current_task.task_id} ({current_task.tool_name}) was marked as SKIPPED by Error Fallback "
+            f"after {fail_count} failure(s). Last error ({error_type}): {error_msg}. "
+            f"Failed parameters: {failed_params}. "
+            f"Recovery history: {strategy_summary or 'None'}."
+        )
+
+        current_task.execution_context = EXECUTION_CONTEXT(
+            tool_name=current_task.tool_name,
+            parameters=failed_params if isinstance(failed_params, dict) else {},
+            result=rich_skip_result,
+            analysis=rich_skip_analysis,
+            goal_achieved=False,
+        )
+        current_task.status = "skip"
+
+    @classmethod
     def __subAGENT_error_fallback(cls, state: "WorkflowStateModel") -> dict:
-        ## todo shifting fallback to use enhanced helper - pending
-        """Handle task failures with a tiered, state-driven recovery system."""
+        """Handle task failures with a tiered, state-driven recovery system.
+
+        Consumes the schema-validated strategy decision from EnhancedErrorFallbackHelpers.decide_recovery_strategy.
+        Every exit path transitions the task to either:
+        - status = 'pending' (when a recovery strategy succeeds), OR
+        - status = 'skip' with full execution_context & strategy_history (when skipping or when recovery fails).
+        """
         AgentStatusUpdater.update_status(
             "error_recovery", task_id=state.current_task_id
         )
@@ -1399,44 +1459,32 @@ class AgentGraphCore:
             (task for task in updated_tasks if task.task_id == current_task_id), None
         )
 
-        if not current_task or not current_task.failure_context:
+        if not current_task:
             return {
                 "tasks": updated_tasks,
                 "executed_nodes": state.executed_nodes + ["subAGENT_error_fallback"],
             }
 
-        # todo here the enhancement start to use the new helper
-        # 1. DELEGATE to the new, intelligent helper
-        recovery_decision = (
-            AgentCoreHelpers.EnhancedErrorFallbackHelpers.decide_recovery_strategy(
-                current_task, state
-            )
-        )
-        strategy = recovery_decision.get(
-            "recovery_strategy", None
-        )  # <-- Use the strategy from the helper
-        # Canonicalize strategy names from LLM to internal enums
-        if not strategy:
-            current_task.status = "failed"
-            current_task.failure_context.strategy_history.append(
-                FAILURE_CONTEXT_STRATEGY(
-                    recovery_strategy="NO_STRATEGY",
-                    reasoning=recovery_decision.get(
-                        "reasoning", "No viable recovery strategy identified."
-                    ),
-                    outcome="NOT_APPLIED",
-                    details={
-                        "description": current_task.description,
-                        "error_message": getattr(
-                            current_task.failure_context, "error_message", None
-                        ),
-                    },
-                )
+        if not current_task.failure_context:
+            cls.__mark_task_unrecoverable_and_skip(
+                current_task=current_task,
+                strategy_name="NO_STRATEGY",
+                reasoning="Task entered error fallback without failure_context; skipping to preserve workflow progression.",
+                outcome="NOT_APPLIED",
             )
             return {
                 "tasks": updated_tasks,
                 "executed_nodes": state.executed_nodes + ["subAGENT_error_fallback"],
             }
+
+        # 1. DELEGATE to the schema-validated strategy producer
+        recovery_decision = (
+            AgentCoreHelpers.EnhancedErrorFallbackHelpers.decide_recovery_strategy(
+                current_task, state
+            )
+        )
+        strategy = recovery_decision.get("recovery_strategy", "SKIP")
+
         # 2. ACT on the strategic decision
         try:
             if strategy == "PARAMETER_REPAIR":
@@ -1446,14 +1494,12 @@ class AgentGraphCore:
                     )
                 )
                 if is_repaired:
-                    # Ensure execution_context exists before assigning parameters
                     if current_task.execution_context is None:
                         current_task.execution_context = EXECUTION_CONTEXT(
                             tool_name=current_task.tool_name,
                             parameters={},
                         )
                     else:
-                        # Keep tool_name in sync in case it changed elsewhere
                         current_task.execution_context.tool_name = (
                             current_task.tool_name
                         )
@@ -1466,34 +1512,45 @@ class AgentGraphCore:
                                 "reasoning",
                                 "Parameters repaired based on failure context.",
                             ),
+                            confidence_level=recovery_decision.get(
+                                "confidence_level", "LOW"
+                            ),
+                            estimated_success_probability=recovery_decision.get(
+                                "estimated_success_probability", 50
+                            ),
+                            next_steps=recovery_decision.get("next_steps"),
                             outcome="APPLIED",
                             details={
                                 "repaired_parameters": new_params,
                                 "description": current_task.description,
-                                "error_message": getattr(
-                                    current_task.failure_context, "error_message", None
-                                ),
+                                "error_message": current_task.failure_context.error_message,
                             },
                         )
                     )
                 else:
-                    current_task.status = "failed"
+                    cls.__mark_task_unrecoverable_and_skip(
+                        current_task=current_task,
+                        strategy_name="PARAMETER_REPAIR",
+                        reasoning=recovery_decision.get(
+                            "reasoning",
+                            "Parameter repair failed validation or LLM could not repair parameters.",
+                        ),
+                        outcome="FAILURE",
+                        recovery_decision=recovery_decision,
+                    )
+
             elif strategy == "ALTERNATIVE_TOOL":
                 new_tool = AgentCoreHelpers.ErrorFallbackHelpers.find_alternative_tool(
                     current_task, state
                 )
                 if new_tool:
                     current_task.tool_name = new_tool
-                    # 🚨 CRITICAL FIX: DO NOT reset parameters to {} - preserve failure_context for parameter generator
                     if current_task.execution_context is None:
                         current_task.execution_context = EXECUTION_CONTEXT(
                             tool_name=new_tool, parameters={}
                         )
                     else:
-                        # Preserve the failed parameters in failure_context - DO NOT reset to empty dict
                         current_task.execution_context.tool_name = new_tool
-                        # 🚨 KEY FIX: Keep parameters empty but ensure failure_context is preserved
-                        # The parameter generator will use failure_context.failed_parameters to avoid repetition
                         current_task.execution_context.parameters = {}
                         current_task.execution_context.result = None
                         current_task.execution_context.analysis = None
@@ -1505,38 +1562,35 @@ class AgentGraphCore:
                             reasoning=recovery_decision.get(
                                 "reasoning", "Alternative tool suggested by LLM."
                             ),
+                            confidence_level=recovery_decision.get(
+                                "confidence_level", "LOW"
+                            ),
+                            estimated_success_probability=recovery_decision.get(
+                                "estimated_success_probability", 50
+                            ),
+                            next_steps=recovery_decision.get("next_steps"),
                             outcome="APPLIED",
                             details={
                                 "alternative_tool": new_tool,
                                 "description": current_task.description,
-                                "error_message": getattr(
-                                    current_task.failure_context, "error_message", None
-                                ),
+                                "error_message": current_task.failure_context.error_message,
                             },
                         )
                     )
                 else:
-                    # Record no-op attempt for observability
-                    current_task.failure_context.strategy_history.append(
-                        FAILURE_CONTEXT_STRATEGY(
-                            recovery_strategy="ALTERNATIVE_TOOL",
-                            reasoning=recovery_decision.get(
-                                "reasoning", "Alternative tool suggested by LLM."
-                            ),
-                            outcome="NOT_APPLIED",
-                            details={
-                                "alternative_tool": None,
-                                "description": current_task.description,
-                                "error_message": getattr(
-                                    current_task.failure_context, "error_message", None
-                                ),
-                            },
-                        )
+                    cls.__mark_task_unrecoverable_and_skip(
+                        current_task=current_task,
+                        strategy_name="ALTERNATIVE_TOOL",
+                        reasoning=recovery_decision.get(
+                            "reasoning",
+                            "No valid alternative tool found for failed task.",
+                        ),
+                        outcome="NOT_APPLIED",
+                        recovery_decision=recovery_decision,
+                        extra_details={"alternative_tool": None},
                     )
-                    current_task.status = "failed"
 
             elif strategy == "TASK_DECOMPOSITION":
-                # Build parent context with completed tasks and failure context
                 completed_tasks = [
                     t
                     for t in updated_tasks
@@ -1544,10 +1598,7 @@ class AgentGraphCore:
                     and t.execution_context
                     and t.execution_context.result
                 ]
-                current_task.status = (
-                    "skip"  # Mark as like this while we handle decomposition
-                )
-                # this is the issue it passes the only last strategy context
+                current_task.status = "skip"
                 parent_context = {
                     "original_goal": state.original_goal,
                     "completed_tasks_history": completed_tasks,
@@ -1574,7 +1625,7 @@ class AgentGraphCore:
                     f"- Error Type: {parent_context['failed_task_context']['error_type']}\n"
                     f"- LAST Failed Parameters: {parent_context['failed_task_context']['failed_parameters']}\n"
                     f"**FAILED FULL HISTORY NEVER IGNORE THIS ***\n"
-                    f" \n".join(
+                    + " \n".join(
                         [
                             f"  {idx + 1}. Strategy: {s.recovery_strategy}, Outcome: {s.outcome}, Reasoning: {s.reasoning}"
                             for idx, s in enumerate(
@@ -1586,8 +1637,6 @@ class AgentGraphCore:
                     )
                 )
 
-                # this needs to be got more verbose like what error we are facing and how to decompose such that,
-                # we would be able to pass the last finding to next higher task
                 detailed_spawn_reason = f"""
                       --- RECOVERY MANDATE: TASK DECOMPOSITION ---
                     
@@ -1615,8 +1664,7 @@ class AgentGraphCore:
                       or the original task. Your purpose is to implement the recovery plan exactly as specified.
                     """
 
-                # there is we are adding the artificial tasks to TASK DECOMPOSER work on that
-                sub_tasks: list[TASK] = (
+                sub_tasks: list[TASK] | None = (
                     AgentCoreHelpers.ErrorFallbackHelpers.convert_decision_task(
                         [parent_context_str, detailed_spawn_reason],
                         str(
@@ -1628,101 +1676,91 @@ class AgentGraphCore:
                     )
                 )
 
-                # insert that artificial TASKS created by the parser
-                parent_task_idx = next(
-                    (
-                        i
-                        for i, t in enumerate(state.tasks)
-                        if t.task_id == current_task.task_id
-                    ),
-                    None,
-                )
-                # insertion logic
-                state.tasks = (
-                    state.tasks[: parent_task_idx + 1]
-                    + sub_tasks
-                    + state.tasks[parent_task_idx + 1 :]
-                )
-
-                spawn_result = Spawn_subAgent.spawn_subAgent_recursive(
-                    state,
-                    sub_tasks[0],
-                    detailed_spawn_reason,
-                    parent_context_str,
-                    recovery_plan=recovery_decision.get("recovery_plan"),
-                )
-                if spawn_result.get("spawn_triggered"):
-                    current_task.failure_context.strategy_history.append(
-                        FAILURE_CONTEXT_STRATEGY(
-                            recovery_strategy="TASK_DECOMPOSITION",
-                            reasoning=recovery_decision.get(
-                                "reasoning", "Decomposition suggested by LLM."
-                            ),
-                            outcome="APPLIED",
-                            details={
-                                "spawned_subtasks": [
-                                    t.tool_name
-                                    for t in spawn_result["tasks"]
-                                    if t.task_id != current_task.task_id
-                                ],
-                                "description": current_task.description,
-                                "error_message": getattr(
-                                    current_task.failure_context, "error_message", None
-                                ),
-                            },
-                        )
+                if sub_tasks:
+                    parent_task_idx = next(
+                        (
+                            i
+                            for i, t in enumerate(state.tasks)
+                            if t.task_id == current_task.task_id
+                        ),
+                        None,
                     )
-                    return {
-                        "tasks": spawn_result["tasks"],
-                        "current_task_id": spawn_result["current_task_id"],
-                        "executed_nodes": state.executed_nodes
-                        + ["subAGENT_error_fallback"],
-                    }
-                else:
-                    current_task.status = "failed"
+                    if parent_task_idx is not None:
+                        state.tasks = (
+                            state.tasks[: parent_task_idx + 1]
+                            + sub_tasks
+                            + state.tasks[parent_task_idx + 1 :]
+                        )
+
+                    spawn_result = Spawn_subAgent.spawn_subAgent_recursive(
+                        state,
+                        sub_tasks[0],
+                        detailed_spawn_reason,
+                        parent_context_str,
+                        recovery_plan=recovery_decision.get("recovery_plan"),
+                    )
+                    if spawn_result and spawn_result.get("spawn_triggered"):
+                        current_task.failure_context.strategy_history.append(
+                            FAILURE_CONTEXT_STRATEGY(
+                                recovery_strategy="TASK_DECOMPOSITION",
+                                reasoning=recovery_decision.get(
+                                    "reasoning", "Decomposition suggested by LLM."
+                                ),
+                                confidence_level=recovery_decision.get(
+                                    "confidence_level", "LOW"
+                                ),
+                                estimated_success_probability=recovery_decision.get(
+                                    "estimated_success_probability", 60
+                                ),
+                                next_steps=recovery_decision.get("next_steps"),
+                                outcome="APPLIED",
+                                details={
+                                    "spawned_subtasks": [
+                                        t.tool_name
+                                        for t in spawn_result["tasks"]
+                                        if t.task_id != current_task.task_id
+                                    ],
+                                    "description": current_task.description,
+                                    "error_message": current_task.failure_context.error_message,
+                                },
+                            )
+                        )
+                        return {
+                            "tasks": spawn_result["tasks"],
+                            "current_task_id": spawn_result["current_task_id"],
+                            "executed_nodes": state.executed_nodes
+                            + ["subAGENT_error_fallback"],
+                        }
+
+                cls.__mark_task_unrecoverable_and_skip(
+                    current_task=current_task,
+                    strategy_name="TASK_DECOMPOSITION",
+                    reasoning=recovery_decision.get(
+                        "reasoning",
+                        "Task decomposition failed to generate valid sub-tasks.",
+                    ),
+                    outcome="FAILURE",
+                    recovery_decision=recovery_decision,
+                )
 
             elif strategy == "SKIP":
-                current_task.status = "skip"
-                current_task.execution_context = EXECUTION_CONTEXT(
-                    tool_name=current_task.tool_name,
-                    parameters={},
-                    result="Task skipped as per recovery strategy.",
-                    analysis="Task was skipped to allow workflow progression.",
-                    goal_achieved=False,
+                cls.__mark_task_unrecoverable_and_skip(
+                    current_task=current_task,
+                    strategy_name="SKIP",
+                    reasoning=recovery_decision.get(
+                        "reasoning", "Skipping task as per recovery strategy."
+                    ),
+                    outcome="APPLIED",
+                    recovery_decision=recovery_decision,
                 )
-
-                current_task.failure_context.strategy_history.append(
-                    FAILURE_CONTEXT_STRATEGY(
-                        recovery_strategy="SKIP",
-                        reasoning=recovery_decision.get(
-                            "reasoning", "Skipping task as per recovery strategy."
-                        ),
-                        confidence_level=recovery_decision.get(
-                            "confidence_level", "HIGH"
-                        ),
-                        estimated_success_probability=recovery_decision.get(
-                            "estimated_success_probability", 0
-                        ),
-                        next_steps=recovery_decision.get(
-                            "next_steps", "task got skipped as per strategy"
-                        ),
-                        outcome="APPLIED",
-                        details={
-                            "description": current_task.description,
-                            "error_message": getattr(
-                                current_task.failure_context, "error_message", None
-                            ),
-                        },
-                    )
-                )
-
-                return {
-                    "tasks": updated_tasks,
-                    "executed_nodes": state.executed_nodes
-                    + ["subAGENT_error_fallback"],
-                }
             else:
-                current_task.status = "failed"
+                cls.__mark_task_unrecoverable_and_skip(
+                    current_task=current_task,
+                    strategy_name="NO_STRATEGY",
+                    reasoning=f"Unsupported recovery strategy '{strategy}'; skipping task with failure context.",
+                    outcome="NOT_APPLIED",
+                    recovery_decision=recovery_decision,
+                )
 
         except Exception as e:
             ContextRegistry.get().get_logger().log_error(
@@ -1734,9 +1772,16 @@ class AgentGraphCore:
                     "exception": str(e),
                 },
             )
-            current_task.status = "failed"
-            current_task.failure_context.error_message += (
-                f" | Error during recovery processing: {e}"
+            existing_msg = current_task.failure_context.error_message or ""
+            current_task.failure_context.error_message = (
+                f"{existing_msg} | Error during recovery processing: {e}".strip(" |")
+            )
+            cls.__mark_task_unrecoverable_and_skip(
+                current_task=current_task,
+                strategy_name="NO_STRATEGY",
+                reasoning=f"Exception during error fallback recovery: {e}",
+                outcome="FAILURE",
+                recovery_decision=recovery_decision,
             )
 
         return {
@@ -1748,23 +1793,6 @@ class AgentGraphCore:
     def __subAGENT_task_planner(cls, state: "WorkflowStateModel") -> dict:
         """📋 WORKFLOW ORCHESTRATOR: Manages task progression and parent-child relationships.
         🆕 DUAL CONTEXT BRIDGE: Passes both raw results and synthesized analysis to the next task.
-
-        This node implements sophisticated logic for hierarchical task management:
-
-        PARENT-CHILD LOGIC:
-        - Monitors spawned sub-tasks (float IDs like 1.1, 1.2) for completion
-        - Updates parent task status based on sub-task results
-        - Handles both success (all sub-tasks complete) and failure scenarios
-
-        TASK SELECTION WITH DUAL CONTEXT BRIDGE:
-        - Finds next pending task in priority order (sorted by task_id)
-        - 🆕 COLLECTS the full history of completed TASK objects.
-        - 🆕 INJECTS this history (containing both raw `.result` and summarized `.analysis`) into the next task.
-        - This prevents infinite loops by giving the next LLM clean, summarized context for decision-making, while preserving the full raw data for tools that need it.
-        - Returns None when no more tasks remain (triggers finalizer).
-
-        This is where the hierarchical magic happens - parent tasks are only
-        considered complete when their spawned sub-tasks finish successfully.
         """
         ContextRegistry.get().get_logger().log_info(
             "--- NODE: Task Planner ---",
@@ -1775,26 +1803,18 @@ class AgentGraphCore:
         tasks = state.tasks
         last_completed_id = state.current_task_id
 
-        # If the last completed task was a sub-task (e.g., '1.1-abc'), update its parent
-        if (
-            isinstance(last_completed_id, str) and "-" in last_completed_id
-        ):  # Check for new string format
-            # Extract parent_id from string, e.g., '1' from '1.1-abc'
-            parent_id_prefix = last_completed_id.rsplit(".")[
-                0
-            ]  # immediate parent before dot
+        if isinstance(last_completed_id, str) and "-" in last_completed_id:
+            parent_id_prefix = last_completed_id.rsplit(".")[0]
             parent_task = next(
                 (t for t in tasks if str(t.task_id) == parent_id_prefix), None
-            )  # Find parent by prefix
+            )
             if parent_task and parent_task.status == "in_progress":
-                # Find sibling tasks that share the same parent prefix
                 sibling_tasks = [
                     t
                     for t in tasks
                     if isinstance(t.task_id, str)
                     and t.task_id.startswith(f"{parent_id_prefix}.")
                 ]
-                # 🔥 Include skip in terminal states to handle skipped sub-tasks
                 TERMINAL_STATES = ["completed", "failed", "skip"]
                 if all(t.status in TERMINAL_STATES for t in sibling_tasks):
                     failed_subtasks = [t for t in sibling_tasks if t.status == "failed"]
@@ -1824,17 +1844,15 @@ class AgentGraphCore:
                         )
                         parent_task.execution_context.analysis = f"Successfully completed {completed_count} of {len(sibling_tasks)} subtasks{skip_msg}."
 
-        # 🌉 DUAL CONTEXT BRIDGE: Collect the full history of completed tasks AND failed tasks with validator feedback
+        # 🌉 DUAL CONTEXT BRIDGE: Collect completed tasks AND failed/fallback-skipped tasks with failure context
         completed_tasks = [t for t in tasks if t.status == "completed"]
         failed_tasks_with_context = [
             t
             for t in tasks
-            if t.status == "failed"
+            if t.status in ("failed", "skip")
             and t.failure_context
-            and t.failure_context.error_type == "GoalValidationFailure"
         ]
 
-        # Find the next pending task
         pending_tasks = sorted(
             [t for t in tasks if t.status == "pending"], key=lambda x: x.task_id
         )
@@ -1844,10 +1862,6 @@ class AgentGraphCore:
             next_task = pending_tasks[0]
             next_task_id = next_task.task_id
 
-            # 🆕 INJECT DUAL CONTEXT: Pass the *entire list* of completed TASK objects AND validator feedback from failed tasks.
-            # This gives the next node access to both raw .result and summarized .analysis from completed tasks,
-            # PLUS validator reasoning from failed tasks to avoid repeating the same mistakes.
-            # We also include the original goal for full context.
             accumulated_context = {
                 "original_goal": state.original_goal,
                 "completed_tasks_history": completed_tasks,
@@ -2304,7 +2318,7 @@ class AgentGraphCore:
     def build_graph(cls):
         """🏗️ LANGGRAPH WORKFLOW BUILDER: Constructs the complete hierarchical agent workflow.
 
-        This method creates a sophisticated 7-node state machine that handles:
+        This method creates a sophisticated 9-node state machine that handles:
         - Dynamic task planning with tool pre-filtering
         - Intelligent task execution with spawning capabilities
         - Advanced error recovery with spawning-based recovery
@@ -2312,9 +2326,14 @@ class AgentGraphCore:
         - Schema-aware parameter generation
         - Comprehensive result finalization
 
-        WORKFLOW ARCHITECTURE:
-        Entry → initial_planner → classifier → [parameter_generator|error_fallback]
-              → task_executor → [task_planner|finalizer] → classifier → ... → END
+        WORKFLOW ARCHITECTURE (matches the nodes and edges registered below):
+        Entry → initial_planner → classifier
+        classifier → [parameter_generator | error_fallback]
+        parameter_generator → task_executor → context_synthesizer → goal_validator
+        error_fallback → classifier (retry loop)
+        goal_validator → [classifier | task_planner | finalizer]
+        task_planner → [classifier | finalizer]
+        finalizer → END
 
         The conditional routing enables sophisticated decision-making while maintaining
         clean separation of concerns and full observability throughout execution.

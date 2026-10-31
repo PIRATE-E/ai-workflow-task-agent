@@ -1,20 +1,33 @@
 [project]
 name = "cold-wind-ai"
-version = "1.9.1"
+version = "2.0.0"
 description = "Cold Wind AI — multi-platform AI agent with MCP tool execution"
 readme = "README.md"
 requires-python = ">=3.13"
 # dependencies = # Root has no runtime dependencies of its own — each member declares its own.
 
 [tool.uv.workspace]
-members = ["core", "desktop", "server"]
+members = ["core", "desktop", "server", "slint_gui"]
 
 [tool.uv.sources]
 coldwind-core = { workspace = true }
 
 
+# ─────────────────────────────────────────────────────────────────────
+# TY (Astral) — first-party module discovery for the PEP-420 namespace.
+# Found live in the 2026-10-24 trial: ty searches the project root
+# (+ ./src etc.) by default, but `coldwind.*` is assembled from TWO
+# source roots (core/src + desktop/src), so imports did not resolve.
+# `environment.root` is ty's native equivalent of pyrightconfig.json's
+# `extraPaths` (docs.astral.sh/ty/modules). The .venv for third-party
+# packages is auto-detected (it sits at the project root).
+# Undo = delete this table; pyrightconfig.json users are unaffected.
+# ─────────────────────────────────────────────────────────────────────
+[tool.ty.environment]
+root = ["./core/src", "./desktop/src", "./slint_gui/src"]
+
 [tool.ruff]
-lint.select = ["PTH", "ASYNC", "UP028"]
+lint.extend-select = ["PTH", "ASYNC", "UP028"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

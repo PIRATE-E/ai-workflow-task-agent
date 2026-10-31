@@ -1,11 +1,20 @@
+"""
+Exit Slash Command
+
+Handles the /exit slash command by requesting application exit
+through the active runtime context (ContextRegistry.get().request_exit()).
+"""
 
 from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
+from coldwind.core.system_logging.debug_protocol import debug_error
+from coldwind.desktop.slash_commands.protocol import (
+    CommandOption,
+    CommandResult,
+    SlashCommand,
+)
 
-from coldwind.desktop.slash_commands.protocol import SlashCommand, CommandOption, CommandResult
-from coldwind.core.utils.listeners.exit_listener import ExitListener
 
-
-def register_exit_command():
+def register_exit_command() -> None:
     """Function to register the /exit command."""
     from ..on_run_time_register import OnRunTimeRegistry
 
@@ -14,48 +23,44 @@ def register_exit_command():
         options=None,
         requirements=None,
         description="Exit the application.",
-        handler=exit_handler
+        handler=exit_handler,
     )
     registry = OnRunTimeRegistry()
     try:
         registry.register(exit_command)
     except registry.CommandAlreadyRegisteredError:
-        # Command is already registered; we can choose to log this or ignore it.
         pass
 
-def exit_handler(command : SlashCommand, options : CommandOption) -> CommandResult:
-    """Handler function to exit the application.
 
-    :param command: The SlashCommand object for exit
-    :param options: CommandOption for exit command flags, or None
-    :return: CommandResult indicating success or failure of the operation.
+def exit_handler(
+    command: SlashCommand, options: CommandOption | None
+) -> CommandResult:
     """
+    Handler function to exit the application.
 
+    ---------------------------------------------------------------------------
+    WHAT CHANGED & WHY:
+    Retired legacy ExitListener / event_manager from exit command handling.
+    WHY: Exit signaling is now standardized via ContextRegistry.get().request_exit().
+    The host platform's turn loop checks context.is_exiting() to break cleanly,
+    eliminating monolithic in-memory event bus dependencies.
+    ---------------------------------------------------------------------------
+    """
     try:
-        # ✅ Use the standardized ticket system — read the exit listener from the
-        # active runtime context's listener dict (was settings.listeners['exit']).
-        exit_listener : ExitListener = ContextRegistry.get().get_listeners()['exit']
-        exit_listener.emit_exit_ticket(
-            source_class=type(command),
-            source_name="/exit_command"
-        )
-
-        # Don't set settings.exit_flag directly - let the ticket system handle it
-        # settings.exit_flag = True  # ❌ Removed: Ticket system handles this
-
+        ContextRegistry.get().request_exit()
         return CommandResult(
             success=True,
-            message="🎫 Exit ticket issued. Waiting for workflow completion...",
-            data={"exit_ticket_issued": True}
+            message="🎫 Exit requested. Waiting for workflow completion...",
+            data={"exit_requested": True},
         )
-
     except Exception as e:
-        # WHAT: Import debug_error from core system_logging debug_protocol.
-        # WHY: Decouples exit handler from legacy desktop/ui/diagnostics/debug_helpers.py.
-        from coldwind.core.system_logging.debug_protocol import debug_error
         debug_error(
-            f"Error in exit_handler: {str(e)}",
-            body="An error occurred while trying to emit exit ticket.",
-            metadata={"exception": str(e)}
+            f"Error in exit_handler: {e}",
+            body="An error occurred while trying to request exit.",
+            metadata={"exception": str(e)},
         )
-        return CommandResult(success=False, message="Failed to issue exit ticket.", error={"error": str(e)})
+        return CommandResult(
+            success=False,
+            message=f"Failed to exit cleanly: {e}",
+            error={"error": str(e)},
+        )

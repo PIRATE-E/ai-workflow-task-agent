@@ -1,147 +1,114 @@
-import atexit
-import signal
-from typing import Callable, List
+from typing import Any, Callable
 
-# Socket connection lives on the active RuntimeContextInterface — accessed via
-# ContextRegistry.get().get_socket_connection() (returns None until the
-# orchestrator wires it, so the existing truthy-guard pattern still works).
 from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
 
 
-# this is cleanup code for the chat system
 class ChatDestructor:
-    """
-    Handles the cleanup of chat resources, ensuring that all models are stopped and resources are released.
-    also clean other resources that might be used during the chat session. like socket connections, files, etc.
-    This is typically called when the chat session ends or when the application is exiting.
+    """Handles graceful cleanup of chat and engine resources upon shutdown.
+
+    Ensures that background models, MCP client subprocesses, and browser
+    sessions are cleanly released. Emits structured diagnostics through
+    the active platform logger and dispatches any hook failures to
+    the runtime ExceptionHandlerInterface.
     """
 
-    is_cleaned_registered = False
-    _cleanup_executed = False  # Flag to prevent double cleanup execution
-    _all_functions: List[Callable] = []  # Function to be called for cleanup, if any
-    _original_sigint_handler = None  # Original SIGINT handler
-    _original_sigterm_handler = None  # Original SIGTERM handler
+    _cleanup_executed: bool = False
+    _all_functions: list[Callable[[], Any]] = []
 
     @classmethod
-    def add_destroyer_function(cls, function: Callable):
+    def add_destroyer_function(cls, function: Callable[[], Any]) -> None:
+        """Add a cleanup function to be called during the cleanup process.
+
+        :param function: A callable that performs resource cleanup.
         """
-        Add a cleanup function to be called during the cleanup process.
-        :param function: A callable function that performs cleanup.
-        """
-        if (
-            function
-            and callable(function)
-            and function not in ChatDestructor._all_functions
-        ):
-            ChatDestructor._all_functions.append(function)
-        else:
+        # ---------------------------------------------------------------------
+        # WHAT CHANGED & WHY:
+        # Separated callable validation from duplicate-membership check.
+        # WHY: Registration is idempotent; prevents false ValueError crashes
+        # when both engine boot and orchestrator register the same hook.
+        # ---------------------------------------------------------------------
+        if not function or not callable(function):
             raise ValueError("Provided function is not callable")
+        if function not in cls._all_functions:
+            cls._all_functions.append(function)
 
     @classmethod
-    def register_cleanup_handlers(cls):
+    def call_all_cleanup_functions(cls) -> None:
+        """Execute all registered cleanup functions sequentially.
+
+        Guarantees that an exception in one cleanup hook does not prevent
+        remaining hooks from executing. Dispatches diagnostic logs and
+        tracebacks via the active runtime context.
         """
-        Register cleanup handlers for graceful shutdown.
-        This ensures models are stopped even during abrupt termination.
-        """
-        if cls.is_cleaned_registered:
-            socket = ContextRegistry.get().get_socket_connection()
-            if socket:
-                socket.send_error(
-                    "[LOG]Cleanup handlers already registered."
-                )
-            return
-
-        # Register atexit handler (called during normal Python exit)
-        atexit.register(cls.call_all_cleanup_functions)
-
-        # Register signal handlers for termination signals
-        try:
-            # Store original handlers before overwriting
-            cls._original_sigint_handler = signal.signal(
-                signal.SIGINT, cls._signal_handler
-            )  # Ctrl+C
-            cls._original_sigterm_handler = signal.signal(
-                signal.SIGTERM, cls._signal_handler
-            )  # Termination signal
-
-            if hasattr(signal, "SIGBREAK"):  # Windows specific
-                signal.signal(signal.SIGBREAK, cls._signal_handler)
-        except (OSError, ValueError) as e:
-            print(f"Could not register signal handler: {e}")
-
-        cls.is_cleaned_registered = True
-        socket = ContextRegistry.get().get_socket_connection()
-        if socket:
-            socket.send_error(
-                "[LOG]✅ Chat cleanup handlers registered successfully"
-            )
-
-    @classmethod
-    def _signal_handler(cls, signum, frame):
-        """
-        Handle termination signals and ensure proper cleanup.
-        """
-        socket = ContextRegistry.get().get_socket_connection()
-        if socket:
-            socket.send_error(
-                f"🛑 Signal {signum} received, cleaning up models..."
-            )
-        cls.call_all_cleanup_functions()
-
-        # Call original handler if it existed
-        if signum == signal.SIGINT and cls._original_sigint_handler:
-            cls._original_sigint_handler(signum, frame)
-        elif signum == signal.SIGTERM and cls._original_sigterm_handler:
-            cls._original_sigterm_handler(signum, frame)
-        else:
-            # Default termination
-            signal.default_int_handler(signum, frame)
-
-    @classmethod
-    def call_all_cleanup_functions(cls):
-        # Grab the socket once for the duration of cleanup — repeated reads would
-        # thrash the registry and the value is stable inside a single teardown.
-        socket = ContextRegistry.get().get_socket_connection()
-        # Prevent double cleanup execution
         if cls._cleanup_executed:
-            if socket:
-                socket.send_error(
-                    "[LOG]Cleanup already executed, skipping."
-                )
             return
 
-        cls._cleanup_executed = True  # Set flag to prevent re-execution
+        cls._cleanup_executed = True
+
+        try:
+            context = ContextRegistry.get()
+            logger = context.get_logger()
+            error_handler = context.get_error_handler()
+        except Exception:
+            context = logger = error_handler = None
 
         if len(cls._all_functions) == 0:
-            if socket:
-                socket.send_error("[LOG]No cleanup functions registered.")
+            if logger:
+                logger.log_info("CLEANUP • EMPTY", "No cleanup functions registered.")
             return
 
-        if socket:
-            socket.send_error("[LOG]🧹 Starting cleanup process...")
+        if logger:
+            logger.log_info("CLEANUP • START", "Starting resource cleanup process.")
 
         terminated_count = 0
         for func in cls._all_functions:
+            func_name = getattr(func, "__name__", str(func))
             try:
                 if callable(func):
-                    if socket:
-                        socket.send_error(
-                            f"[LOG]Executing cleanup: {func.__name__}"
+                    if logger:
+                        logger.log_info(
+                            "CLEANUP • HOOK_RUN",
+                            f"Executing cleanup: {func_name}",
+                            metadata={"hook": func_name},
                         )
-                    func()  # Call the cleanup function
+                    func()
                     terminated_count += 1
                 else:
-                    print(f"[LOG]Function {func} is not callable, skipping.")
+                    if logger:
+                        logger.log_warning(
+                            "CLEANUP • INVALID",
+                            f"Function {func} is not callable, skipping.",
+                        )
             except Exception as e:
-                error_msg = f"[LOG]Error during cleanup function {func.__name__ if hasattr(func, '__name__') else func}: {e}"
-                if socket:
-                    socket.send_error(error_msg)
-                else:
-                    print(error_msg)
+                # -------------------------------------------------------------
+                # WHAT CHANGED & WHY:
+                # Dispatched cleanup exception to ContextRegistry host error handler.
+                # WHY: Replaced legacy raw-socket sends and unformatted print statements.
+                # Passes live Exception object to host error handler for rich diagnostics
+                # while emitting structured log events to OnTimeRegistry.
+                # -------------------------------------------------------------
+                if error_handler:
+                    try:
+                        error_handler.handle_exception(
+                            e,
+                            context=f"ChatDestructor Cleanup: {func_name}",
+                            extra_context={"hook": func_name, "phase": "teardown"},
+                        )
+                    except Exception:
+                        pass
 
-        if socket:
-            socket.send_error(
-                f"[LOG]✅ Cleanup completed. {terminated_count} functions executed."
+                if logger:
+                    logger.log_error(
+                        "CLEANUP • HOOK_ERROR",
+                        f"Error during cleanup hook {func_name}: {e}",
+                        metadata={"hook": func_name, "error": str(e)},
+                    )
+                else:
+                    print(f"[CLEANUP ERROR] {func_name}: {e}")
+
+        if logger:
+            logger.log_info(
+                "CLEANUP • DONE",
+                f"Cleanup completed. {terminated_count} functions executed.",
+                metadata={"executed_count": terminated_count},
             )
-        else:
-            print(f"[LOG]✅ Cleanup completed. {terminated_count} functions executed.")

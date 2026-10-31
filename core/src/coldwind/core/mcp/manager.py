@@ -52,20 +52,25 @@ from coldwind.core.mcp.mcp_register_structure import (
 
 # WHAT: Route exception handling through core exception_interface contract.
 # WHY: Eliminates illegal Core -> Desktop import, preserving the Layering Invariant.
+# WHAT: Route exception handling through core exception_interface contract.
+# WHY: Eliminates legacy _CoreExceptionHandlerAdapter and fake RichTracebackManager aliases.
 from coldwind.core.interfaces.exception_interface import rich_exception_handler
 
 
-class _CoreExceptionHandlerAdapter:
-    """Adapter routing legacy RichTracebackManager calls to the active runtime error handler."""
-    @staticmethod
-    def handle_exception(error: Exception, context: str = "", extra_context: Optional[dict[str, Any]] = None) -> None:
-        try:
-            ContextRegistry.get().get_error_handler().handle_exception(error, context, extra_context)
-        except Exception:
-            pass
+def _handle_exception(
+    error: Exception,
+    context: str = "",
+    extra_context: Optional[dict[str, Any]] = None,
+) -> None:
+    """Helper to route exceptions to active runtime error handler safely."""
+    try:
+        ContextRegistry.get().get_error_handler().handle_exception(
+            error, context, extra_context
+        )
+    except Exception:
+        pass
 
 
-RichTracebackManager = _CoreExceptionHandlerAdapter
 import pathlib
 
 
@@ -217,6 +222,7 @@ class MCP_Manager:
         cls,
         name: str,
         runner: Command,
+        # TODO: legacy this is not currently latest now all the module name are getting passed from command !!
         package: Optional[str],
         args: list[str],
         func: Callable,
@@ -542,7 +548,7 @@ class MCP_Manager:
         Notes:
             - Server process uses PIPE for stdin/stdout for JSON-RPC communication
             - stderr is logged separately for debugging
-            - Working directory set to project root (BASE_DIR.parent)
+            - Working directory set to project root (DesktopConfig.project_root)
             - Handshake sends initialize request with protocol version info
             - Tool discovery happens immediately after successful handshake
             - Tools are automatically registered with DynamicToolRegister for LangChain
@@ -612,10 +618,12 @@ class MCP_Manager:
                     return False
 
                 # Check working directory
-                # MIGRATED: settings.BASE_DIR → ContextRegistry.get().get_settings().BASE_DIR
+                # 🔧 FIX (BUG-5): BASE_DIR was a ghost attr — the real typed field is
+                # project_root (pydantic attr access is case-sensitive), so every
+                # server start died with AttributeError here and returned False.
                 try:
                     working_dir = str(
-                        ContextRegistry.get().get_settings().BASE_DIR.parent.resolve()
+                        ContextRegistry.get().get_settings().project_root.resolve()
                     )
                     ContextRegistry.get().get_logger().log_info(
                         heading="MCP • DEBUG_WORKING_DIR",
@@ -623,8 +631,8 @@ class MCP_Manager:
                         metadata={
                             "server": name,
                             "working_dir": working_dir,
-                            "base_dir": str(
-                                ContextRegistry.get().get_settings().BASE_DIR
+                            "project_root": str(
+                                ContextRegistry.get().get_settings().project_root
                             ),
                             "parent_exists": pathlib.Path(working_dir).exists(),
                         },
@@ -718,7 +726,7 @@ class MCP_Manager:
                                     metadata={"server": name},
                                 )
                         except Exception as tool_discovery_error:
-                            RichTracebackManager.handle_exception(
+                            _handle_exception(
                                 tool_discovery_error,
                                 context=f"MCP Tool Discovery - {name}",
                                 extra_context={
@@ -733,7 +741,7 @@ class MCP_Manager:
                             )
                             return False  # Server started but tool discovery failed, treat as failure for now
                     except Exception as init_error:
-                        RichTracebackManager.handle_exception(
+                        _handle_exception(
                             init_error,
                             context=f"MCP Server Initialization - {name}",
                             extra_context={
@@ -757,7 +765,7 @@ class MCP_Manager:
                     return True
 
                 except subprocess.CalledProcessError as process_error:
-                    RichTracebackManager.handle_exception(
+                    _handle_exception(
                         process_error,
                         context=f"MCP Server Process Creation - {name}",
                         extra_context={
@@ -773,7 +781,7 @@ class MCP_Manager:
                     )
                     return False
                 except Exception as e:
-                    RichTracebackManager.handle_exception(
+                    _handle_exception(
                         e,
                         context=f"MCP Server Startup - {name}",
                         extra_context={
@@ -796,7 +804,7 @@ class MCP_Manager:
                 )
                 return False
         except Exception as e:
-            RichTracebackManager.handle_exception(
+            _handle_exception(
                 e,
                 context=f"MCP Server Startup Wrapper - {name}",
                 extra_context={"server_name": name},
@@ -837,7 +845,7 @@ class MCP_Manager:
         """
         # Perform any necessary initialization here
         # MIGRATED: settings.MCP_CONFIG.get('MCP_ENABLED') →
-        # ContextRegistry.get().get_settings().mcp_config.get('MCP_ENABLED')
+        # ContextRegistry.get().get_settings().mcp_enabled (typed field on CoreSettinngs)
         MCP_Manager.mcp_enabled = ContextRegistry.get().get_settings().mcp_enabled
         ContextRegistry.get().get_logger().log_info(
             heading="MCP • MANAGER_INIT",
@@ -903,11 +911,15 @@ class MCP_Manager:
         # Check if server exists and is running
         if name not in MCP_Manager.mcp_servers:
             msg = f"Server '{name}' not found"
-            ContextRegistry.get().get_logger().log_error(heading="MCP • CALL_ERROR", body=msg, metadata={"server": name})
+            ContextRegistry.get().get_logger().log_error(
+                heading="MCP • CALL_ERROR", body=msg, metadata={"server": name}
+            )
             return {"success": False, "error": msg}
         if MCP_Manager.mcp_servers[name]["status"] != "running":
             msg = f"Server '{name}' is not running"
-            ContextRegistry.get().get_logger().log_error(heading="MCP • CALL_ERROR", body=msg, metadata={"server": name})
+            ContextRegistry.get().get_logger().log_error(
+                heading="MCP • CALL_ERROR", body=msg, metadata={"server": name}
+            )
             return {"success": False, "error": msg}
         ContextRegistry.get().get_logger().log_info(
             heading="MCP • TOOL_CALL",
@@ -917,7 +929,9 @@ class MCP_Manager:
         proc = MCP_Manager.running_servers.get(name)
         if not proc:
             msg = f"Server '{name}' process not found"
-            ContextRegistry.get().get_logger().log_error(heading="MCP • CALL_ERROR", body=msg, metadata={"server": name})
+            ContextRegistry.get().get_logger().log_error(
+                heading="MCP • CALL_ERROR", body=msg, metadata={"server": name}
+            )
             return {"success": False, "error": msg}
         try:
             mcp_request = {

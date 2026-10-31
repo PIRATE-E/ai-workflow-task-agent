@@ -1,17 +1,20 @@
-import json
-import os
-import select
-import socket
-import subprocess
-import sys
 from abc import abstractmethod
 from collections import deque
 from dataclasses import asdict
 from dataclasses import dataclass
+import json
+import os
 from pathlib import Path
+import select
+import shutil
+import socket
+import subprocess
+import sys
+import time
 from typing import Any, override
 
 from coldwind.core.mcp.mcp_register_structure import ServerConfig
+from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
 from coldwind.core.system_logging.debug_protocol import LogEntry
 from coldwind.core.system_logging.debug_protocol.dashboard_transport import (
     DashboardManager,
@@ -272,87 +275,42 @@ class DesktopDashboardManager(DashboardManager):
                 cmd, cwd=Path.cwd(), creationflags=subprocess.CREATE_NEW_CONSOLE
             )
         else:
-
-            # Enhanced terminal commands with proper working directory, title, and UV
+            # NotImplemented(
+            #     "the rewrite how the dashbaord console and commands choosen !!"
+            # )
             cwder = Path.cwd()
             runner_server_path = Path(__file__).absolute().parent / "runner_server.py"
-            terminals = [
-                # WHAT: konsole prioritized as top terminal emulator.
-                # WHY: Matches the tested legacy launch configuration from socket_manager.py.
-                [
-                    "konsole",
-                    "--hold",
-                    "-e",
-                    "bash",
-                    "-c",
-                    f"cd '{cwder}' && uv run python '{runner_server_path}'; echo 'Log server ended. Press Enter to close...'; read",
-                ],
-                # kitty as secondary modern terminal option
-                [
+
+            # 1. Fetch desktop settings via canonical registry lookup
+            settings = ContextRegistry.get().get_settings()
+            term_bin = settings.dashboard_terminal_bin
+            flags_before = settings.dashboard_terminal_flags_before
+            flags_after = settings.dashboard_terminal_flags_after
+
+            if term_bin == "auto":
+                terms = [
                     "kitty",
-                    "--title",
-                    "Cold Wind Debug Dashboard",
-                    "--directory",
-                    str(cwder),
-                    "--hold",
-                    "bash",
-                    "-c",
-                    f"uv run python '{runner_server_path}'; echo 'Log server ended. Press Enter to close...'; read",
-                ],
-                # qterminal with bash wrapper for persistence
-                [
-                    "qterminal",
-                    "-e",
-                    "bash",
-                    "-c",
-                    f"cd '{cwder}' && uv run python '{runner_server_path}'; echo 'Log server ended. Press Enter to close...'; read",
-                ],
-                # gnome-terminal with bash wrapper for persistence
-                [
+                    "konsole",
+                    "wezterm",
+                    "alacritty",
                     "gnome-terminal",
-                    "--",
-                    "bash",
-                    "-c",
-                    f"cd '{cwder}' && uv run python '{runner_server_path}'; echo 'Log server ended. Press Enter to close...'; read",
-                ],
-                # xterm with hold flag
-                [
                     "xterm",
-                    "-hold",
-                    "-e",
-                    "bash",
-                    "-c",
-                    f"cd '{cwder}' && uv run python '{runner_server_path}'",
-                ],
-                # tmux as persistent fallback
-                [
-                    "tmux",
-                    "new-session",
-                    "-d",
-                    "-s",
-                    "ai_logs",
-                    f"cd '{cwder}' && uv run python '{runner_server_path}'",
-                ],
-            ]
+                ]
+                term_bin = next((t for t in terms if shutil.which(t)), "kitty")
 
-            cmd = terminals[0]
-            for active_terminal in terminals:
-                if (
-                    subprocess.run(
-                        ["which", active_terminal[0]], capture_output=True
-                    ).returncode
-                    == 0
-                ):
-                    cmd = active_terminal
-                    break
+            ## convert the whole dashbaord command and flags_after into bash script !
+            shell_command_sh = f"cd '{cwder}' && uv run python '{runner_server_path}'"
+            if flags_after:
+                shell_command_sh += f" {'; '.join(flags_after)}"
+            else:
+                shell_command_sh += (
+                    " echo 'DashboardManager Ended. Press Enter..'; read"
+                )
 
-            # WHAT: Launch with start_new_session=True, stdout=DEVNULL, and stderr=DEVNULL.
-            # WHY: In POSIX, start_new_session=True invokes setsid(), detaching the new terminal
-            #      window from the parent agent's process group and controlling TTY. Redirecting
-            #      stdout/stderr prevents Qt and GLFW warning logs (e.g. qt.qpa.services portal errors)
-            #      from bleeding into and polluting the parent agent's console.
+            cmd_args = [term_bin, *flags_before, "bash", "-c", shell_command_sh]
+
             cls.server_process = subprocess.Popen(
-                cmd,
+                cmd_args,
                 start_new_session=True,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,

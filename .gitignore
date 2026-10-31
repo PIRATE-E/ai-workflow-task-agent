@@ -113,6 +113,7 @@ Thumbs.db
 # Project-specific
 conversation_history.json
 basic_logs/
+scratch/
 screenshots/
 *.png
 *.jpg

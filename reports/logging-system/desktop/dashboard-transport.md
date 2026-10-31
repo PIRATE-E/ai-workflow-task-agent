@@ -97,15 +97,15 @@ is_connected_status() # the health probe — see §4
 
 Implements core's abstract `DashboardManager`:
 
-- **`start_dashboard()`** — picks the first available terminal from an ordered list
-  (`qterminal` → `gnome-terminal` → `xterm` → `konsole` → `tmux`; the kitty-first
-  variant with `--hold` and `start_new_session=True` was applied on 2026-09-14) and
-  `Popen`s:
-  ```
-  bash -c "cd '<cwd>' && uv run python '<repo>/desktop/.../runner_server.py>; echo …; read"
-  ```
-  The `bash -c` + read/hold wrapper keeps the window open after the server exits for
-  forensic reading. On Windows the equivalent is `CREATE_NEW_CONSOLE`.
+- **`start_dashboard()`** — dynamically orchestrates terminal spawning using desktop settings resolved from `ContextRegistry.get().get_settings()`:
+  - **`dashboard_terminal_bin`**: Configurable via `.env` (`DASHBOARD_TERMINAL_BIN`). When set to `"auto"`, it probes installed emulators in-memory using `shutil.which` across `["kitty", "konsole", "wezterm", "alacritty", "gnome-terminal", "xterm"]` without spawning external shell processes.
+  - **`dashboard_terminal_flags_before`**: Parsed natively from JSON by Pydantic (`list[str]`, e.g. `'["--title", "Cold Wind Debug Dashboard"]'`). Unpacked directly into the terminal emulator's CLI arguments (`*flags_before`).
+  - **`dashboard_terminal_flags_after`**: Parsed natively from JSON by Pydantic (`list[str]`, e.g. `'["exit"]'`). Appended into the inner `bash -c` wrapper with a leading semicolon separator (or defaults to a persist prompt `read` if omitted).
+  - **Subprocess Assembly**:
+    ```bash
+    [term_bin, *flags_before, "bash", "-c", "cd '<cwd>' && uv run python '<path>/runner_server.py'; <flags_after>"]
+    ```
+    Executed with `start_new_session=True` (detaches process group from parent controlling TTY) and `stdout=DEVNULL, stderr=DEVNULL` to silence GUI warnings. On Windows, uses `CREATE_NEW_CONSOLE`.
 - **`send_to_dashboard(log_entry)`** — gates on `server_process.poll() is None`
   (subprocess alive) + `is_connected_status()` (TCP healthy), then ships JSON.
 
@@ -174,8 +174,8 @@ readiness probe instead of a fixed sleep.
 | You want… | Where |
 |---|---|
 | Change the port/host | `SocketManager.ServerConfig` (SERVER_PORT / SERVER_HOST) |
-| Understand "did the server die?" | `ClientSocketManager.is_connected_status()` |
-| Terminal fallback order | `DesktopDashboardManager.start_dashboard()` `terminals` list |
+| Configure terminal emulator / flags | `DesktopConfig` (`dashboard_terminal_bin`, `_flags_before`, `_flags_after` in `.env`) |
+| In-memory emulator fallback order | `DesktopDashboardManager.start_dashboard()` `shutil.which` probe list |
 | Server loop internals | `ServerSocketManager.recieve_raw_log()` |
 | Sends/hangs in send path | called thread; `sendall` blocks until kernel accepts |
 

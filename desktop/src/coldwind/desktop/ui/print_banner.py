@@ -30,8 +30,8 @@ Y                  Y           Y    Y                 Y                  Y      
         Align.center(
             Panel.fit(
                 Text(banner, style="bold magenta"),
-                title="LangGraph Chatbot",
-                subtitle="made by pirate",
+                title="coldwind-AI",
+                subtitle="made by pirate version !! {dev-unstable}",
                 style="bold blue",
             )
         )

@@ -18,7 +18,6 @@ from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
 # OPENAI_API_KEY → ContextRegistry.get().get_settings().openai_api_key
 # OPENAI_TIMEOUT → ContextRegistry.get().get_settings().openai_timeout
 # API_DEFAULT_API_MODEL → ContextRegistry.get().get_settings().api_default_api_model
-from coldwind.core.utils.listeners.rich_status_listen import RichStatusListener
 
 
 class OpenAIIntegration:
@@ -61,7 +60,8 @@ class OpenAIIntegration:
         Initialize the OpenAIIntegration instance.
 
         Args:
-            api_key (Optional[str]): The OpenAI API key. If not provided, uses OPEN_AI_API_KEY from settings.
+            api_key (Optional[str]): The OpenAI API key. If not provided, read from the
+            active context settings (ContextRegistry.get().get_settings().openai_api_key).
             model (Optional[str]): The model name to use. Defaults to 'openai/gpt-oss-120b'.
         """
         # Prevent re-initialization of singleton
@@ -390,9 +390,6 @@ class OpenAIIntegration:
                 timeout=self._settings.openai_timeout,
             )
 
-            # Enhanced response system_logging
-            # if settings.socket_con:
-            #     settings.socket_con.send_error(f"[DEBUG] OpenAI async API call completed successfully")
 
             return self._handle_non_streaming_response_with_debugging(completion)
 
@@ -893,22 +890,24 @@ class OpenAIIntegration:
 
         IMPORTANT: THIS METHOD SHOULD BE CALLED BEFORE EACH OPENAI API REQUEST TO ENSURE COMPLIANCE WITH RATE LIMITS.
         IMPORTANT: THIS IS A SYNCHRONOUS METHOD, SO IT SHOULD BE USED IN SYNC CONTEXTS ONLY.
-        :return: fuck the cpu for waiting
+        :return: None. Blocks the calling thread (time.sleep) while the rate-limit window resets.
         """
         from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
 
-        # MIGRATED: settings.listeners.get('eval') → ContextRegistry.get().get_listeners().get('eval')
+        # ---------------------------------------------------------------------
+        # WHAT CHANGED & WHY:
+        # Removed legacy eval_listener / RichStatusListener event triggers.
+        # WHY: Rate limits and API progress now log through standard Core logger
+        # (Dispatcher -> Handler), enabling native platform handlers to capture
+        # events without monolithic in-memory event buses.
+        # ---------------------------------------------------------------------
         with cls._thread_lock:
             OpenAIIntegration.requests_count += 1
-            eval_listener: RichStatusListener = ContextRegistry.get().get_listeners().get("eval", None)
-            # if eval_listener is not None:
-            #     eval_listener.emit_on_variable_change(
-            #         OpenAIIntegration,
-            #         "status",
-            #         f"{eval_listener.get_last_event().meta_data.get('new_value')}",
-            #         f"{eval_listener.get_last_event().meta_data.get('new_value')} @"
-            #         f"request count :- {cls.requests_count}",
-            #     )
+            ContextRegistry.get().get_logger().log_info(
+                heading="STATUS",
+                body=f"API request {cls.requests_count} in progress",
+                metadata={"requests_count": cls.requests_count},
+            )
             if OpenAIIntegration.requests_count == 1:
                 OpenAIIntegration._last_request_time = time.perf_counter()
             current_time = time.perf_counter()
@@ -916,24 +915,16 @@ class OpenAIIntegration:
                 elapsed_time = current_time - OpenAIIntegration._last_request_time
                 if elapsed_time < 60:
                     wait_time = 60 - elapsed_time
-                    
 
                     ContextRegistry.get().get_logger().log_critical(
-                        heading="OPENAI • RATE_LIMIT",
-                        body="API rate limit hit - waiting for reset",
+                        heading="STATUS",
+                        body=f"Rate limit hit - waiting for reset {wait_time:.1f}s (Requests: {cls.requests_count})",
                         metadata={
                             "wait_time": wait_time,
                             "context": "sync_rate_limiting",
+                            "requests_count": cls.requests_count,
                         },
                     )
-                    if eval_listener is not None:
-                        eval_listener.emit_on_variable_change(
-                            OpenAIIntegration,
-                            "None",
-                            "None",
-                            f"Rate limit hit - waiting for reset {wait_time} seconds"
-                            f"no of requests :- {cls.requests_count}",
-                        )
                     time.sleep(wait_time)
                     OpenAIIntegration.requests_count = 0
                     OpenAIIntegration._last_request_time = time.perf_counter()
@@ -948,7 +939,7 @@ class OpenAIIntegration:
         This method ensures that no more than 30 requests are made 60 sec.
 
         IMPORTANT: THIS METHOD SHOULD BE CALLED BEFORE EACH OPENAI API REQUEST TO ENSURE COMPLIANCE WITH RATE LIMITS.
-        :return: fuck the asynchronicity
+        :return: None. Awaits the rate-limit window reset asynchronously (asyncio.sleep) so the event loop stays responsive.
         """
         # 🔧 FIX: Proper async context management
         from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
@@ -956,16 +947,12 @@ class OpenAIIntegration:
         # Use proper async lock instead of sync lock
         async with cls._client_lock:
             OpenAIIntegration.requests_count += 1
-            # MIGRATED: settings.listeners.get('eval') → ContextRegistry.get().get_listeners().get('eval')
-            eval_listener: RichStatusListener = ContextRegistry.get().get_listeners().get("eval", None)
 
-            if eval_listener is not None:
-                eval_listener.emit_on_variable_change(
-                    OpenAIIntegration,
-                    "status",
-                    f"Processing request {cls.requests_count}",
-                    f"API request {cls.requests_count} in progress",
-                )
+            ContextRegistry.get().get_logger().log_info(
+                heading="STATUS",
+                body=f"API request {cls.requests_count} in progress",
+                metadata={"requests_count": cls.requests_count},
+            )
 
             if OpenAIIntegration.requests_count == 1:
                 OpenAIIntegration._last_request_time = time.perf_counter()
@@ -976,25 +963,16 @@ class OpenAIIntegration:
                 elapsed_time = current_time - OpenAIIntegration._last_request_time
                 if elapsed_time < 60:
                     wait_time = 60 - elapsed_time
-                    # make update that we hit rate limit
-                    
 
                     ContextRegistry.get().get_logger().log_critical(
-                        heading="OPENAI • RATE_LIMIT",
-                        body="API rate limit hit - waiting for reset",
+                        heading="STATUS",
+                        body=f"Rate limit hit - waiting for reset {wait_time:.1f}s (Requests: {cls.requests_count})",
                         metadata={
                             "wait_time": wait_time,
                             "context": "async_rate_limiting",
+                            "requests_count": cls.requests_count,
                         },
                     )
-
-                    if eval_listener is not None:
-                        eval_listener.emit_on_variable_change(
-                            OpenAIIntegration,
-                            "None",
-                            "None",
-                            f"Rate limit hit - waiting for reset {wait_time} seconds, requests: {cls.requests_count}",
-                        )
 
                     await asyncio.sleep(wait_time)
                     OpenAIIntegration.requests_count = 0
@@ -1165,15 +1143,6 @@ class OpenAIIntegration:
         """
         old_value = OpenAIIntegration.requests_count
         OpenAIIntegration.requests_count = value
-
-        # Emit event to listeners
-        # eval_listener: RichStatusListener = settings.listeners.get('eval', None)
-        # if eval_listener is not None:
-        #     new_value = (f"{eval_listener.get_last_event().meta_data.get('new_value')!s}"
-        #                  .split('@'))[0] + f"@request count :- {value}"
-        #     eval_listener.emit_on_variable_change(OpenAIIntegration, "status",
-        #                                           f"{eval_listener.get_last_event().meta_data.get('new_value')}",
-        #                                           new_value)
 
 
 if __name__ == "__main__":

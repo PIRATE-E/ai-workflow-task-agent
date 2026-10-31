@@ -84,7 +84,7 @@ class CoreSettinngs(BaseSettings):
 
     # ── Graph Export Paths ──
     # WHAT: Added `png_file_path` configuration key to CoreSettinngs with default fallback.
-    # WHY: Decouples `save_graph_png` in `chat_initializer.py` from legacy `settings.py`.
+    # WHY: Decouples `save_graph_png` in `ColdWindEngine` from legacy `settings.py`.
     # Platform implementations (e.g. `DesktopConfig`) override this with absolute project paths.
     png_file_path: Path = Path("basic_logs/graph.png")
 

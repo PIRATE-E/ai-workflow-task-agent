@@ -5,26 +5,28 @@ providing timeout handling, process ID (PID) tracking, and clean termination.
 
 UPDATE (Feb 2026): Added Runner-based event-driven execution as alternative to subprocess.
 """
-import asyncio
+
 import datetime
 import json
 import os
 import subprocess
 import sys
+import uuid
 from pathlib import Path
 from typing import List
 
 # Ensure project root is on sys.path for correct module resolution in the subprocess
 if __package__ is None:
     p = Path(__file__).resolve()
-    project_root = next((parent for parent in p.parents if (parent / 'src').is_dir()),
-                        p.parents[4] if len(p.parents) > 4 else p.parent)
+    project_root = next(
+        (parent for parent in p.parents if (parent / "src").is_dir()),
+        p.parents[4] if len(p.parents) > 4 else p.parent,
+    )
     sys.path.insert(0, str(project_root))
 
 # browser dependencies - only import what's needed for BrowserUseCompatibleLLM in parent process
 
 from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
-
 
 # WHAT: Removed unused imports of Runner and BrowserRequiredConfig.
 # WHY: browser_tool/__init__.py imports BrowserHandler from this module for backward compatibility.
@@ -39,6 +41,7 @@ class BrowserHandler:
 
     UPDATE (Feb 2026): Now supports Runner-based event-driven execution via use_runner flag.
     """
+
     # 🔓 BORN UNASSIGNED (fixes import-time ContextRegistry.get() crash).
     # Previously these were class-body assignments that called
     # ContextRegistry.get().get_settings() during class definition — which
@@ -55,7 +58,13 @@ class BrowserHandler:
 
     # Flag to switch between legacy subprocess and new Runner-based execution
 
-    def __init__(self, query: str, head_less_mode: bool = False, log: bool = True, keep_alive: bool = True):
+    def __init__(
+        self,
+        query: str,
+        head_less_mode: bool = False,
+        log: bool = True,
+        keep_alive: bool = True,
+    ):
         # Resolve config at the very top, before any read (professional
         # pattern — the active context must exist by the time a BrowserHandler
         # is constructed, which is always post-boot). Missing registry/context
@@ -80,23 +89,34 @@ class BrowserHandler:
         """
         Manages the subprocess using subprocess.Popen and returns the result or error message.
         """
-        # # Create unique result file for this execution
-        # result_file_name = f"browser_result_{uuid.uuid4().hex}.json"
-        # self.result_file = settings.BASE_DIR / "basic_logs" / result_file_name
-        # self.result_file.parent.mkdir(parents=True, exist_ok=True)
-        # MIGRATED: settings.BROWSER_USE_LOG_FILE → get_settings().BROWSER_USE_LOG_FILE
-        self.result_file = Path(ContextRegistry.get().get_settings().BROWSER_USE_LOG_FILE).resolve()
+        # 🔧 FIX (BUG-5): the migrated line read ghost attrs — BASE_DIR and
+        # BROWSER_USE_LOG_FILE never existed on CoreSettinngs/DesktopConfig (the
+        # typed classes declare project_root / browser_use_log_file), so this
+        # crashed with AttributeError before the subprocess could even spawn.
+        # WHAT: restored the pre-migration design — a unique per-execution result
+        # file under <project_root>/basic_logs, deleted after the parent reads it.
+        # WHY: the subprocess writes its result JSON here while the parent streams
+        # subprocess stdout into browser.txt, so both need distinct paths.
+        result_file_name = f"browser_result_{uuid.uuid4().hex}.json"
+        self.result_file = (
+            Path(ContextRegistry.get().get_settings().project_root)
+            / "basic_logs"
+            / result_file_name
+        )
+        self.result_file.parent.mkdir(parents=True, exist_ok=True)
 
         # Prepare arguments for subprocess
         args_dict = {
-            'query': self.query,
-            'headless': self.head_less_mode,
-            'keep_alive': self.keep_alive,
-            'result_file': str(self.result_file)
+            "query": self.query,
+            "headless": self.head_less_mode,
+            "keep_alive": self.keep_alive,
+            "result_file": str(self.result_file),
         }
 
         # Get path to the subprocess runner script
-        runner_script = Path(__file__).parent/ "browser_tool" / "browser_subprocess_runner.py"
+        runner_script = (
+            Path(__file__).parent / "browser_tool" / "browser_subprocess_runner.py"
+        )
 
         # Build command
         cmd = [sys.executable, str(runner_script), json.dumps(args_dict)]
@@ -106,18 +126,31 @@ class BrowserHandler:
         try:
             # Setup stdout/stderr redirection
             if self.log:
-                # MIGRATED: settings.BASE_DIR → get_settings().BASE_DIR
-                log_path = ContextRegistry.get().get_settings().BASE_DIR / "basic_logs" / "browser.txt"
+                # 🔧 FIX (BUG-5): BASE_DIR was a ghost attr (real field: project_root).
+                # Log file name now comes from the typed browser_use_log_file field
+                # instead of a hardcoded "browser.txt".
+                _settings = ContextRegistry.get().get_settings()
+                log_path = (
+                    Path(_settings.project_root)
+                    / "basic_logs"
+                    / _settings.browser_use_log_file
+                )
                 log_path.parent.mkdir(parents=True, exist_ok=True)
 
                 # Open log file for subprocess output
-                self.log_file_handle = open(log_path, 'w', encoding='utf-8', buffering=1)
+                self.log_file_handle = open(
+                    log_path, "w", encoding="utf-8", buffering=1
+                )
 
                 # Write header
                 self.log_file_handle.write(f"\n{'='*80}\n")
-                self.log_file_handle.write(f"BROWSER SUBPROCESS STARTED - TIME: {datetime.datetime.now()}\n")
+                self.log_file_handle.write(
+                    f"BROWSER SUBPROCESS STARTED - TIME: {datetime.datetime.now()}\n"
+                )
                 self.log_file_handle.write(f"Query: {self.query}\n")
-                self.log_file_handle.write(f"Headless: {self.head_less_mode}, Keep Alive: {self.keep_alive}\n")
+                self.log_file_handle.write(
+                    f"Headless: {self.head_less_mode}, Keep Alive: {self.keep_alive}\n"
+                )
                 self.log_file_handle.write(f"Result file: {self.result_file}\n")
                 self.log_file_handle.write(f"{'='*80}\n")
                 self.log_file_handle.flush()
@@ -131,19 +164,21 @@ class BrowserHandler:
             # Create subprocess with OS-level stdout/stderr redirection
             # On Windows, use CREATE_NO_WINDOW to prevent console popup
             creation_flags = 0
-            if sys.platform == 'win32':
+            if sys.platform == "win32":
                 creation_flags = subprocess.CREATE_NO_WINDOW
 
             # Prepare environment with UTF-8 encoding to handle emojis in browser_use logs
             env = os.environ.copy()
-            env['PYTHONIOENCODING'] = 'utf-8'  # Force UTF-8 for subprocess I/O (fixes emoji system_logging)
+            env["PYTHONIOENCODING"] = (
+                "utf-8"  # Force UTF-8 for subprocess I/O (fixes emoji system_logging)
+            )
 
             self.process = subprocess.Popen(
                 cmd,
                 stdout=stdout_target,
                 stderr=stderr_target,
                 creationflags=creation_flags,
-                env=env  # Use modified environment with UTF-8 encoding
+                env=env,  # Use modified environment with UTF-8 encoding
             )
 
             self.process_id = self.process.pid
@@ -156,8 +191,8 @@ class BrowserHandler:
                     "pid": self.process_id,
                     "query": self.query,
                     "result_file": str(self.result_file),
-                    "log_enabled": self.log
-                }
+                    "log_enabled": self.log,
+                },
             )
 
             # Wait for process to complete with timeout
@@ -170,14 +205,16 @@ class BrowserHandler:
                     # Read result from file
                     if self.result_file.exists():
                         try:
-                            with open(self.result_file, 'r', encoding='utf-8') as f:
+                            with open(self.result_file, "r", encoding="utf-8") as f:
                                 result_data = json.load(f)
 
-                            if result_data.get('status') == 'success':
-                                result_str = result_data.get('result', 'No result in file')
+                            if result_data.get("status") == "success":
+                                result_str = result_data.get(
+                                    "result", "No result in file"
+                                )
                             else:
-                                error = result_data.get('error', 'Unknown error')
-                                traceback_info = result_data.get('traceback', '')
+                                error = result_data.get("error", "Unknown error")
+                                traceback_info = result_data.get("traceback", "")
                                 result_str = f"Browser subprocess error: {error}\n\n{traceback_info}"
                         except json.JSONDecodeError as e:
                             result_str = f"Failed to parse result file: {e}. Check browser.txt for details."
@@ -194,7 +231,9 @@ class BrowserHandler:
                 result_str = f"Tool execution timed out after {self.time_out} seconds and was terminated."
 
         except Exception as e:
-            result_str = f"An error occurred while managing the browser tool process: {e}"
+            result_str = (
+                f"An error occurred while managing the browser tool process: {e}"
+            )
             if self.process:
                 try:
                     if self.process.poll() is None:  # Process is still running
@@ -232,7 +271,7 @@ class BrowserHandler:
         """
         if process is None:
             return
-            
+
         try:
             if process.poll() is None:  # Process is still running
                 process.terminate()
@@ -248,8 +287,8 @@ class BrowserHandler:
                 metadata={
                     "process_id": process.pid,
                     "is_alive": process.poll() is None,
-                    "returncode": process.returncode
-                }
+                    "returncode": process.returncode,
+                },
             )
             if process in BrowserHandler.running_processes:
                 BrowserHandler.running_processes.remove(process)
@@ -264,37 +303,50 @@ class BrowserHandler:
         close all the running subprocesses if any
         :return:
         """
-        if hasattr(BrowserHandler, 'running_processes') and BrowserHandler.running_processes:
+        if (
+            hasattr(BrowserHandler, "running_processes")
+            and BrowserHandler.running_processes
+        ):
             # Create a copy of the list to avoid modification during iteration
             processes_to_clean = BrowserHandler.running_processes.copy()
             for proc in processes_to_clean:
                 BrowserHandler._clean_up(proc)
 
 
-def browser_use_tool(query: str, head_less_mode: bool = True, log: bool = True, keep_alive:bool = False) -> str:
+def browser_use_tool(
+    query: str, head_less_mode: bool = True, log: bool = True, keep_alive: bool = False
+) -> str:
     """
     Main entry point for the browser_agent tool.
     Creates an instance of BrowserHandler and returns the result.
-    
+
     Args:
         query: The task/query to be executed by the browser agent
         head_less_mode: Whether to run the browser in headless mode
         log: Whether to enable system_logging to browser.txt
         keep_alive: Whether to keep the browser alive after execution
-        
+
     Returns:
         str: The result of the browser agent execution or error message
     """
     try:
-        handler = BrowserHandler(query=query, head_less_mode=head_less_mode, log=log, keep_alive=keep_alive)
+        handler = BrowserHandler(
+            query=query, head_less_mode=head_less_mode, log=log, keep_alive=keep_alive
+        )
         return handler.result
     except Exception as e:
         error_msg = f"browser_use_tool failed with exception: {e}"
         # Try to log the error if system_logging is enabled
         if log:
             try:
-                # MIGRATED: settings.BASE_DIR → get_settings().BASE_DIR
-                log_path = ContextRegistry.get().get_settings().BASE_DIR / "basic_logs" / "browser.txt"
+                # 🔧 FIX (BUG-5): BASE_DIR was a ghost attr (real field: project_root);
+                # log file name comes from the typed browser_use_log_file field.
+                _settings = ContextRegistry.get().get_settings()
+                log_path = (
+                    Path(_settings.project_root)
+                    / "basic_logs"
+                    / _settings.browser_use_log_file
+                )
                 log_path.parent.mkdir(parents=True, exist_ok=True)
                 with open(log_path, "a", encoding="utf-8") as f:
                     f.write(f"\n[ERROR] {error_msg}\n")
@@ -303,13 +355,15 @@ def browser_use_tool(query: str, head_less_mode: bool = True, log: bool = True, 
         return error_msg
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     # test_query = "/agent you have to open browser in which open nvidia nim api website where you have to get knowledge about the models it offers for developers those model are text-to-text generation capabilities you have to then provide me best model for agentic and bigger context window !! to accomplish best among them you have to keep comparing with each others into ai benchmark websites !! after which you have to just provide me one model name !! who is best agentic model and long context model !! https://build.nvidia.com/explore/discover this is the website url !!"
     test_query = "/agent Navigate to YouTube, search the night we met, identify the official music video, play it, and keep alive, log to the true."
     print(f"Invoking browser_use_tool for query: '{test_query}'")
 
     # Run the tool and get the result directly
-    final_response = browser_use_tool(query=test_query, head_less_mode=False, log=True, keep_alive=True)
+    final_response = browser_use_tool(
+        query=test_query, head_less_mode=False, log=True, keep_alive=True
+    )
 
     print(f"\n--- Standalone Execution Result ---")
     print(final_response)

@@ -1,4 +1,6 @@
 from pathlib import Path
+
+from pydantic import Field
 from coldwind.core.config.coreSettings import CoreSettinngs
 
 
@@ -22,20 +24,18 @@ class DesktopConfig(CoreSettinngs):
 
     # ── Desktop Path Settings ──
     # WHAT: Explicitly declare project_root as a Path field on DesktopConfig.
-    # WHY: Handlers and cleanup routines (such as TextHandler at
-    # core/system_logging/handlers/handler_base.py:112 and error_transfer.py:111)
-    # query `ContextRegistry.get().get_settings().project_root`. Without this field
-    # declared and populated, accessing the property raises:
-    # AttributeError: 'DesktopConfig' object has no attribute 'project_root'
+    # WHY: Handlers and cleanup routines query `ContextRegistry.get().get_settings().project_root`.
+    # Purged unused `rag_example_file_path` (pointed to non-existent kafka.pdf),
+    # `rag_hash_file_path`, and `rag_triples_file_path` to avoid ghost configs.
     project_root: Path
     png_file_path: Path
     browser_use_user_profile_path: str
     mcp_config_path: Path
 
-    # ── Desktop RAG Paths ──
-    rag_example_file_path: Path
-    rag_hash_file_path: Path
-    rag_triples_file_path: Path
+    # -- dashboard terminal ---
+    dashboard_terminal_bin: str = "auto"
+    dashboard_terminal_flags_before: list[str] = Field(default_factory=list)
+    dashboard_terminal_flags_after: list[str] = Field(default_factory=list)
 
     def __init__(self, project_root: Path, **kwargs):
         """
@@ -58,16 +58,6 @@ class DesktopConfig(CoreSettinngs):
             project_root / "profiles" / "main_profile"
         )
         kwargs["mcp_config_path"] = project_root / ".mcp.json"
-
-        # RAG files located inside the core package
-        core_dir = project_root / "core" / "src" / "coldwind" / "core"
-        kwargs["rag_example_file_path"] = core_dir / "RAG" / "RAG_FILES" / "kafka.pdf"
-        kwargs["rag_hash_file_path"] = (
-            core_dir / "RAG" / "RAG_FILES" / "processed_hash_chunks.txt"
-        )
-        kwargs["rag_triples_file_path"] = (
-            core_dir / "RAG" / "RAG_FILES" / "processed_triple.json"
-        )
 
         # Explicitly pass the .env file from the project root using pydantic-settings _env_file
         kwargs["_env_file"] = project_root / ".env"

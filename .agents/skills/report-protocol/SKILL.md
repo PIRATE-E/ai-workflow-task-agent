@@ -1,125 +1,149 @@
 ---
 name: report-protocol
-description: Use PROACTIVELY when the user asks to create a report, generate a report, report on something, create an analysis document, deep research, or wants structured documentation.
+description: Creates and maintains a local documentation library (default `reports/`) of research reports, concept notes, bug investigations, design decisions and comparisons. Every doc is visually structured markdown (TL;DR, one table or diagram per section, numbered Q&A log at the end), and every folder gets a summary-with-links README using relative paths only. Make sure to use this skill whenever the user asks to create, write or generate a report, doc, write-up, analysis, deep research or "document this", asks to update or fix a reports README/index, or asks to log a question into a doc - even if they never say "report".
 ---
 
 # report-protocol
 
-You are a patient, thorough research and documentation specialist.
+You maintain a **documentation library** that a human will skim, click through and learn from. The reader is the user, not a text-scraping agent. A doc that is a wall of paragraphs has failed, however accurate it is.
 
-## Core identity
+Every rule below exists to stop one failure: information piled up in paragraphs with no structure, no summary and no way to navigate. If you are unsure which way to go, choose the layout that can be understood by reading only headings, tables, diagrams and the TL;DR.
 
-- Researcher: verify claims with multiple sources before writing.
-- Teacher: explain clearly and avoid jargon without definition.
+---
 
-## Mission
+## 1. Library layout
 
-Create comprehensive, structured reports with strong verification and clear explanations.
-
-## Workflow
-
-1. Gather context from the user and the current project.
-2. Research the topic deeply using available web and project tools.
-3. Cross-check claims against official docs or primary sources.
-4. Connect findings back to the repository's actual code and conventions.
-5. Write the report in a structured, scannable format.
-
-## Report shape
-
-Use a report structure with:
-
-- Domain & dependencies (first section — which platform this doc covers, which other systems/platforms it touches)
-- Executive summary
-- System context
-- Detailed analysis
-- Visual diagrams
-- Root cause investigation
-- Solution design
-- Code examples
-- Testing and validation
-- Learning outcomes
-- Quick reference
-- Related resources
-- Glossary
-- Q&A log
-
-## 📚 Library Shelving Contract (mandatory)
-
-This section is the hard contract for WHERE reports live. Filing decisions are
-steps to execute, not judgment calls.
-
-### Rule 1 — System-first shelves
-
-Every report file lives at exactly this path shape:
-
-```
-reports/<system-name>/<domain>/<file>.md
+```text
+reports/
+|-- README.md                  <- root: summary + domain table (relative links)
++-- <domain>/
+    |-- README.md              <- sub-domain: fixed template
+    |-- 01-<slug>.md
+    +-- 02-<slug>.md
 ```
 
-- `<system-name>` — the product system: `logging-system`, `event-system`,
-  `model-management`, etc. NEVER numbers (`01_…`), never one-off topic names.
-- `<domain>` — exactly one of the platform packages: `core`, `desktop`,
-  `server`, or `shared` (cross-domain glue only).
+| Rule                     | Detail                                                                                                                                                                                                                          |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Root**                 | `reports/` unless the project says otherwise (some projects use `docs/`; the same rules apply).                                                                                                                                 |
+| **README != bare index** | A README is a _summary page_: TL;DR, tables, a map, key takeaways, and hyperlinks. It is never just a list of links. There is no separate `INDEX.md`.                                                                           |
+| **Names**                | Match the naming already used in sibling folders. For new docs default to `NN-kebab-title.md` with the next free number.                                                                                                        |
+| **Links**                | **Strictly relative**, computed from the file that contains the link (`./02-x.md`, `../README.md`, `../../core/src/x.py`). Never `/home/...` or `file:///...`. Relative links are what make the file clickable in every viewer. |
 
-### Rule 2 — Every system folder owns a README with a strict skeleton
+---
 
-`reports/<system-name>/README.md` MUST exist and contain exactly these sections:
+## 2. Workflow
 
-```markdown
-# <System Name>
+| Step                          | Do this                                                                                                       | Why                                                              |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| 1. Orient                     | Read `reports/README.md`, then the target domain README. Decide: extend an existing doc, or create a new one. | Prevents duplicate docs and orphan folders.                      |
+| 2. Pick the type              | Choose from the table in section 3.                                                                           | Each type has a shape that fits its job.                         |
+| 3. Pick the verification mode | See section 5.                                                                                                | The user wants research only when they ask for it.               |
+| 4. Draft from the template    | Copy `assets/templates/<type>.md` and fill it.                                                                | The template is what keeps every doc structured.                 |
+| 5. Update READMEs             | Sub-domain README first, then root README. Do this **automatically**, without asking.                         | A doc that is not in a README does not exist for the reader.     |
+| 6. Lint                       | Run `python <skill-dir>/scripts/lint_reports.py reports` and fix every error.                                 | It checks links, structure and README coverage for you.          |
+| 7. Report back                | Reply in a short table: path (relative), type, verification mode, lint result.                                | The user should not have to open the file to know what happened. |
 
-## Domain
-<which platforms this system spans, one line each>
+---
 
-## Overview
-<3–5 lines: what the system does>
+## 3. Doc types
 
-## Interdependence Map
-<one Mermaid diagram: this system + the systems it depends on>
+| Type                    | Use for                                             | Template                                  |
+| ----------------------- | --------------------------------------------------- | ----------------------------------------- |
+| **Concept note**        | Learning or explaining a topic or component         | `assets/templates/concept-note.md`        |
+| **Investigation**       | Bugs, failures, root causes                         | `assets/templates/investigation.md`       |
+| **Design / decision**   | Choosing an approach, migration plans, architecture | `assets/templates/design-decision.md`     |
+| **Research comparison** | Comparing tools, libraries or options               | `assets/templates/research-comparison.md` |
 
-## Ownership Table
-| Domain | Folder | Files | Documents |
-|--------|--------|-------|-----------|
+When a request spans types (an investigation that ends in a design choice), write the main type and link to a second doc instead of merging them.
 
-## Index
-<deep links into each platform's docs>
-```
+---
 
-### Rule 3 — Index maintenance is part of "done"
+## 4. Writing rules
 
-- Creating a NEW system → update `reports/README.md` in the SAME change as the
-  report files (row: system, domains present, one-line purpose, link).
-- Adding a doc to an existing system → update that system's README Index and
-  Ownership Table in the same change.
-- Stale indexes = incomplete task. Never file a report without the index update.
+**Hard rules.** These are checked by the lint script.
 
-### Rule 4 — Cross-domain facts live at the system level
+| Rule                                                                                                                        | Why                                       |
+| --------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
+| Every doc opens with a title, a **metadata table**, and a `> **TL;DR:**` box (1-3 lines).                                   | The reader gets the core in five seconds. |
+| **Every `##` section contains at least one table or Mermaid diagram.** Only `TL;DR`, `Related` and `Start here` are exempt. | Forces structure over paragraphs.         |
+| Every link is a relative path and resolves to a real file.                                                                  | Clickable everywhere.                     |
+| The **Q&A Log is the last `##` section** of every doc, and READMEs have none.                                               | See section 6.                            |
+| Sub-domain READMEs use `assets/templates/subdomain-readme.md`.                                                              | Same shape in every folder.               |
 
-If platform B depends on an interface defined in platform A (e.g., desktop
-implements core's `DashboardManager`), the SYSTEM README states it. Individual
-docs link to the README, not restate it. Prevents drift between core/ and
-desktop/ copies of the same fact.
+**Soft defaults.** Follow them unless the content gives a good reason not to.
 
-### Rule 5 — Numbering only inside a domain
+- Keep paragraphs to about 4 lines. Convert comparisons and lists of facts into tables.
+- Put long supporting detail inside `<details><summary>...</summary>...</details>` so the page stays scannable.
+- Keep tables compact. Split a table that passes about 8 rows or 4 columns.
+- Bold a key term the first time it appears. Use a short plain-English meaning next to any jargon.
+- Mermaid diagrams stay under 12 nodes, with quoted labels when they contain brackets or colons. A broken diagram is worse than a table.
+- Each visual gets a title line and a one-line "how to read this".
+- Tables and prose carry the same depth. A visual never replaces the explanation, and never forces you to trim real content.
 
-`core/01-...`, `core/02-...` is allowed when reading order matters (multi-part
-tutorials). NEVER number systems or domains themselves.
+---
 
-### Filing checklist (run mentally before ANY report write)
+## 5. Verification
 
-1. Which SYSTEM does this belong to? (create it if it doesn't exist — with README)
-2. Which DOMAIN does it document? (core / desktop / server / shared)
-3. Does the system README Index + Ownership Table mention the new doc?
-4. Does `reports/README.md` have a row for the system
-5. Does the doc open with `Domain & Dependencies`?
+Pick the mode from the request. **Never invent APIs, functions, syntax or facts.** Prefer "I need to research this further" over guessing.
 
-If any answer is no, the report is not done.
+| Mode                   | When                                                                                     | What you do                                                                                                                                          |
+| ---------------------- | ---------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Codebase** (default) | The doc is about the project's own code or decisions                                     | Read the actual files. Link the real file and line with a relative path. A claim about code is VERIFIED only if you saw it in the file this session. |
+| **Research**           | The user says "research", "deep research", "verify", or the doc is a Research comparison | Check each important claim against 2-3 independent sources. Prefer official docs and primary sources. Fill the _Sources and confidence_ table.       |
 
-## Rules
+Marks used in every verification table:
 
-- Never invent APIs, functions, or facts.
-- Prefer "I need to research this further" over guessing.
-- Append to existing Q&A logs instead of overwriting them.
-- Update folder indexes after creating a report.
-- Follow the Library Shelving Contract exactly — path shape, README skeleton,
-  and index updates are mandatory, not style choices.
+| Mark       | Meaning                                                    |
+| ---------- | ---------------------------------------------------------- |
+| VERIFIED   | Verified. You saw the file, or two or more sources agree.  |
+| UNVERIFIED | Unverified or single source.                               |
+| CONFLICT   | Sources conflict or the claim is refuted. Show both sides. |
+
+Optional: put the matching emoji next to the word for quick scanning: check mark button U+2705 (VERIFIED), warning sign U+26A0 (UNVERIFIED), cross mark U+274C (CONFLICT). The word is always required; the emoji is a bonus.
+
+If you have no web access, say so in the doc and mark external claims UNVERIFIED. Set the metadata **Confidence** row to match the weakest important claim.
+
+---
+
+## 6. Q&A Log
+
+The log records questions the user asked about a doc, with short concrete answers.
+
+| Rule          | Detail                                                                                                                                                                                                  |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Location**  | The very last `##` section of the doc, named `## Q&A Log`.                                                                                                                                              |
+| **Format**    | Table with columns `# \| Question \| Answer (concrete) \| Date`. Rows are `Q1`, `Q2`, ...                                                                                                               |
+| **Numbering** | Append-only. New number = last number + 1. Never reuse or renumber.                                                                                                                                     |
+| **Style**     | Answers in 1-3 lines, concrete, no storytelling.                                                                                                                                                        |
+| **READMEs**   | Never contain a Q&A log or a question list.                                                                                                                                                             |
+| **Fusing**    | When an answer changes what a summary reader should know, rewrite the matching TL;DR line, README table cell, or metadata `Context` row **as a plain fact**. Do not write "Q3 says..." outside the log. |
+
+**Offer, don't assume.** After a teaching exchange that touches an existing doc (or a clearly durable doubt), offer once, in one line: `Log this as Q<next> in <relative path>? (yes/no)`. Log only after a yes. If the user says no or ignores it, do not ask again for that topic. Skip the offer for trivial exchanges.
+
+---
+
+## 7. README maintenance
+
+After creating or changing any doc:
+
+1. **Sub-domain README:** add or update the doc's row in _At a glance_ (relative link, type, what it answers, fused context, status), update the doc count and the _Updated_ date, and refresh _Reading path_ and _Key takeaways_ if the doc changes them.
+2. **Root README:** update the domain's row (summary, doc count, status), the _Recently updated_ table, and the _Map_.
+3. **New domain:** create its README from the template and add a row to the root README.
+4. Run the lint script.
+
+---
+
+## 8. Boundaries
+
+- This skill writes documentation. It does not change code; follow the project's own code-change protocol for that.
+- If the project's `AGENTS.md` defines other required steps (for example logging findings to a memory or knowledge graph), do those too. This skill does not replace them.
+- For the _wording_ of explanations inside a doc, keep it plain and direct. The teaching skill governs live chat, not file content.
+
+## 9. Before you finish
+
+Check silently, never show it:
+
+1. Does the doc have the metadata table, TL;DR box, one visual per `##`, and the Q&A Log last?
+2. Is the doc listed in its folder README, and the folder in the root README?
+3. Are all links relative, and does the lint script pass with zero errors?
+4. Are unverified claims marked UNVERIFIED and does the Confidence row match?

@@ -36,7 +36,8 @@ from coldwind.desktop.ui.print_message_style import print_message
 class DesktopDebugLogger(DebugLoggerInterface):
     """
     Desktop implementation of the DebugLoggerInterface.
-    Routes core logs to the existing desktop debug_helpers which use rich console output.
+    Routes core logs to the core system_logging debug protocol
+    (debug_info / debug_warning / debug_error / debug_critical).
     """
 
     @override
@@ -82,7 +83,16 @@ class DesktopExceptionHandler(ExceptionHandlerInterface):
         context: str = "",
         extra_context: Optional[dict[str, Any]] = None,
     ) -> None:
-        RichTracebackManager.handle_exception(error, context, extra_context)
+        # ---------------------------------------------------------------------
+        # WHAT CHANGED & WHY:
+        # Explicitly pass context and extra_context as keyword arguments.
+        # WHY: Previously passed positionally as the 3rd argument, which landed in
+        # `exc_type` in RichTracebackManager.handle_exception(exception, context, exc_type, ...),
+        # causing an AttributeError ('dict' object has no attribute '__name__').
+        # ---------------------------------------------------------------------
+        RichTracebackManager.handle_exception(
+            error, context=context, extra_context=extra_context
+        )
 
 
 class DesktopMessageDisplay(MessageDisplayInterface):
@@ -98,7 +108,8 @@ class DesktopMessageDisplay(MessageDisplayInterface):
         print_message(content, sender=role)
 
     def display_banner(self, title: str, subtitle: str = "") -> None:
-        print_banner(title, subtitle)
+        # NOTE: print banner doesnt accept any argument for desktop !!
+        print_banner()
 
 
 class DesktopCommandParser(CommandParserInterface):
@@ -123,15 +134,23 @@ class DesktopCommandParser(CommandParserInterface):
     def register_default_commands(self) -> None:
         """
         WHAT: Register default desktop slash commands into OnRunTimeRegistry.
-        WHY: Moves desktop slash command registration out of core chat_initializer.py,
+        WHY: Moves desktop slash command registration out of core ColdWindEngine,
         preserving the Layering Invariant ('Desktop imports Core; Core NEVER imports Desktop').
         """
-        from coldwind.desktop.slash_commands.commands.clear import register_clear_command
+        from coldwind.desktop.slash_commands.commands.clear import (
+            register_clear_command,
+        )
         from coldwind.desktop.slash_commands.commands.help import register_help_command
         from coldwind.desktop.slash_commands.commands.exit import register_exit_command
-        from coldwind.desktop.slash_commands.commands.core_slashs.agent import register_agent_command
-        from coldwind.desktop.slash_commands.commands.core_slashs.chat_llm import register_chat_llm_command
-        from coldwind.desktop.slash_commands.commands.core_slashs.use_tool import register_slash_command_use_tool
+        from coldwind.desktop.slash_commands.commands.core_slashs.agent import (
+            register_agent_command,
+        )
+        from coldwind.desktop.slash_commands.commands.core_slashs.chat_llm import (
+            register_chat_llm_command,
+        )
+        from coldwind.desktop.slash_commands.commands.core_slashs.use_tool import (
+            register_slash_command_use_tool,
+        )
 
         for reg_fn in (
             register_clear_command,
@@ -145,7 +164,6 @@ class DesktopCommandParser(CommandParserInterface):
                 reg_fn()
             except Exception:
                 pass
-
 
 
 #### NOTE:-this is the main runtine context that we would be gonna access using the get method on the context registry !!
@@ -191,12 +209,10 @@ class DesktopRunTimeContext(PlatformRuntimeContextInterface):
         self._console = None
         self._debug_console = None
 
-        # 2. Socket Connection (Previously: settings.socket_con)
-        # Born None — filled later by the orchestrator via set_socket_connection().
-        self._socket_con = None
-
-        # 3. Listeners & Flags (Previously: settings.listeners, settings.exit_flag)
-        self._listeners = {"eval": None, "exit": None}
+        # 2. Exit Flag (Previously: settings.exit_flag)
+        # WHAT: Purged legacy `self._listeners` container and `self._socket_con` slot.
+        # WHY: Legacy ExitListener, RichStatusListener, and raw SocketManager were deleted.
+        # Exit signaling is unified via `is_exiting()` / `request_exit()`.
         self._exit_flag = False
 
         # ── Interface Implementations ──
@@ -273,19 +289,3 @@ class DesktopRunTimeContext(PlatformRuntimeContextInterface):
     def set_debug_console(self, console: Any) -> None:
         """Fill the debug Console slot post-construction (e.g. subprocess bootstrap)."""
         self._debug_console = console
-
-    def get_socket_connection(self) -> Any:
-        """Return the raw socket connection, or None if not yet connected."""
-        return self._socket_con
-
-    def set_socket_connection(self, conn: Any) -> None:
-        """Fill the socket slot post-construction (e.g. SocketManager.get_socket_con())."""
-        self._socket_con = conn
-
-    def get_listeners(self) -> Any:
-        """Return the listener dict (born empty)."""
-        return self._listeners
-
-    def register_listener(self, key: str, listener: Any) -> None:
-        """Add ``listener`` to the listener dict under ``key`` (overwrites on clash)."""
-        self._listeners[key] = listener

@@ -7,7 +7,7 @@ Each driver class:
 - Has __init__(self, runner_instance)
 - Has async methods that execute_method will find and run
 
-Mapping from browser_subprocess_runner.py:
+Mapping from the pre-refactor browser_subprocess_runner.py monolith (each driver below owns one section of the old file):
 - PreRequirementsCustomEvent: Check internet, RAM, browser_use installed
 - SetupDriver: Create LLM, Browser, Agent instances + monkey patch
 - OnStartDriver: Load custom sessions, wait for browser ready
@@ -110,7 +110,7 @@ class SetupDriver(Handler):
     3. Create the browser window
     4. Create the robot agent that controls the browser
 
-    Maps to browser_subprocess_runner.py lines:
+    Ported from the pre-refactor browser_subprocess_runner.py monolith (old line ranges below):
     - BrowserUseCompatibleLLM class (lines 70-160)
     - Browser creation (lines 174-180)
     - Agent creation (lines 185-193)
@@ -148,7 +148,7 @@ class SetupDriver(Handler):
         """Create BrowserUseCompatibleLLM adapter.
 
         This wraps ModelManager to be compatible with browser_use's expected LLM interface.
-        From browser_subprocess_runner.py lines 70-160.
+        Ported from the pre-refactor browser_subprocess_runner.py monolith (old lines 70-160).
         """
         from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
         from coldwind.core.utils.model_manager import ModelManager
@@ -277,7 +277,7 @@ class SetupDriver(Handler):
     async def create_browser_instance(self):
         """Create Browser instance.
 
-        From browser_subprocess_runner.py lines 174-180.
+        Ported from the pre-refactor browser_subprocess_runner.py monolith (old lines 174-180).
         """
         from browser_use import Browser
         from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
@@ -289,9 +289,10 @@ class SetupDriver(Handler):
             headless=config.headless,
             keep_alive=config.keep_alive,
             record_video_dir=config.video_dir if config.record_video else None,
-            # MIGRATED: settings.BROWSER_USE_USER_PROFILE_PATH →
-            # ContextRegistry.get().get_settings().BROWSER_USE_USER_PROFILE_PATH
-            user_data_dir=config.user_data_dir or ContextRegistry.get().get_settings().BROWSER_USE_USER_PROFILE_PATH,
+            # 🔧 FIX (BUG-5): ghost attr BROWSER_USE_USER_PROFILE_PATH → real typed
+            # field browser_use_user_profile_path (the uppercase name never existed
+            # on CoreSettinngs/DesktopConfig → AttributeError at browser creation).
+            user_data_dir=config.user_data_dir or ContextRegistry.get().get_settings().browser_use_user_profile_path,
         )
 
         # Store on runner for later use
@@ -304,7 +305,7 @@ class SetupDriver(Handler):
     async def create_agent_instance(self):
         """Create Agent instance.
 
-        From browser_subprocess_runner.py lines 185-193.
+        Ported from the pre-refactor browser_subprocess_runner.py monolith (old lines 185-193).
         """
         from browser_use import Agent
 
@@ -341,7 +342,7 @@ class OnStartDriver(Handler):
     1. Wait for browser to be ready (connected)
     2. Load saved data from last time (form data, scroll position)
 
-    Maps to browser_subprocess_runner.py:
+    Ported from the pre-refactor browser_subprocess_runner.py monolith:
     - load_custom_sessions() function (lines 285-375)
     - wait_until_browser_ready() (lines 287-298)
     """
@@ -356,7 +357,7 @@ class OnStartDriver(Handler):
     async def wait_for_browser_ready(self):
         """Wait until browser CDP client is ready.
 
-        From browser_subprocess_runner.py lines 287-298.
+        Ported from the pre-refactor browser_subprocess_runner.py monolith (old lines 287-298).
         """
         browser = self.runner.browser
         config = self.runner.config
@@ -379,7 +380,7 @@ class OnStartDriver(Handler):
         """Load custom browser sessions if available.
 
         Restores: URL, form data, scroll position.
-        From browser_subprocess_runner.py lines 299-375.
+        Ported from the pre-refactor browser_subprocess_runner.py monolith (old lines 299-375).
         """
         import aiofiles
         from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
@@ -388,9 +389,9 @@ class OnStartDriver(Handler):
         config = self.runner.config
 
         session_file_path = Path(
-            # MIGRATED: settings.BROWSER_USE_USER_PROFILE_PATH →
-            # ContextRegistry.get().get_settings().BROWSER_USE_USER_PROFILE_PATH
-            config.user_data_dir or ContextRegistry.get().get_settings().BROWSER_USE_USER_PROFILE_PATH) / "custom_sessions.json"
+            # 🔧 FIX (BUG-5): ghost attr BROWSER_USE_USER_PROFILE_PATH → real typed
+            # field browser_use_user_profile_path (AttributeError under old name).
+            config.user_data_dir or ContextRegistry.get().get_settings().browser_use_user_profile_path) / "custom_sessions.json"
 
         if not session_file_path.exists():
             print("[DRIVER] No custom session file found, starting fresh.")
@@ -474,7 +475,7 @@ class OnRunningDriver(Handler):
     2. Tell the robot to do the task (agent.run())
     3. Wait for the robot to finish
 
-    Maps to browser_subprocess_runner.py:
+    Ported from the pre-refactor browser_subprocess_runner.py monolith:
     - agent.run() (lines 215-218)
     - monitering_browser_process() (lines 211-213, 560-590)
     """
@@ -570,7 +571,7 @@ class OnRunningDriver(Handler):
     async def start_browser_monitoring(self):
         """Start monitoring thread to watch if browser is still alive.
 
-        From browser_subprocess_runner.py lines 560-590.
+        Ported from the pre-refactor browser_subprocess_runner.py monolith (old lines 560-590).
         """
 
         def _runner(q: queue.Queue):
@@ -596,7 +597,7 @@ class OnRunningDriver(Handler):
     async def run_agent(self):
         """Execute the agent task.
 
-        From browser_subprocess_runner.py lines 215-218.
+        Ported from the pre-refactor browser_subprocess_runner.py monolith (old lines 215-218).
         """
         agent = self.runner.agent
 
@@ -629,7 +630,7 @@ class OnCompleteDriver(Handler):
     2. Save where we were (so we can continue later)
     3. Write the answer to a file
 
-    Maps to browser_subprocess_runner.py:
+    Ported from the pre-refactor browser_subprocess_runner.py monolith:
     - result.final_result() (lines 227-228)
     - save_custom_sessions() (lines 378-416)
     - Write result to file (lines 233-238)
@@ -645,7 +646,7 @@ class OnCompleteDriver(Handler):
     async def extract_final_result(self):
         """Extract final result from agent.
 
-        From browser_subprocess_runner.py lines 227-228.
+        Ported from the pre-refactor browser_subprocess_runner.py monolith (old lines 227-228).
         """
         agent_result = getattr(self.runner, 'agent_result', None)
 
@@ -665,7 +666,7 @@ class OnCompleteDriver(Handler):
     async def save_custom_sessions(self):
         """Save current browser session state.
 
-        From browser_subprocess_runner.py lines 378-416.
+        Ported from the pre-refactor browser_subprocess_runner.py monolith (old lines 378-416).
         """
         import aiofiles
         from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
@@ -740,9 +741,9 @@ class OnCompleteDriver(Handler):
 
             # Save to file
             session_file_path = Path(
-                # MIGRATED: settings.BROWSER_USE_USER_PROFILE_PATH →
-                # ContextRegistry.get().get_settings().BROWSER_USE_USER_PROFILE_PATH
-                config.user_data_dir or ContextRegistry.get().get_settings().BROWSER_USE_USER_PROFILE_PATH) / 'custom_sessions.json'
+                # 🔧 FIX (BUG-5): ghost attr BROWSER_USE_USER_PROFILE_PATH → real typed
+                # field browser_use_user_profile_path (AttributeError under old name).
+                config.user_data_dir or ContextRegistry.get().get_settings().browser_use_user_profile_path) / 'custom_sessions.json'
             async with aiofiles.open(session_file_path, 'w', encoding='utf-8') as f:
                 await f.write(json.dumps(session_data, indent=2))
 
@@ -755,7 +756,7 @@ class OnCompleteDriver(Handler):
     async def write_result_to_file(self):
         """Write final result to output file.
 
-        From browser_subprocess_runner.py lines 233-238.
+        Ported from the pre-refactor browser_subprocess_runner.py monolith (old lines 233-238).
         """
         config = self.runner.config
         final_result = getattr(self.runner, 'final_result', None)
@@ -812,7 +813,7 @@ class OnExceptionDriver(Handler):
     async def write_error_to_file(self):
         """Write error to result file.
 
-        From browser_subprocess_runner.py lines 267-277.
+        Ported from the pre-refactor browser_subprocess_runner.py monolith (old lines 267-277).
         """
         config = self.runner.config
         exception = getattr(self.runner, 'last_exception', None)
@@ -849,7 +850,7 @@ class TeardownDriver(Handler):
     2. If keep_alive is True, wait for user to close browser
     3. Clean up any leftover mess
 
-    Maps to browser_subprocess_runner.py:
+    Ported from the pre-refactor browser_subprocess_runner.py monolith:
     - agent.close() (line 223)
     - keep_alive wait logic (lines 240-261)
     """
@@ -887,7 +888,7 @@ class TeardownDriver(Handler):
     async def handle_keep_alive(self):
         """Handle keep_alive mode - wait for browser to close.
 
-        From browser_subprocess_runner.py lines 240-261.
+        Ported from the pre-refactor browser_subprocess_runner.py monolith (old lines 240-261).
         """
         config = self.runner.config
         monitor_queue = getattr(self.runner, 'monitor_queue', None)
@@ -919,7 +920,7 @@ class TeardownDriver(Handler):
     async def __close_agent(self):
         """Close the agent.
 
-        From browser_subprocess_runner.py line 223.
+        Ported from the pre-refactor browser_subprocess_runner.py monolith (old line 223).
         """
         agent = getattr(self.runner, 'agent', None)
 

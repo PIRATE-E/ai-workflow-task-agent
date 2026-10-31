@@ -90,7 +90,7 @@ class FAILURE_CONTEXT_STRATEGY(BaseModel):
 
 class FAILURE_CONTEXT(BaseModel):
     error_message: str = Field(
-        ..., description="Detailed error message from the last failure"
+        default="Unknown error", description="Detailed error message from the last failure"
     )
     fail_count: int = Field(
         description="number of times the task has failed", default=1, ge=1
@@ -109,11 +109,11 @@ class FAILURE_CONTEXT(BaseModel):
     )
     failed_parameters: dict[str, Any] | None = Field(
         default=None, description="The parameters that caused the failure"
-    )  # <-- NEW FIELD
-    strategy_history: list[FAILURE_CONTEXT_STRATEGY] | None = Field(
+    )
+    strategy_history: list[FAILURE_CONTEXT_STRATEGY] = Field(
         default_factory=list,
         description="History of all recovery strategies attempted with outcomes",
-    )  # <-- NEW FIELD
+    )
     # Cooldown timestamp to avoid tight retry loops
     next_attempt_timestamp: str | None = Field(
         default=None, description="Earliest time allowed for next retry"
@@ -166,7 +166,7 @@ class TASK(BaseModel):
         description="current status", default="pending"
     )
     max_retries: int = Field(
-        description="maximum number of retries allowed", default=1, ge=0
+        description="maximum number of retries allowed", default=2, ge=0
     )
     depth: int = Field(
         description="recursion depth of the task", default=0, ge=0

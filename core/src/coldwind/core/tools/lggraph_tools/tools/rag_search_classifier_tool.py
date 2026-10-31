@@ -9,7 +9,6 @@ from rich.prompt import Prompt
 
 import coldwind.core.prompts.rag_search_classifier_prompts
 
-# from lggraph import console  # this need to fixed we are importing console from "lggraph" file
 from coldwind.core.RAG.RAG_FILES import neo4j_rag
 from coldwind.core.RAG.RAG_FILES import rag
 from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
@@ -17,10 +16,8 @@ from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
 # sourced via ContextRegistry:
 #   - HumanMessage → direct langchain_core import (this module constructs
 #     HumanMessage instances for LLM prompts, so it needs the real class).
-#   - socket_con → ContextRegistry.get().get_socket_connection() (None-safe;
-#     None means no socket registered, matching the old `if settings.socket_con:`
-#     guard semantics).
 #   - console → ContextRegistry.get().get_console().
+#   - logger → ContextRegistry.get().get_logger().
 # Pure config values (gpt_model, DEFAULT_RAG_EXAMPLE_FILE_PATH,
 # enable_sound_notifications) are accessed via get_settings().<field>.
 from langchain_core.messages import HumanMessage
@@ -133,12 +130,11 @@ def retrieve_knowledge_graph(query: str) -> str:
             json_result = ModelManager.convert_to_json(result)
             return json.dumps(json_result)  # Return as JSON string for compatibility
         except Exception as e:
-            # MIGRATED: settings.socket_con → ContextRegistry.get().get_socket_connection()
-            _socket_con = ContextRegistry.get().get_socket_connection()
-            if _socket_con:
-                _socket_con.send_error(
-                    f"[ERROR] Failed to invoke model {model_name}: {e}"
-                )
+            ContextRegistry.get().get_logger().log_error(
+                "RAG_TOOL • MODEL_INVOCATION_ERROR",
+                f"Failed to invoke model {model_name}: {e}",
+                {"model_name": model_name, "error": str(e)},
+            )
             return None
 
     # ✅ FIX 2: Actually call the function to generate cypher
@@ -158,30 +154,28 @@ def retrieve_knowledge_graph(query: str) -> str:
         reasoning = cypher_result.get("reasoning", "")
 
     except json.JSONDecodeError as e:
-        # MIGRATED: settings.socket_con → ContextRegistry.get().get_socket_connection()
-        _socket_con = ContextRegistry.get().get_socket_connection()
-        if _socket_con:
-            _socket_con.send_error(
-                f"[ERROR] Failed to parse JSON response: {e}"
-            )
+        ContextRegistry.get().get_logger().log_error(
+            "RAG_TOOL • JSON_DECODE_ERROR",
+            f"Failed to parse JSON response: {e}",
+            {"error": str(e), "raw_response": cypher_content},
+        )
         return f"[ERROR] Invalid JSON response for query: {query}"
     except Exception as e:
-        # MIGRATED: settings.socket_con → ContextRegistry.get().get_socket_connection()
-        _socket_con = ContextRegistry.get().get_socket_connection()
-        if _socket_con:
-            _socket_con.send_error(
-                f"[ERROR] Unexpected error processing response: {e}"
-            )
+        ContextRegistry.get().get_logger().log_error(
+            "RAG_TOOL • PROCESSING_ERROR",
+            f"Unexpected error processing response: {e}",
+            {"error": str(e)},
+        )
         return f"[ERROR] Failed to process response for query: {query}"
 
     if not final_cypher:
         return f"[ERROR] Failed to generate any valid cypher query for: {query}"
 
-    # MIGRATED: settings.socket_con → ContextRegistry.get().get_socket_connection()
-    _socket_con = ContextRegistry.get().get_socket_connection()
-    if _socket_con:
-        _socket_con.send_error(f"[LOG] FINAL CYPHER QUERY: {final_cypher}")
-        _socket_con.send_error(f"[LOG] REASONING: {reasoning}")
+    ContextRegistry.get().get_logger().log_info(
+        "RAG_TOOL • CYPHER_GENERATED",
+        f"Generated Cypher query for '{query}'",
+        {"cypher": final_cypher, "reasoning": reasoning},
+    )
 
     # Execute the cypher query
     receive_triples = neo4j_rag.get_retrieve_triples(final_cypher)
@@ -193,10 +187,11 @@ def retrieve_knowledge_graph(query: str) -> str:
     triples_text = "\n".join(
         [neo4j_rag.extract_triple_text(triple) for triple in receive_triples]
     )
-    # MIGRATED: settings.socket_con → ContextRegistry.get().get_socket_connection()
-    _socket_con = ContextRegistry.get().get_socket_connection()
-    if _socket_con:
-        _socket_con.send_error(f"[LOG] TRIPLES TEXT: {triples_text}")
+    ContextRegistry.get().get_logger().log_info(
+        "RAG_TOOL • TRIPLES_RETRIEVED",
+        f"Retrieved {len(receive_triples)} triples from Neo4j",
+        {"triples_count": len(receive_triples), "preview": triples_text[:100]},
+    )
 
     # Create a comprehensive, user-friendly explanation prompt (HYBRID APPROACH)
     from coldwind.core.prompts.rag_search_classifier_prompts import Prompts

@@ -30,7 +30,7 @@ class ChatCompleter(Completer):
     """
 
     def get_completions(
-            self, document: Document, complete_event: CompleteEvent
+        self, document: Document, complete_event: CompleteEvent
     ) -> Iterable[Completion]:
         # Get fresh reference to registry each time (it's a singleton)
         registry = OnRunTimeRegistry()
@@ -66,48 +66,48 @@ class ChatCompleter(Completer):
     def _get_command_emoji(self, command: str) -> str:
         """Return an emoji for the command type."""
         emojis = {
-            'help': '❓',
-            'agent': '🤖',
-            'clear': '🧹',
-            'exit': '👋',
-            'chat': '💬',
-            'tool': '🔧',
+            "help": "❓",
+            "agent": "🤖",
+            "clear": "🧹",
+            "exit": "👋",
+            "llm": "💬",
+            "tool": "🔧",
         }
-        return emojis.get(command.lower(), '⚡')
+        return emojis.get(command.lower(), "⚡")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
 #                           MODERN CLI STYLE THEME
 # ═══════════════════════════════════════════════════════════════════════════════
 
-MODERN_STYLE = Style.from_dict({
-    # Prompt
-    'prompt': '#00d4aa bold',
-
-    # Completion menu
-    'completion-menu': 'bg:#1a1b26',
-    'completion-menu.completion': 'bg:#1a1b26 #a9b1d6',
-    'completion-menu.completion.current': 'bg:#7c3aed #ffffff bold',
-    'completion-menu.meta.completion': 'bg:#1a1b26 #565f89',
-    'completion-menu.meta.completion.current': 'bg:#7c3aed #e0e0e0',
-
-    # Scrollbar
-    'scrollbar.background': 'bg:#1a1b26',
-    'scrollbar.button': 'bg:#7c3aed',
-
-    # Auto-suggest ghost text
-    'auto-suggest': '#4a5568',
-})
+MODERN_STYLE = Style.from_dict(
+    {
+        # Prompt
+        "prompt": "#00d4aa bold",
+        # Completion menu
+        "completion-menu": "bg:#1a1b26",
+        "completion-menu.completion": "bg:#1a1b26 #a9b1d6",
+        "completion-menu.completion.current": "bg:#7c3aed #ffffff bold",
+        "completion-menu.meta.completion": "bg:#1a1b26 #565f89",
+        "completion-menu.meta.completion.current": "bg:#7c3aed #e0e0e0",
+        # Scrollbar
+        "scrollbar.background": "bg:#1a1b26",
+        "scrollbar.button": "bg:#7c3aed",
+        # Auto-suggest ghost text
+        "auto-suggest": "#4a5568",
+    }
+)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
 #                           CUSTOM KEY BINDINGS
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 def create_key_bindings() -> KeyBindings:
     """
     Create custom key bindings for better autocomplete UX.
-    
+
     TAB Behavior:
     - If dropdown open + suggestion exists → Insert suggestion
     - If dropdown open + NO suggestion → Move to next menu option
@@ -163,7 +163,7 @@ def create_key_bindings() -> KeyBindings:
             if completion:
                 # Apply the selected completion and add space
                 buffer.apply_completion(completion)
-                buffer.insert_text(' ')
+                buffer.insert_text(" ")
                 return
             else:
                 # No item selected, just submit what's there
@@ -172,7 +172,6 @@ def create_key_bindings() -> KeyBindings:
 
         # Case 2: No dropdown - just submit the input
         buffer.validate_and_handle()
-
 
     @kb.add(Keys.Escape)
     def handle_escape(event):
@@ -229,36 +228,36 @@ class InputHandler:
     def get_user_input(self, prompt_text=None, style=None) -> str:
         """
         Get user input with autocomplete.
-        
+
         Usage:
             handler = InputHandler()
             user_input = handler.get_user_input()
-            
+
         Custom prompt:
             user_input = handler.get_user_input("Ask me: ")
         """
         if prompt_text is None and style is None:
-            prompt_text = [('class:prompt', 'you ➜ ')]
+            prompt_text = [("class:prompt", "you ➜ ")]
         elif prompt_text is not None and style is None:
-            prompt_text = [('class:prompt', prompt_text)]
+            prompt_text = [("class:prompt", prompt_text)]
         elif prompt_text is None:
-            prompt_text = [(style, 'you ➜ ')]
+            prompt_text = [(style, "you ➜ ")]
 
         # If we're not in an interactive terminal, prompt_toolkit can't work reliably.
         if not sys.stdin.isatty():
             try:
                 # best-effort plain prompt
-                return input('you ➜ ')
+                return input("you ➜ ")
             except EOFError:
-                return '/exit'
+                return "/exit"
 
         try:
             return InputHandler._session.prompt(prompt_text)
         except EOFError:
-            return '/exit'
+            return "/exit"
         except Exception:
             # prompt_toolkit can throw when terminal state is odd; fall back.
             try:
-                return input('you ➜ ')
+                return input("you ➜ ")
             except EOFError:
-                return '/exit'
+                return "/exit"

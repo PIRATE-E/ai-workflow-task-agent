@@ -50,7 +50,7 @@ class McpConfigFile:
 
         if not hasattr(cls, "__config_path") or cls.__config_path is None:
             # MIGRATED: settings.MCP_CONFIG.get('MCP_CONFIG_PATH') →
-            # ContextRegistry.get().get_settings().mcp_config.get('MCP_CONFIG_PATH')
+            # ContextRegistry.get().get_settings().mcp_config_path (typed field on DesktopConfig)
             cls.__config_path = (
                 ContextRegistry.get().get_settings().mcp_config_path
             )  # Default path if not set
