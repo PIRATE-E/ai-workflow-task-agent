@@ -21,7 +21,7 @@ def classify_message_type(state) -> dict:
         /llm, /tool, and /agent. If no valid command is detected, the default route is /llm.
     """
     ContextRegistry.get().get_logger().log_info(
-        heading="STATUS",
+        heading="AGENT • CLASSIFY_ROUTING",
         body="Analyzing request and routing...",
         metadata={"node": "classify_message"},
     )

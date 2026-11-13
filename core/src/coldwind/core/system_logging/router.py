@@ -15,6 +15,9 @@ class Router:
 
     # Default keyword mappings: keyword → LogCategory
     # These can be customized per instance
+    # WHAT: Added ENGINE, TICKET, and CLEANUP keywords mapped to AGENT_WORKFLOW.
+    # WHY: Ensures lifecycle, ticket, and engine orchestration logs route to AGENT_WORKFLOW
+    #      instead of silently falling back to LogCategory.OTHER.
     DEFAULT_KEYWORD_MAP = {
         "MCP": LogCategory.MCP_SERVER,
         "API": LogCategory.API_CALL,
@@ -23,6 +26,9 @@ class Router:
         "TOOL": LogCategory.TOOL_EXECUTION,
         "AGENT": LogCategory.AGENT_WORKFLOW,
         "WORKFLOW": LogCategory.AGENT_WORKFLOW,
+        "ENGINE": LogCategory.AGENT_WORKFLOW,
+        "TICKET": LogCategory.AGENT_WORKFLOW,
+        "CLEANUP": LogCategory.AGENT_WORKFLOW,
         "ERROR": LogCategory.ERROR_TRACEBACK,
         "FAILED": LogCategory.ERROR_TRACEBACK,
         "TRACEBACK": LogCategory.ERROR_TRACEBACK,

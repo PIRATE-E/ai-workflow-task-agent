@@ -45,7 +45,7 @@ def generate_llm_response(state) -> dict:
     # platform turn status handler on Rich. Terminal spinners belong to platform handlers.
     # -------------------------------------------------------------------------
     ContextRegistry.get().get_logger().log_info(
-        heading="STATUS",
+        heading="AGENT • CHAT_LLM",
         body="Generating response from LLM...",
         metadata={"node": "chatBot"},
     )
