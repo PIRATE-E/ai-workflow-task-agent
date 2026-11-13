@@ -1,5 +1,5 @@
-from .protocol import SlashCommand, CommandOption, CommandResult
 from .on_run_time_register import OnRunTimeRegistry
+from .protocol import CommandResult, SlashCommand
 
 
 class ExecutionAr:

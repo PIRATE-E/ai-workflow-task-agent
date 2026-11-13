@@ -1,5 +1,6 @@
-from ..protocol import SlashCommand, CommandResult, CommandOption
 from ..on_run_time_register import OnRunTimeRegistry
+from ..protocol import CommandOption, CommandResult, SlashCommand
+
 
 def register_help_command() -> None:
     """Function to register the /help command in the OnRunTimeRegistry."""

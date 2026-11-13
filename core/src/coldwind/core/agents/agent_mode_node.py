@@ -23,11 +23,12 @@ import unicodedata
 from coldwind.core.agents.agentic_orchestrator import (
     AgentGraphCore,
 )
-from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
-from coldwind.core.runtime.runtime_obj_enum import CoreRunTimeObjects
+
 # WHAT: Route exception handling through core exception_interface contract.
 # WHY: Eliminates illegal Core -> Desktop import, preserving the Layering Invariant.
 from coldwind.core.interfaces.exception_interface import rich_exception_handler
+from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
+from coldwind.core.runtime.runtime_obj_enum import CoreRunTimeObjects
 
 
 def normalize_utf8_text(text: str) -> str:
@@ -51,7 +52,8 @@ def normalize_utf8_text(text: str) -> str:
         
         return text
     except Exception as e:
-        ContextRegistry.get().get_logger().log_info("UTF8_NORMALIZATION", f"Failed to normalize text: {e}", metadata={
+        # Standardized heading to AGENT • UTF8_NORMALIZE for Router and telemetry compliance
+        ContextRegistry.get().get_logger().log_info("AGENT • UTF8_NORMALIZE", f"Failed to normalize text: {e}", metadata={
             "original_length": len(text),
             "error_type": type(e).__name__
         })
@@ -286,8 +288,8 @@ def agent_node(state):
             )
 
         # Log both the user-facing text and the raw normalized final_response for debugging
-        ContextRegistry.get().get_logger().log_info("AGENT_MODE • FINAL_RESPONSE_DELIVER", f"Delivering final response to user", metadata={
-            "function name": "agent_node",
+        ContextRegistry.get().get_logger().log_info("AGENT_MODE • FINAL_RESPONSE_DELIVER", "Delivering final response to user", metadata={
+            "function_name": "agent_node",
             "display_preview": (display_text or "")[:400],
             "raw_preview": (str(final_response) or "")[:400],
         })

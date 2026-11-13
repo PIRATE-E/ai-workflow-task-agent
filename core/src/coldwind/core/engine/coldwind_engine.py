@@ -22,16 +22,6 @@ from typing import Any, cast
 
 from coldwind.core.engine.chat_destructor import ChatDestructor
 from coldwind.core.engine.graphs.node_assign import GraphBuilder
-from coldwind.core.mcp.load_config import McpConfigFile
-from coldwind.core.mcp.manager import MCP_Manager
-from coldwind.core.mcp.mcp_manager_util import Utils
-from coldwind.core.models import StateAccessor
-from coldwind.core.models.state import State
-from coldwind.core.models.ticket_in import TicketIn
-from coldwind.core.models.ticket_out import TicketOut
-from coldwind.core.runtime import ContextRegistry, CoreRunTimeObjects
-from coldwind.core.tools.lggraph_tools.tools.browser_tool import BrowserHandler
-from coldwind.core.utils.model_manager import ModelManager
 
 # -------------------------------------------------------------------------
 # WHAT CHANGED & WHY:
@@ -46,6 +36,17 @@ from coldwind.core.utils.model_manager import ModelManager
 from coldwind.core.interfaces.exception_interface import (
     rich_exception_handler,
 )
+from coldwind.core.mcp.load_config import McpConfigFile
+from coldwind.core.mcp.manager import MCP_Manager
+from coldwind.core.mcp.mcp_manager_util import Utils
+from coldwind.core.models import StateAccessor
+from coldwind.core.models.state import State
+from coldwind.core.models.ticket_in import TicketIn
+from coldwind.core.models.ticket_out import TicketOut
+from coldwind.core.runtime import ContextRegistry, CoreRunTimeObjects
+from coldwind.core.tools.lggraph_tools.tools.browser_tool import BrowserHandler
+from coldwind.core.utils.model_manager import ModelManager
+from coldwind.core.utils.open_ai_integration import OpenAIIntegration
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
 from langgraph.graph.state import CompiledStateGraph
 
@@ -320,7 +321,7 @@ class ColdWindEngine:
         self.tools = ToolAssign.get_tools_list()
 
         ContextRegistry.get().get_logger().log_info(
-            heading="Tools Registered",
+            heading="ENGINE • TOOLS_REGISTERED",
             body=f"Registered {len(self.tools)} tools successfully.",
             metadata={
                 "tools_count": len(self.tools),
@@ -329,8 +330,8 @@ class ColdWindEngine:
 
     def _register_logging_handlers(self):
         """Register logging handlers for the chat application."""
-        from ..system_logging.on_time_registry import OnTimeRegistry
         from ..system_logging.handlers.handler_base import TextHandler
+        from ..system_logging.on_time_registry import OnTimeRegistry
 
         async def register_handlers():
             ##### this is the place which register the all logging handlers #####
@@ -369,7 +370,7 @@ class ColdWindEngine:
         init_thread.start()
         init_thread.join()  # Wait for completion
         ContextRegistry.get().get_logger().log_info(
-            heading="Logging Handlers Registered",
+            heading="ENGINE • LOGGING_REGISTERED",
             body="Core logging handlers registered successfully.",
             metadata={},
         )
@@ -455,6 +456,8 @@ class ColdWindEngine:
         start_time = time.perf_counter()
         context = ContextRegistry.get()
         logger = context.get_logger()
+        # Reset turn metrics so ticket begins with clean 0 requests
+        OpenAIIntegration.reset_ticket_requests()
 
         HumanMessage, AIMessage, BaseMessage = context.get_service(
             cast(type, cast(object, CoreRunTimeObjects.message_classes))
@@ -464,7 +467,9 @@ class ColdWindEngine:
         raw_messages = fetched_state.get("messages", [])
 
         if not isinstance(raw_messages, list):
-            raise RuntimeTicketError("Malformed ticket working_state: 'messages' must be a list !!")
+            raise RuntimeTicketError(
+                "Malformed ticket working_state: 'messages' must be a list !!"
+            )
 
         serialized_messages: list[HumanMessage | AIMessage] = []
 
@@ -473,7 +478,9 @@ class ColdWindEngine:
                 serialized_messages.append(raw_message)
             elif isinstance(raw_message, BaseMessage):
                 if getattr(raw_message, "type", "") == "human":
-                    serialized_messages.append(HumanMessage(content=raw_message.content))
+                    serialized_messages.append(
+                        HumanMessage(content=raw_message.content)
+                    )
                 else:
                     serialized_messages.append(AIMessage(content=raw_message.content))
 
@@ -482,7 +489,9 @@ class ColdWindEngine:
                 content = raw_message.get("content")
 
                 if role is None or content is None:
-                    raise RuntimeTicketError(f"Malformed ticket message: role={role}, content={content}")
+                    raise RuntimeTicketError(
+                        f"Malformed ticket message: role={role}, content={content}"
+                    )
 
                 role_normalized = str(role).lower()
                 if role_normalized in ("user", "human"):
@@ -490,9 +499,13 @@ class ColdWindEngine:
                 elif role_normalized in ("ai", "assistant"):
                     serialized_messages.append(AIMessage(content=content))
                 else:
-                    raise RuntimeTicketError(f"Unsupported message role in ticket: '{role}'")
+                    raise RuntimeTicketError(
+                        f"Unsupported message role in ticket: '{role}'"
+                    )
             else:
-                raise RuntimeTicketError(f"Unsupported message format in working_state: {type(raw_message).__name__}")
+                raise RuntimeTicketError(
+                    f"Unsupported message format in working_state: {type(raw_message).__name__}"
+                )
 
         # O(1) append human turn - zero redundant casting
         serialized_messages.append(HumanMessage(content=ticket.user_message))
@@ -516,7 +529,9 @@ class ColdWindEngine:
 
         try:
             updated_state: dict[str, Any] = self._graph.invoke(state)
-            StateAccessor().sync_with_langgraph(cast(State, cast(object, updated_state)))
+            StateAccessor().sync_with_langgraph(
+                cast(State, cast(object, updated_state))
+            )
 
             logger.log_info(
                 "TICKET • DONE",
@@ -528,15 +543,20 @@ class ColdWindEngine:
                 },
             )
 
+            total_turn_requests = OpenAIIntegration.total_requests
             usage = {
                 "latency_ms": round((time.perf_counter() - start_time) * 1000, 2),
                 "message_count": len(updated_state.get("messages", [])),
+                "rpm_count": OpenAIIntegration.requests_count,
+                "total_requests": total_turn_requests,
             }
 
             # O(1) last message extraction - no extra lists, no memory leak
             messages = updated_state.get("messages", [])
             if not messages:
-                raise RuntimeTicketError("Graph execution completed with empty messages state !!")
+                raise RuntimeTicketError(
+                    "Graph execution completed with empty messages state !!"
+                )
 
             last_msg = messages[-1]
             if isinstance(last_msg, AIMessage):
@@ -550,11 +570,15 @@ class ColdWindEngine:
             else:
                 transcript = str(last_msg)
 
+            # Reset requests counter upon ticket completion
+            OpenAIIntegration.reset_ticket_requests()
             return TicketOut(
                 ticket_id=ticket.ticket_id,
                 status="COMPLETED",
                 new_working_state=updated_state,
-                transcript=transcript if isinstance(transcript, str) else str(transcript),
+                transcript=(
+                    transcript if isinstance(transcript, str) else str(transcript)
+                ),
                 usage=usage,
                 error_info=None,
             )
@@ -568,10 +592,14 @@ class ColdWindEngine:
                 )
             except Exception:
                 pass
+            total_turn_requests = OpenAIIntegration.total_requests
             usage = {
                 "latency_ms": round((time.perf_counter() - start_time) * 1000, 2),
                 "message_count": len(serialized_messages),
+                "rpm_count": OpenAIIntegration.requests_count,
+                "total_requests": total_turn_requests,
             }
+            OpenAIIntegration.reset_ticket_requests()
             return TicketOut(
                 ticket_id=ticket.ticket_id,
                 status="FAILED",

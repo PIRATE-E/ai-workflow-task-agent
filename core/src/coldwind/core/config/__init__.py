@@ -3,6 +3,6 @@
 
 # WHAT: Export both CoreSettinngs and CoreSettings.
 # WHY: Supports corrected spelling while preserving backward compatibility across all modules.
-from .coreSettings import CoreSettinngs, CoreSettings
+from .coreSettings import CoreSettings, CoreSettinngs
 
-__all__ = ["CoreSettinngs", "CoreSettings"]
+__all__ = ["CoreSettings", "CoreSettinngs"]

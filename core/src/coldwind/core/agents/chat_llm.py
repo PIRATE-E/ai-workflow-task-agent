@@ -1,11 +1,10 @@
-from langchain_core.messages import AIMessage, HumanMessage
-
-from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
-from coldwind.core.tools.lggraph_tools.tool_assign import ToolAssign
 # WHAT: Route print_message through core ui_interface contract.
 # WHY: Eliminates illegal Core -> Desktop import, preserving the Layering Invariant.
 from coldwind.core.interfaces.ui_interface import print_message
+from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
+from coldwind.core.tools.lggraph_tools.tool_assign import ToolAssign
 from coldwind.core.utils.model_manager import ModelManager
+from langchain_core.messages import AIMessage, HumanMessage
 
 
 def generate_llm_response(state) -> dict:
@@ -46,7 +45,7 @@ def generate_llm_response(state) -> dict:
     # platform turn status handler on Rich. Terminal spinners belong to platform handlers.
     # -------------------------------------------------------------------------
     ContextRegistry.get().get_logger().log_info(
-        heading="STATUS",
+        heading="AGENT • CHAT_LLM",
         body="Generating response from LLM...",
         metadata={"node": "chatBot"},
     )

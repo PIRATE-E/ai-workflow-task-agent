@@ -27,12 +27,12 @@ import inspect
 import pathlib
 import sys
 import traceback
+from collections.abc import Callable
 from datetime import datetime
-from typing import Optional, Dict, Any, Callable
+from typing import Any
 
 from rich.console import Console
-from rich.traceback import install, Traceback
-
+from rich.traceback import Traceback, install
 
 
 class RichTracebackManager:
@@ -49,9 +49,9 @@ class RichTracebackManager:
     """
 
     _initialized = False
-    _console: Optional[Console] = None
+    _console: Console | None = None
     _error_count = 0
-    _error_categories: Dict[str, int] = {}
+    _error_categories: dict[str, int] = {}
     _handling_exception: bool = False  # re-entrancy guard
 
     @classmethod
@@ -59,7 +59,7 @@ class RichTracebackManager:
         cls,
         show_locals: bool = False,  # Disabled by default for cleaner main process
         max_frames: int = 10,
-        suppress_modules: Optional[list] = None,
+        suppress_modules: list | None = None,
     ) -> None:
         """
         Initialize Rich Traceback system for MAIN PROCESS ONLY.
@@ -119,7 +119,7 @@ class RichTracebackManager:
         max_frames: int = 10,
         theme: str = "monokai",
         extra_lines: int = 1,
-        suppress_modules: Optional[list] = None,
+        suppress_modules: list | None = None,
     ) -> None:
         """
         Initialize Rich Traceback system for DEBUG PROCESS ONLY.
@@ -230,10 +230,10 @@ class RichTracebackManager:
         cls,
         exception: Exception,
         context: str = "Unknown Context",
-        exc_type: Optional[type] = None,
-        exc_traceback: Optional[Any] = None,
+        exc_type: type | None = None,
+        exc_traceback: Any | None = None,
         show_locals: bool = True,
-        extra_context: Optional[Dict[str, Any]] = None,
+        extra_context: dict[str, Any] | None = None,
     ) -> None:
         """
         Handle and display exception with rich formatting.
@@ -344,12 +344,12 @@ class RichTracebackManager:
                 from coldwind.core.system_logging.debug_protocol import debug_error
 
                 # Print error content directly instead of sending panel
-                error_content = f"🚨 {error_category}: {str(exception)}\n\nContext: {context_text}\n\nTraceback:\n{traceback.format_exc()}"
+                error_content = f"🚨 {error_category}: {exception!s}\n\nContext: {context_text}\n\nTraceback:\n{traceback.format_exc()}"
                 print(f"[RICH_TRACEBACK_ERROR] {error_content}")
                 # now send the error to the debug console
                 debug_error(
                     heading=error_category,
-                    body=f"{str(exception)}\n\n{rich_traceback}",
+                    body=f"{exception!s}\n\n{rich_traceback}",
                     metadata={
                         "context": context,
                         "error_category": error_category,
@@ -365,7 +365,7 @@ class RichTracebackManager:
 
                     debug_error(
                         heading="RICH_TRACEBACK • ERROR",
-                        body=f"{error_category}: {str(exception)}",
+                        body=f"{error_category}: {exception!s}",
                         metadata={
                             "context": context,
                             "error_category": error_category,
@@ -380,7 +380,7 @@ class RichTracebackManager:
             cls._handling_exception = False
 
     @classmethod
-    def _get_caller_info(cls) -> Optional[Dict[str, str]]:
+    def _get_caller_info(cls) -> dict[str, str] | None:
         """
         Get information about the caller that triggered the exception.
         """
@@ -496,7 +496,7 @@ class RichTracebackManager:
             # No fallback to prevent user window spam
 
     @classmethod
-    def get_error_statistics(cls) -> Dict[str, Any]:
+    def get_error_statistics(cls) -> dict[str, Any]:
         """
         Get error statistics for debugging and monitoring.
 

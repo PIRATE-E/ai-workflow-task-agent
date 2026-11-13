@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Any, Optional
+from typing import Any
 
 
 class ExceptionHandlerInterface(ABC):
@@ -12,7 +12,7 @@ class ExceptionHandlerInterface(ABC):
     """
 
     @abstractmethod
-    def handle_exception(self, error: Exception, context: str = "", extra_context: Optional[dict[str, Any]] = None) -> None:
+    def handle_exception(self, error: Exception, context: str = "", extra_context: dict[str, Any] | None = None) -> None:
         """
         Handle and format an exception.
         
@@ -21,7 +21,6 @@ class ExceptionHandlerInterface(ABC):
             context: A brief description of what was happening when the error occurred.
             extra_context: Additional metadata useful for debugging.
         """
-        pass
 
 
 def exception_handler(context_name: str):

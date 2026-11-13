@@ -1,9 +1,8 @@
+# MIGRATED: settings.console → ContextRegistry.get().get_console().
+from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
 from rich.align import Align
 from rich.panel import Panel
 from rich.text import Text
-
-# MIGRATED: settings.console → ContextRegistry.get().get_console().
-from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
 
 
 def print_banner():

@@ -3,16 +3,16 @@ import gc
 import json
 import threading
 import time
-from typing import Any, Optional, Iterator, Union, overload, List, Dict
+from collections.abc import Iterator
+from typing import Any, Optional, overload
 
 try:
     import winsound
 except ImportError:
     winsound = None  # Not available on Linux/Mac
 
-from openai import OpenAI, AsyncOpenAI
-
 from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
+from openai import AsyncOpenAI, OpenAI
 
 # Legacy direct imports removed — config values now accessed via ContextRegistry.get().get_settings()
 # OPENAI_API_KEY → ContextRegistry.get().get_settings().openai_api_key
@@ -31,14 +31,21 @@ class OpenAIIntegration:
     """
 
     instance: Optional["OpenAIIntegration"] = None
-    _async_lock: Optional[AsyncOpenAI] = None
-    requests_count: int = 0
-    _last_request_time: Optional[float] = None
+    _async_lock: AsyncOpenAI | None = None
+    requests_count: int = 0  # this would be reset on rate limit
+    total_requests: int = 0  # this is total requests send in current ticket turn !!
+    _last_request_time: float | None = None
+
+    @classmethod
+    def reset_ticket_requests(cls) -> None:
+        """Reset the per-ticket request counter to zero for a new ticket turn."""
+        with cls._thread_lock:
+            cls.total_requests = 0
 
     # 🔧 FIX: Add error handling attributes for circuit breaker pattern
     _failure_count: int = 0
     _circuit_open: bool = False
-    _circuit_open_until: Optional[float] = None
+    _circuit_open_until: float | None = None
     _max_failures: int = 5  # Changed from 3 to 5 to match test expectations
     _circuit_timeout: int = 10  # seconds
 
@@ -53,9 +60,7 @@ class OpenAIIntegration:
             cls.instance = super().__new__(cls)
         return cls.instance
 
-    def __init__(
-            self, api_key: Optional[str] = None, model: Optional[str] = None
-    ) -> None:
+    def __init__(self, api_key: str | None = None, model: str | None = None) -> None:
         """
         Initialize the OpenAIIntegration instance.
 
@@ -82,7 +87,10 @@ class OpenAIIntegration:
 
         self.api_key = key
         self.client = OpenAI(
-            base_url=self.base_url, api_key=key, timeout=self._settings.openai_timeout, max_retries=2
+            base_url=self.base_url,
+            api_key=key,
+            timeout=self._settings.openai_timeout,
+            max_retries=2,
         )
 
     async def _get_async_client(self) -> AsyncOpenAI:
@@ -112,31 +120,27 @@ class OpenAIIntegration:
                 self._async_lock = None
 
     @overload
-    def generate_text(self, prompt: str, stream: bool = False) -> str:
-        ...
+    def generate_text(self, prompt: str, stream: bool = False) -> str: ...
 
     @overload
-    def generate_text(self, prompt: str, stream: bool = True) -> Iterator[str]:
-        ...
+    def generate_text(self, prompt: str, stream: bool = True) -> Iterator[str]: ...
 
     @overload
     def generate_text(
-            self, messages: list[dict[str, str]], stream: bool = False
-    ) -> str:
-        ...
+        self, messages: list[dict[str, str]], stream: bool = False
+    ) -> str: ...
 
     @overload
     def generate_text(
-            self, messages: list[dict[str, str]], stream: bool = True
-    ) -> Iterator[str]:
-        ...
+        self, messages: list[dict[str, str]], stream: bool = True
+    ) -> Iterator[str]: ...
 
     def generate_text(
-            self,
-            prompt: Optional[str] = None,
-            messages: Optional[list[dict[str, str]]] = None,
-            stream: bool = False,
-    ) -> Union[str, Iterator[str]]:
+        self,
+        prompt: str | None = None,
+        messages: list[dict[str, str]] | None = None,
+        stream: bool = False,
+    ) -> str | Iterator[str]:
         """
         Generate text from the OpenAI API.
 
@@ -153,7 +157,6 @@ class OpenAIIntegration:
         """
         # 🔧 FIX: Check circuit breaker first
         if self._is_circuit_open():
-            
 
             ContextRegistry.get().get_logger().log_warning(
                 heading="OPENAI • CIRCUIT_BREAKER_BLOCK",
@@ -170,7 +173,6 @@ class OpenAIIntegration:
             raise ValueError("Prompt cannot be empty.")
 
         # Enhanced system_logging for debugging
-        
 
         if prompt:
             # WHAT: Replaced undefined debug_api_call with standard ContextRegistry logger.
@@ -193,7 +195,6 @@ class OpenAIIntegration:
 
         while attempt <= max_attempts:
             try:
-                
 
                 ContextRegistry.get().get_logger().log_info(
                     heading="OPENAI • API_ATTEMPT",
@@ -222,14 +223,14 @@ class OpenAIIntegration:
                     )
 
                 # Enhanced response system_logging
-                
 
                 ContextRegistry.get().get_logger().log_info(
                     "OPENAI • API_CALL_COMPLETED",
                     "OpenAI API call completed successfully",
                     metadata={
                         "stream_mode": stream,
-                        "request_count": OpenAIIntegration.requests_count,
+                        "rpm_count": OpenAIIntegration.requests_count,
+                        "total_requests": OpenAIIntegration.total_requests,
                     },
                 )
 
@@ -244,7 +245,6 @@ class OpenAIIntegration:
                     )
 
             except Exception as e:
-                
 
                 error_str = str(e)
 
@@ -291,9 +291,9 @@ class OpenAIIntegration:
                         return self._get_fallback_response("502")
 
                 elif (
-                        "BadRequestError" in error_str
-                        or "500" in error_str
-                        or "400" in error_str
+                    "BadRequestError" in error_str
+                    or "500" in error_str
+                    or "400" in error_str
                 ):
                     ContextRegistry.get().get_logger().log_error(
                         heading="OPENAI • API_ERROR",
@@ -328,7 +328,7 @@ class OpenAIIntegration:
         return self._get_fallback_response("max_attempts")
 
     async def generate_text_async(
-            self, prompt: str = None, messages: Optional[List[Dict[str, str]]] = None
+        self, prompt: str = None, messages: list[dict[str, str]] | None = None
     ) -> str:
         """
         Asynchronously generate text from the OpenAI API with enhanced error handling.
@@ -351,7 +351,6 @@ class OpenAIIntegration:
             raise ValueError("OpenAI integration not initialized")
 
         # Enhanced system_logging for debugging
-        
 
         if prompt:
             ContextRegistry.get().get_logger().log_info(
@@ -390,11 +389,9 @@ class OpenAIIntegration:
                 timeout=self._settings.openai_timeout,
             )
 
-
             return self._handle_non_streaming_response_with_debugging(completion)
 
         except Exception as e:
-            
 
             ContextRegistry.get().get_logger().log_error(
                 heading="OPENAI • API_CALL_FAILED",
@@ -404,7 +401,7 @@ class OpenAIIntegration:
             raise Exception(f"OpenAI async API call failed: {e}")
 
     async def generate_text_async_streaming(
-            self, prompt: str, messages: Optional[List[Dict[str, str]]] = None
+        self, prompt: str, messages: list[dict[str, str]] | None = None
     ) -> Iterator[str]:
         """
         Asynchronously generate streaming text from the OpenAI API.
@@ -457,14 +454,13 @@ class OpenAIIntegration:
 
             async for chunk in completion:
                 if (
-                        chunk.choices
-                        and chunk.choices[0].delta
-                        and chunk.choices[0].delta.content
+                    chunk.choices
+                    and chunk.choices[0].delta
+                    and chunk.choices[0].delta.content
                 ):
                     yield chunk.choices[0].delta.content
 
         except Exception as e:
-            
 
             ContextRegistry.get().get_logger().log_error(
                 heading="OPENAI • STREAMING_CALL_FAILED",
@@ -505,7 +501,6 @@ class OpenAIIntegration:
         """
         # 🔧 FIX: Add comprehensive None and error checking
         if completion is None:
-            
 
             ContextRegistry.get().get_logger().log_error(
                 heading="OPENAI • NULL_STREAMING_COMPLETION",
@@ -544,7 +539,6 @@ class OpenAIIntegration:
                         yield content
 
                 except Exception as chunk_error:
-                    
 
                     ContextRegistry.get().get_logger().log_warning(
                         heading="OPENAI • CHUNK_PROCESSING_ERROR",
@@ -558,15 +552,13 @@ class OpenAIIntegration:
                     continue
 
         except Exception as streaming_error:
-            
 
             ContextRegistry.get().get_logger().log_error(
                 heading="OPENAI • STREAMING_ERROR",
                 body=f"Error during streaming: {streaming_error}",
                 metadata={"error_type": type(streaming_error).__name__},
             )
-            # Record failure for circuit breaker
-            OpenAIIntegration.requests_count += 1  # Ensure request is counted
+            # Record failure for circuit breaker (request was already incremented at start)
             instance = OpenAIIntegration()
             instance._record_failure()
 
@@ -577,7 +569,6 @@ class OpenAIIntegration:
         """
         # 🔧 FIX: Comprehensive None checking first
         if completion is None:
-            
 
             ContextRegistry.get().get_logger().log_error(
                 heading="OPENAI • NULL_COMPLETION",
@@ -592,7 +583,6 @@ class OpenAIIntegration:
         # 🔧 FIX: Enhanced choices validation
         try:
             if not hasattr(completion, "choices"):
-                
 
                 ContextRegistry.get().get_logger().log_error(
                     heading="OPENAI • NO_CHOICES_ATTRIBUTE",
@@ -603,16 +593,15 @@ class OpenAIIntegration:
 
             choices = completion.choices
             if choices is None or len(choices) == 0:
-                
 
                 ContextRegistry.get().get_logger().log_error(
                     heading="OPENAI • NO_CHOICES",
                     body="No choices found in API response",
                     metadata={
                         "choices_value": str(choices),
-                        "choices_type": type(choices).__name__
-                        if choices is not None
-                        else "None",
+                        "choices_type": (
+                            type(choices).__name__ if choices is not None else "None"
+                        ),
                     },
                 )
                 # Record failure for circuit breaker
@@ -626,7 +615,6 @@ class OpenAIIntegration:
                 raise Exception("First choice is None")
 
             if not hasattr(choice, "message") or choice.message is None:
-                
 
                 ContextRegistry.get().get_logger().log_error(
                     heading="OPENAI • NO_MESSAGE",
@@ -641,16 +629,15 @@ class OpenAIIntegration:
             msg = choice.message
 
         except Exception as structure_error:
-            
 
             ContextRegistry.get().get_logger().log_critical(
                 heading="OPENAI • RESPONSE_STRUCTURE_ERROR",
                 body=f"Error accessing completion structure: {structure_error}",
                 metadata={
                     "error_type": type(structure_error).__name__,
-                    "completion_type": type(completion).__name__
-                    if completion
-                    else "None",
+                    "completion_type": (
+                        type(completion).__name__ if completion else "None"
+                    ),
                 },
             )
             # Record failure for circuit breaker
@@ -662,13 +649,11 @@ class OpenAIIntegration:
         content = getattr(msg, "content", None)
         reasoning_content = getattr(msg, "reasoning_content", None)
 
-        
-
         # 🎯 Return regular content immediately if available
         if content and str(content).strip():
             ContextRegistry.get().get_logger().log_info(
                 heading="OPENAI • CONTENT_FOUND",
-                body=f"Standard content found: {str(content)}",
+                body=f"Standard content found: {content!s}",
                 metadata={
                     "content_type": "standard_content",
                     "content_length": len(str(content)),
@@ -723,7 +708,6 @@ class OpenAIIntegration:
             return content_str
 
         # If everything fails, record failure and provide fallback
-        
 
         ContextRegistry.get().get_logger().log_error(
             heading="OPENAI • COMPLETE_FAILURE",
@@ -739,7 +723,7 @@ class OpenAIIntegration:
         return '{"error": "No content available", "fallback": true}'
 
     @staticmethod
-    def _extract_json_from_reasoning(reasoning_content: str) -> Optional[str]:
+    def _extract_json_from_reasoning(reasoning_content: str) -> str | None:
         """
         Extract JSON from reasoning_content using LLM.
         Only called when NVIDIA API returns reasoning_content but no regular content.
@@ -759,16 +743,16 @@ class OpenAIIntegration:
                 prompt_generator.get_json_extraction_prompts()
             )
 
-            
-
             ContextRegistry.get().get_logger().log_info(
                 heading="OPENAI • JSON_EXTRACTION_ATTEMPT",
                 body="Starting LLM-based JSON extraction from reasoning content",
                 metadata={
                     "reasoning_content_length": len(reasoning_content),
-                    "reasoning_preview": reasoning_content[:1000] + "..."
-                    if len(reasoning_content) > 200
-                    else reasoning_content,
+                    "reasoning_preview": (
+                        reasoning_content[:1000] + "..."
+                        if len(reasoning_content) > 200
+                        else reasoning_content
+                    ),
                 },
             )
 
@@ -800,11 +784,10 @@ class OpenAIIntegration:
 
             # Get the extracted content
             if (
-                    extraction_completion.choices
-                    and extraction_completion.choices[0].message
+                extraction_completion.choices
+                and extraction_completion.choices[0].message
             ):
                 extracted = extraction_completion.choices[0].message.content
-                
 
                 ContextRegistry.get().get_logger().log_info(
                     heading="OPENAI • EXTRACTION_RESPONSE",
@@ -821,8 +804,6 @@ class OpenAIIntegration:
                         # Direct JSON validation without calling ModelManager.convert_to_json
                         json.loads(extracted.strip())
 
-                        
-
                         ContextRegistry.get().get_logger().log_info(
                             heading="OPENAI • JSON_EXTRACTION_SUCCESS",
                             body="Successfully extracted valid JSON from reasoning_content",
@@ -834,7 +815,6 @@ class OpenAIIntegration:
                         return extracted.strip()
 
                     except json.JSONDecodeError as json_error:
-                        
 
                         ContextRegistry.get().get_logger().log_warning(
                             heading="OPENAI • INVALID_JSON_EXTRACTED",
@@ -851,7 +831,6 @@ class OpenAIIntegration:
 
                         ModelManager.convert_to_json(extracted.strip())
             else:
-                
 
                 ContextRegistry.get().get_logger().log_critical(
                     heading="OPENAI • NO_EXTRACTED_CONTENT",
@@ -862,11 +841,10 @@ class OpenAIIntegration:
             return None
 
         except Exception as extraction_error:
-            
 
             ContextRegistry.get().get_logger().log_warning(
                 heading="OPENAI • JSON_EXTRACTION_ERROR",
-                body=f"JSON extraction failed: {str(extraction_error)}",
+                body=f"JSON extraction failed: {extraction_error!s}",
                 metadata={
                     "error_type": type(extraction_error).__name__,
                     "fallback_action": "return_none",
@@ -903,10 +881,14 @@ class OpenAIIntegration:
         # ---------------------------------------------------------------------
         with cls._thread_lock:
             OpenAIIntegration.requests_count += 1
+            OpenAIIntegration.total_requests += 1
             ContextRegistry.get().get_logger().log_info(
-                heading="STATUS",
-                body=f"API request {cls.requests_count} in progress",
-                metadata={"requests_count": cls.requests_count},
+                heading="API • REQUEST_PROGRESS",
+                body=f"API request {cls.total_requests} in progress (RPM: {cls.requests_count}/30)",
+                metadata={
+                    "rpm_count": cls.requests_count,
+                    "total_requests": cls.total_requests,
+                },
             )
             if OpenAIIntegration.requests_count == 1:
                 OpenAIIntegration._last_request_time = time.perf_counter()
@@ -917,12 +899,13 @@ class OpenAIIntegration:
                     wait_time = 60 - elapsed_time
 
                     ContextRegistry.get().get_logger().log_critical(
-                        heading="STATUS",
-                        body=f"Rate limit hit - waiting for reset {wait_time:.1f}s (Requests: {cls.requests_count})",
+                        heading="API • RATE_LIMIT_WAIT",
+                        body=f"Rate limit hit - waiting for reset {wait_time:.1f}s (RPM: {cls.requests_count})",
                         metadata={
                             "wait_time": wait_time,
                             "context": "sync_rate_limiting",
-                            "requests_count": cls.requests_count,
+                            "rpm_count": cls.requests_count,
+                            "total_requests": cls.total_requests,
                         },
                     )
                     time.sleep(wait_time)
@@ -947,11 +930,15 @@ class OpenAIIntegration:
         # Use proper async lock instead of sync lock
         async with cls._client_lock:
             OpenAIIntegration.requests_count += 1
+            OpenAIIntegration.total_requests += 1
 
             ContextRegistry.get().get_logger().log_info(
-                heading="STATUS",
-                body=f"API request {cls.requests_count} in progress",
-                metadata={"requests_count": cls.requests_count},
+                heading="API • REQUEST_PROGRESS",
+                body=f"API request {cls.total_requests} in progress (RPM: {cls.requests_count}/30)",
+                metadata={
+                    "rpm_count": cls.requests_count,
+                    "total_requests": cls.total_requests,
+                },
             )
 
             if OpenAIIntegration.requests_count == 1:
@@ -965,12 +952,13 @@ class OpenAIIntegration:
                     wait_time = 60 - elapsed_time
 
                     ContextRegistry.get().get_logger().log_critical(
-                        heading="STATUS",
-                        body=f"Rate limit hit - waiting for reset {wait_time:.1f}s (Requests: {cls.requests_count})",
+                        heading="API • RATE_LIMIT_WAIT",
+                        body=f"Rate limit hit - waiting for reset {wait_time:.1f}s (RPM: {cls.requests_count})",
                         metadata={
                             "wait_time": wait_time,
                             "context": "async_rate_limiting",
-                            "requests_count": cls.requests_count,
+                            "rpm_count": cls.requests_count,
+                            "total_requests": cls.total_requests,
                         },
                     )
 
@@ -991,7 +979,6 @@ class OpenAIIntegration:
             try:
                 cls.instance.client.close()
             except Exception as e:
-                
 
                 ContextRegistry.get().get_logger().log_error(
                     heading="OPENAI • CLEANUP_ERROR",
@@ -1071,13 +1058,12 @@ class OpenAIIntegration:
 
         # Check if circuit timeout has expired
         if (
-                OpenAIIntegration._circuit_open_until
-                and time.time() > OpenAIIntegration._circuit_open_until
+            OpenAIIntegration._circuit_open_until
+            and time.time() > OpenAIIntegration._circuit_open_until
         ):
             OpenAIIntegration._circuit_open = False
             OpenAIIntegration._circuit_open_until = None
             OpenAIIntegration._failure_count = 0
-            
 
             ContextRegistry.get().get_logger().log_info(
                 heading="OPENAI • CIRCUIT_BREAKER_RESET",
@@ -1092,8 +1078,6 @@ class OpenAIIntegration:
         """Record an API failure and potentially open circuit breaker."""
         OpenAIIntegration._failure_count += 1
 
-        
-
         ContextRegistry.get().get_logger().log_warning(
             heading="OPENAI • API_FAILURE_RECORDED",
             body=f"API failure recorded (count: {OpenAIIntegration._failure_count}/{OpenAIIntegration._max_failures})",
@@ -1106,9 +1090,8 @@ class OpenAIIntegration:
         if OpenAIIntegration._failure_count >= OpenAIIntegration._max_failures:
             OpenAIIntegration._circuit_open = True
             OpenAIIntegration._circuit_open_until = (
-                    time.time() + OpenAIIntegration._circuit_timeout
+                time.time() + OpenAIIntegration._circuit_timeout
             )
-            
 
             ContextRegistry.get().get_logger().log_critical(
                 heading="OPENAI • CIRCUIT_BREAKER_OPEN",
@@ -1119,7 +1102,6 @@ class OpenAIIntegration:
     def _record_success(self):
         """Record an API success and reset failure count."""
         if OpenAIIntegration._failure_count > 0:
-            
 
             ContextRegistry.get().get_logger().log_info(
                 heading="OPENAI • API_RECOVERY",

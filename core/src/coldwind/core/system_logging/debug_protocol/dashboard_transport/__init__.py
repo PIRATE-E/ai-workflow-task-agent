@@ -4,7 +4,7 @@ abstract class but hold control,keep eye on over flow of logs and define contrac
 and launching dashboard process or transport of logs ...
 """
 
-from abc import ABC, abstractmethod, ABCMeta
+from abc import ABC, ABCMeta, abstractmethod
 from typing import override
 
 from coldwind.core.system_logging.debug_protocol import LogEntry

@@ -1,11 +1,11 @@
-from typing import TypedDict, List, Annotated
+from typing import Annotated, TypedDict
 
-from langchain_core.messages import HumanMessage, AIMessage
+from langchain_core.messages import AIMessage, HumanMessage
 from langgraph.graph import add_messages
 
 
 class State(TypedDict):
-    messages: Annotated[List[HumanMessage | AIMessage], add_messages]
+    messages: Annotated[list[HumanMessage | AIMessage], add_messages]
     message_type: str | None
 
 
@@ -15,7 +15,7 @@ class StateAccessor:
 
     def __new__(cls):
         if cls._instance is None:
-            cls._instance = super(StateAccessor, cls).__new__(cls)
+            cls._instance = super().__new__(cls)
         return cls._instance
 
     def get_state(self) -> State:
@@ -44,7 +44,7 @@ class StateAccessor:
         """
         self._update_state(langgraph_state)
 
-    def get_messages(self) -> List[HumanMessage | AIMessage]:
+    def get_messages(self) -> list[HumanMessage | AIMessage]:
         """
         Convenience method to get current messages.
         :return: Current messages list

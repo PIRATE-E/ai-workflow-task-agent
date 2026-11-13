@@ -1,4 +1,10 @@
-from coldwind.desktop.slash_commands.protocol import SlashCommand, CommandOption, SlashOptionValueType
+from coldwind.desktop.slash_commands.protocol import (
+    CommandOption,
+    SlashCommand,
+    SlashOptionValueType,
+)
+
+
 class ParseCommand:
     """
         Validate and parse a user-provided slash command and prepare it for the running

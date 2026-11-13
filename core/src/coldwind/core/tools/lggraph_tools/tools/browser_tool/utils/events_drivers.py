@@ -24,7 +24,7 @@ import queue
 import sys
 import traceback
 from pathlib import Path
-from threading import Thread, RLock
+from threading import RLock, Thread
 from typing import TYPE_CHECKING
 
 import psutil
@@ -33,7 +33,6 @@ if TYPE_CHECKING:
     from ..runner import Runner
 
 from ..Handler import Handler, HandlerEnums
-
 
 # =============================================================================
 # PRE-REQUIREMENTS DRIVER (Critical - huge_error=True)
@@ -52,7 +51,7 @@ class PreRequirementsCustomEvent(Handler):
     enum_value = HandlerEnums.ON_PRE_REQUIREMENTS
     huge_error = True  # If ANY check fails, STOP everything!
 
-    def __init__(self, runner_instance: 'Runner'):
+    def __init__(self, runner_instance: Runner):
         """Initialize with runner instance for accessing config."""
         self.runner = runner_instance
 
@@ -69,6 +68,7 @@ class PreRequirementsCustomEvent(Handler):
     def check_ram(self):
         """Check minimum RAM."""
         import os
+
         import psutil
 
         if os.name != 'nt':
@@ -120,13 +120,15 @@ class SetupDriver(Handler):
     enum_value = HandlerEnums.SET_UP
     huge_error = True  # Setup failure is critical!
 
-    def __init__(self, runner_instance: 'Runner'):
+    def __init__(self, runner_instance: Runner):
         self.runner = runner_instance
 
     def apply_monkey_patch_on_watch_dog(self):
         """Apply monkey patch to watchdog to prevent browser from closing if keep_alive is True."""
-        from browser_use.browser.events import BrowserStopEvent, BrowserKillEvent
-        from browser_use.browser.watchdogs.local_browser_watchdog import LocalBrowserWatchdog
+        from browser_use.browser.events import BrowserKillEvent, BrowserStopEvent
+        from browser_use.browser.watchdogs.local_browser_watchdog import (
+            LocalBrowserWatchdog,
+        )
 
         async def on_BrowserStopEvent(instance, event: BrowserStopEvent) -> None:
             """Monkey patched stop watchdog to prevent browser from closing if keep_alive is True."""
@@ -150,12 +152,17 @@ class SetupDriver(Handler):
         This wraps ModelManager to be compatible with browser_use's expected LLM interface.
         Ported from the pre-refactor browser_subprocess_runner.py monolith (old lines 70-160).
         """
-        from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
-        from coldwind.core.utils.model_manager import ModelManager
-        from browser_use.llm.messages import BaseMessage, UserMessage, SystemMessage, AssistantMessage
+        from typing import TypeVar, overload
+
+        from browser_use.llm.messages import (
+            AssistantMessage,
+            BaseMessage,
+            SystemMessage,
+            UserMessage,
+        )
         from browser_use.llm.views import ChatInvokeCompletion
+        from coldwind.core.utils.model_manager import ModelManager
         from pydantic import BaseModel
-        from typing import List, Optional, TypeVar, overload
 
         T = TypeVar('T', bound=BaseModel)
 
@@ -184,18 +191,18 @@ class SetupDriver(Handler):
                 return getattr(self, 'model', 'default')
 
             @overload
-            async def ainvoke(self, messages: List[BaseMessage], output_format: None = None) -> ChatInvokeCompletion[
+            async def ainvoke(self, messages: list[BaseMessage], output_format: None = None) -> ChatInvokeCompletion[
                 str]:
                 ...
 
             @overload
-            async def ainvoke(self, messages: List[BaseMessage], output_format: type[T]) -> ChatInvokeCompletion[T]:
+            async def ainvoke(self, messages: list[BaseMessage], output_format: type[T]) -> ChatInvokeCompletion[T]:
                 ...
 
             async def ainvoke(
                     self,
-                    messages: List[BaseMessage],
-                    output_format: Optional[type[T]] = None,
+                    messages: list[BaseMessage],
+                    output_format: type[T] | None = None,
                     **kwargs
             ) -> ChatInvokeCompletion[T] | ChatInvokeCompletion[str]:
                 """Convert browser_use messages to LangChain format and invoke the model"""
@@ -206,7 +213,9 @@ class SetupDriver(Handler):
                         content = msg.text if hasattr(msg, 'text') else str(msg.content)
                         langchain_messages.append(HumanMessage(content=content))
                     elif isinstance(msg, SystemMessage):
-                        from langchain_core.messages import SystemMessage as LCSystemMessage
+                        from langchain_core.messages import (
+                            SystemMessage as LCSystemMessage,
+                        )
                         content = msg.text if hasattr(msg, 'text') else str(msg.content)
                         langchain_messages.append(LCSystemMessage(content=content))
                     elif isinstance(msg, AssistantMessage):
@@ -351,7 +360,7 @@ class OnStartDriver(Handler):
 
     # No huge_error - session loading failure is not critical
 
-    def __init__(self, runner_instance: 'Runner'):
+    def __init__(self, runner_instance: Runner):
         self.runner = runner_instance
 
     async def wait_for_browser_ready(self):
@@ -483,7 +492,7 @@ class OnRunningDriver(Handler):
     enum_value = HandlerEnums.ON_RUNNING
     huge_error = True  # Agent execution failure is critical
 
-    def __init__(self, runner_instance: 'Runner'):
+    def __init__(self, runner_instance: Runner):
         self.runner = runner_instance
         # FIX: Use queue.Queue (sync) not asyncio.Queue (async) for threading
         self.runner.monitor_queue = queue.Queue()
@@ -640,7 +649,7 @@ class OnCompleteDriver(Handler):
 
     # No huge_error - saving failure shouldn't crash
 
-    def __init__(self, runner_instance: 'Runner'):
+    def __init__(self, runner_instance: Runner):
         self.runner = runner_instance
 
     async def extract_final_result(self):
@@ -792,7 +801,7 @@ class OnExceptionDriver(Handler):
 
     enum_value = HandlerEnums.ON_EXCEPTION
 
-    def __init__(self, runner_instance: 'Runner'):
+    def __init__(self, runner_instance: Runner):
         self.runner = runner_instance
         self.exception = None  # Will be set by runner
 
@@ -859,7 +868,7 @@ class TeardownDriver(Handler):
 
     # No huge_error - cleanup should be best-effort
 
-    def __init__(self, runner_instance: 'Runner'):
+    def __init__(self, runner_instance: Runner):
         # WHAT: Retrieve browser_use_timeout from ContextRegistry instead of legacy settings.py.
         # WHY: Decouples browser driver teardown from ghost settings.py module.
         from coldwind.core.runtime.CoreContextRegistry import ContextRegistry

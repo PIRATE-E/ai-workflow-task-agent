@@ -9,19 +9,18 @@ Provides a beautiful, Cursor AI/Warp-style input experience with:
 - Enter while completing → accept completion, not submit
 """
 
-from typing import Iterable
 import sys
+from collections.abc import Iterable
 
+from coldwind.desktop.slash_commands.on_run_time_register import OnRunTimeRegistry
 from prompt_toolkit import PromptSession
 from prompt_toolkit.auto_suggest import AutoSuggestFromHistory
-from prompt_toolkit.completion import Completer, Completion, CompleteEvent
+from prompt_toolkit.completion import CompleteEvent, Completer, Completion
 from prompt_toolkit.document import Document
 from prompt_toolkit.history import InMemoryHistory
 from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.keys import Keys
 from prompt_toolkit.styles import Style
-
-from coldwind.desktop.slash_commands.on_run_time_register import OnRunTimeRegistry
 
 
 class ChatCompleter(Completer):
@@ -208,7 +207,7 @@ class InputHandler:
 
     def __new__(cls, *args, **kwargs):
         if cls._instance is None:
-            cls._instance = super(InputHandler, cls).__new__(cls)
+            cls._instance = super().__new__(cls)
             cls._instance._init_session()
         return cls._instance
 

@@ -1,15 +1,26 @@
 # major imports required
-from coldwind.core.agents.agentic_orchestrator.agent_core_helpers import AgentCoreHelpers
-from typing import Literal, List, Dict, Any, Optional
+from typing import Literal
 
-from coldwind.core.utils.timestamp_util import get_formatted_timestamp
-from coldwind.core.agents.agentic_orchestrator.hierarchical_agent_prompts import HierarchicalAgentPrompt
-from coldwind.core.utils.model_manager import ModelManager
-from coldwind.core.agents.agentic_orchestrator.pydantic_models import WorkflowStateModel, TASK, EXECUTION_CONTEXT, FAILURE_CONTEXT, subAgent_CONTEXT, REQUIRED_CONTEXT, FAILURE_CONTEXT_STRATEGY
+from coldwind.core.agents.agentic_orchestrator.agent_core_helpers import (
+    AgentCoreHelpers,
+)
 from coldwind.core.agents.agentic_orchestrator.agent_status import AgentStatusUpdater
+from coldwind.core.agents.agentic_orchestrator.hierarchical_agent_prompts import (
+    HierarchicalAgentPrompt,
+)
+from coldwind.core.agents.agentic_orchestrator.pydantic_models import (
+    EXECUTION_CONTEXT,
+    FAILURE_CONTEXT,
+    FAILURE_CONTEXT_STRATEGY,
+    REQUIRED_CONTEXT,
+    TASK,
+    WorkflowStateModel,
+)
 from coldwind.core.agents.agentic_orchestrator.spawn_agent import Spawn_subAgent
-from langgraph.graph import END, StateGraph
 from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
+from coldwind.core.utils.model_manager import ModelManager
+from coldwind.core.utils.timestamp_util import get_formatted_timestamp
+from langgraph.graph import END, StateGraph
 
 
 class AgentGraphCore:
@@ -57,7 +68,7 @@ class AgentGraphCore:
             "--- NODE: Initial Planner ---",
             f"Decomposing goal: {goal}",
             metadata={
-                "function name": "__subAGENT_initial_planner",
+                "function_name": "__subAGENT_initial_planner",
                 "original_goal": goal,
             },
         )
@@ -69,7 +80,7 @@ class AgentGraphCore:
 
         for attempt in range(2):  # Try to generate a valid plan up to 2 times
             ContextRegistry.get().get_logger().log_info(
-                "Initial Planner",
+                "AGENT • INITIAL_PLANNER",
                 f"Planning attempt {attempt + 1}",
                 metadata={"attempt": attempt + 1},
             )
@@ -218,7 +229,7 @@ class AgentGraphCore:
                 plan_is_valid = True
                 validated_tasks = current_validated_tasks
                 ContextRegistry.get().get_logger().log_info(
-                    "Initial Planner",
+                    "AGENT • INITIAL_PLANNER",
                     "Successfully generated a valid plan.",
                     metadata={"attempt": attempt + 1},
                 )
@@ -230,7 +241,7 @@ class AgentGraphCore:
                 else:
                     error_feedback = f"You previously planned to use the tool '{invalid_tool_name}', which is not a valid tool. Please only use tools from the provided list and ensure correct spelling and capitalization."
                 ContextRegistry.get().get_logger().log_warning(
-                    "Initial Planner",
+                    "AGENT • INITIAL_PLANNER",
                     f"Invalid plan generated on attempt {attempt + 1}. Feedback: {error_feedback}",
                     metadata={"attempt": attempt + 1},
                 )
@@ -287,10 +298,11 @@ class AgentGraphCore:
                 # Log skip decisions for visibility
                 if initial_status == "skip":
                     ContextRegistry.get().get_logger().log_info(
-                        "Initial Planner - Pre-Flight Skip",
+                        "AGENT • INITIAL_PLANNER_SKIP",
                         f"Task {idx + 1} marked as SKIP (probability: {skip_probability}%): {item['description'][:60]}...",
                         metadata={
-                            "task_id": str(idx + 1),
+                            "task_id": idx + 1,
+                            "total_tasks": len(filtered_tasks),
                             "skip_reason": skip_reason,
                             "skip_probability": skip_probability,
                             "threshold": skip_threshold,
@@ -324,7 +336,7 @@ class AgentGraphCore:
 
         if not actual_tasks:
             ContextRegistry.get().get_logger().log_error(
-                "Initial Planner",
+                "AGENT • INITIAL_PLANNER",
                 "All planning attempts failed. Using final fallback task.",
                 metadata={},
             )
@@ -340,10 +352,11 @@ class AgentGraphCore:
             )
 
         ContextRegistry.get().get_logger().log_info(
-            "Initial Planner",
+            "AGENT • INITIAL_PLANNER",
             f"Final plan generated with {len(actual_tasks)} tasks.",
             metadata={
-                "task_count": len(actual_tasks),
+                "task_id": 1,
+                "total_tasks": len(actual_tasks),
                 "tasks": [task.model_dump() for task in actual_tasks],
             },
         )
@@ -371,7 +384,7 @@ class AgentGraphCore:
         ContextRegistry.get().get_logger().log_info(
             "--- NODE: Classifier ---",
             "Deciding next action based on task status and failure history",
-            metadata={"function name": "__subAGENT_classifier"},
+            metadata={"function_name": "__subAGENT_classifier"},
         )
         tasks = state.tasks
         current_task = next((t for t in tasks if t.task_id == current_task_id), None)
@@ -394,10 +407,11 @@ class AgentGraphCore:
                 )
 
             ContextRegistry.get().get_logger().log_info(
-                "Classifier - Skip Handler",
+                "AGENT • CLASSIFIER_SKIP",
                 f"Task {current_task_id} is SKIPPED (prob: {skip_probability}%): {skip_reason}",
                 metadata={
-                    "task_id": current_task_id,
+                    "task_id": int(current_task_id),
+                    "total_tasks": len(tasks),
                     "skip_reason": skip_reason,
                     "skip_probability": skip_probability,
                     "task_description": current_task.description[:60] + "...",
@@ -428,10 +442,11 @@ class AgentGraphCore:
             )
             if should_skip:
                 ContextRegistry.get().get_logger().log_info(
-                    "Classifier - Cascade Skip Handler",
+                    "AGENT • CLASSIFIER_CASCADE_SKIP",
                     f"Task {current_task_id} is being SKIPPED due to dependency on skipped tasks: {reason}",
                     metadata={
-                        "task_id": current_task_id,
+                        "task_id": int(current_task_id),
+                        "total_tasks": len(tasks),
                         "skip_reason": reason,
                         "task_description": current_task.description[:60] + "...",
                     },
@@ -460,11 +475,12 @@ class AgentGraphCore:
             persona = "AGENT_PERFORM_ERROR_FALLBACK"
 
         ContextRegistry.get().get_logger().log_info(
-            "Classifier",
+            "AGENT • CLASSIFIER",
             f"Task ID: {current_task_id}, Status: {getattr(current_task, 'status', 'N/A')}, Persona: {persona}",
             metadata={
-                "function name": "__subAGENT_classifier",
-                "task_id": current_task_id,
+                "function_name": "__subAGENT_classifier",
+                "task_id": int(current_task_id),
+                "total_tasks": len(tasks),
                 "task_status": getattr(current_task, "status", None),
                 "persona": persona,
             },
@@ -481,7 +497,7 @@ class AgentGraphCore:
         ContextRegistry.get().get_logger().log_info(
             "--- NODE: Parameter Generator ---",
             "Generating and validating parameters",
-            metadata={"function name": "subAGENT_parameter_generator"},
+            metadata={"function_name": "subAGENT_parameter_generator"},
         )
 
         tasks = state.tasks
@@ -494,11 +510,12 @@ class AgentGraphCore:
             # 🔥 SKIP BYPASS: Skip parameter generation for skipped tasks
             if current_task.status == "skip":
                 ContextRegistry.get().get_logger().log_info(
-                    "Parameter Generator - Skip Bypass",
+                    "AGENT • PARAMETER_GENERATOR_SKIP",
                     "Task is skipped, bypassing parameter generation.",
                     metadata={
-                        "function name": "subAGENT_parameter_generator",
-                        "task_id": current_task_id,
+                        "function_name": "subAGENT_parameter_generator",
+                        "task_id": int(current_task_id),
+                        "total_tasks": len(tasks),
                     },
                 )
                 return {
@@ -514,11 +531,12 @@ class AgentGraphCore:
                 and current_task.execution_context.parameters
             ):
                 ContextRegistry.get().get_logger().log_info(
-                    "Parameter Generator",
+                    "AGENT • PARAMETER_GENERATOR",
                     "Reusing existing parameters for pending task; skipping regeneration.",
                     metadata={
-                        "function name": "subAGENT_parameter_generator",
-                        "task_id": current_task_id,
+                        "function_name": "subAGENT_parameter_generator",
+                        "task_id": int(current_task_id),
+                        "total_tasks": len(tasks),
                     },
                 )
                 return {
@@ -619,11 +637,12 @@ class AgentGraphCore:
                     ],
                 }
                 ContextRegistry.get().get_logger().log_info(
-                    "Parameter Generator",
+                    "AGENT • PARAMETER_GENERATOR",
                     f"Including failure context for task {current_task_id}: {current_task.failure_context.error_type}",
                     metadata={
-                        "function name": "subAGENT_parameter_generator",
-                        "task_id": current_task_id,
+                        "function_name": "subAGENT_parameter_generator",
+                        "task_id": int(current_task_id),
+                        "total_tasks": len(tasks),
                         "error_type": current_task.failure_context.error_type,
                         "fail_count": current_task.failure_context.fail_count,
                     },
@@ -680,11 +699,12 @@ class AgentGraphCore:
                     parameters=parameters,
                 )
                 ContextRegistry.get().get_logger().log_info(
-                    "Parameter Generator",
+                    "AGENT • PARAMETER_GENERATOR",
                     f"Generated and validated parameters for task {current_task_id}",
                     metadata={
-                        "function name": "subAGENT_parameter_generator",
-                        "task_id": current_task_id,
+                        "function_name": "subAGENT_parameter_generator",
+                        "task_id": int(current_task_id),
+                        "total_tasks": len(tasks),
                         "parameters": parameters,
                     },
                 )
@@ -703,11 +723,12 @@ class AgentGraphCore:
                     failed_parameters=parameters,
                 )
                 ContextRegistry.get().get_logger().log_error(
-                    "Parameter Generator",
+                    "AGENT • PARAMETER_GENERATOR",
                     f"Parameter validation failed for task {current_task_id}: {error_message}",
                     metadata={
-                        "function name": "subAGENT_parameter_generator",
-                        "task_id": current_task_id,
+                        "function_name": "subAGENT_parameter_generator",
+                        "task_id": int(current_task_id),
+                        "total_tasks": len(tasks),
                         "tool_name": current_task.tool_name,
                         "invalid_parameters": parameters,
                     },
@@ -758,7 +779,7 @@ class AgentGraphCore:
         ContextRegistry.get().get_logger().log_info(
             "--- NODE: Task Executor ---",
             "Executing or decomposing current task",
-            metadata={"function name": "__subAGENT_task_executor"},
+            metadata={"function_name": "__subAGENT_task_executor"},
         )
         current_task_id = state.current_task_id
         updated_tasks = state.tasks
@@ -769,11 +790,12 @@ class AgentGraphCore:
 
         if not current_task:
             ContextRegistry.get().get_logger().log_error(
-                "Task Executor",
+                "AGENT • TASK_EXECUTOR",
                 f"Could not find current task with ID {current_task_id}",
                 metadata={
-                    "function name": "__subAGENT_task_executor",
-                    "current_task_id": current_task_id,
+                    "function_name": "__subAGENT_task_executor",
+                    "task_id": int(current_task_id),
+                    "total_tasks": len(updated_tasks),
                 },
             )
             return {"workflow_status": "FAILED"}
@@ -781,10 +803,11 @@ class AgentGraphCore:
         # 🔥 SKIP BYPASS: Tasks already marked as skip bypass execution entirely
         if current_task.status == "skip":
             ContextRegistry.get().get_logger().log_info(
-                "Task Executor - Skip Bypass",
+                "AGENT • TASK_EXECUTOR_SKIP",
                 f"Task {current_task_id} is SKIPPED, bypassing execution",
                 metadata={
-                    "task_id": current_task_id,
+                    "task_id": int(current_task_id),
+                    "total_tasks": len(updated_tasks),
                     "skip_reason": (
                         current_task.execution_context.result
                         if current_task.execution_context
@@ -801,9 +824,13 @@ class AgentGraphCore:
         # --- VIRTUAL TOOL INTERCEPTION ---
         if current_task.tool_name == "perform_synthesis":
             ContextRegistry.get().get_logger().log_info(
-                "Task Executor",
+                "AGENT • TASK_EXECUTOR",
                 "Intercepted virtual tool 'perform_synthesis'.",
-                metadata={"task_id": current_task.task_id},
+                metadata={
+                    "function_name": "__subAGENT_task_executor",
+                    "task_id": int(current_task.task_id),
+                    "total_tasks": len(updated_tasks),
+                },
             )
             context_data = current_task.required_context.pre_execution_context or {}
             full_history = context_data.get("completed_tasks_history", [])
@@ -859,10 +886,10 @@ class AgentGraphCore:
                     strategy_history=[],
                 )
                 ContextRegistry.get().get_logger().log_info(
-                    "SubAgent Spawner",
+                    "AGENT • SPAWNER_RUN",
                     f"Injected synthetic failure_context into parent task {current_task.task_id}",
                     metadata={
-                        "function name": "spawn_subAgent_recursive",
+                        "function_name": "spawn_subAgent_recursive",
                         "parent_task_id": current_task.task_id,
                         "injected_failed_parameters": synthetic_failed_params,
                     },
@@ -881,11 +908,12 @@ class AgentGraphCore:
                     extra_info="Decomposing complex task",
                 )
                 ContextRegistry.get().get_logger().log_info(
-                    "Task Executor",
+                    "AGENT • TASK_EXECUTOR",
                     f"Task {current_task_id} is complex - triggering spawning",
                     metadata={
-                        "function name": "__subAGENT_task_executor",
-                        "task_id": current_task_id,
+                        "function_name": "__subAGENT_task_executor",
+                        "task_id": int(current_task_id),
+                        "total_tasks": len(updated_tasks),
                         "complexity_analysis": complexity_analysis,
                     },
                 )
@@ -953,11 +981,12 @@ class AgentGraphCore:
                 "task_execution", task_id=current_task_id, extra_info="Executing tool"
             )
             ContextRegistry.get().get_logger().log_info(
-                "Task Executor",
+                "AGENT • TASK_EXECUTOR",
                 f"Task {current_task_id} is atomic - executing directly",
                 metadata={
-                    "function name": "__subAGENT_task_executor",
-                    "task_id": current_task_id,
+                    "function_name": "__subAGENT_task_executor",
+                    "task_id": int(current_task_id),
+                    "total_tasks": len(updated_tasks),
                 },
             )
 
@@ -966,11 +995,12 @@ class AgentGraphCore:
                 if current_task.status != "in_progress":
                     current_task.status = "in_progress"
                     ContextRegistry.get().get_logger().log_info(
-                        "Task Executor",
+                        "AGENT • TASK_EXECUTOR",
                         f"Marked Task {current_task_id} as in_progress",
                         metadata={
-                            "function name": "__subAGENT_task_executor",
-                            "task_id": current_task_id,
+                            "function_name": "__subAGENT_task_executor",
+                            "task_id": int(current_task_id),
+                            "total_tasks": len(updated_tasks),
                         },
                     )
             except Exception:
@@ -1007,11 +1037,12 @@ class AgentGraphCore:
 
                 # Add explicit debug when failures repeat to help root cause analysis
                 ContextRegistry.get().get_logger().log_error(
-                    "Task Executor",
+                    "AGENT • TASK_EXECUTOR",
                     f"Task {current_task_id} execution failed (fail_count={current_task.failure_context.fail_count}): {result}",
                     metadata={
-                        "function name": "__subAGENT_task_executor",
-                        "task_id": current_task_id,
+                        "function_name": "__subAGENT_task_executor",
+                        "task_id": int(current_task_id),
+                        "total_tasks": len(updated_tasks),
                         "failed_parameters": current_task.execution_context.parameters,
                     },
                 )
@@ -1023,11 +1054,12 @@ class AgentGraphCore:
                         extra_info="failed: exceeded retries",
                     )
                     ContextRegistry.get().get_logger().log_error(
-                        "Task Executor",
+                        "AGENT • TASK_EXECUTOR",
                         f"Task {current_task_id} has failed {current_task.failure_context.fail_count} times. Exceeded retry limit of 3.",
                         metadata={
-                            "function name": "__subAGENT_task_executor",
-                            "task_id": current_task_id,
+                            "function_name": "__subAGENT_task_executor",
+                            "task_id": int(current_task_id),
+                            "total_tasks": len(updated_tasks),
                             "fail_count": current_task.failure_context.fail_count,
                         },
                     )
@@ -1041,11 +1073,12 @@ class AgentGraphCore:
 
         except Exception as e:
             ContextRegistry.get().get_logger().log_error(
-                "Task Executor",
+                "AGENT • TASK_EXECUTOR",
                 f"Error during task execution: {e!s}",
                 metadata={
-                    "function name": "__subAGENT_task_executor",
-                    "task_id": current_task_id,
+                    "function_name": "__subAGENT_task_executor",
+                    "task_id": int(current_task_id),
+                    "total_tasks": len(updated_tasks),
                     "exception": str(e),
                 },
             )
@@ -1093,7 +1126,7 @@ class AgentGraphCore:
         ContextRegistry.get().get_logger().log_info(
             "--- NODE: Context Synthesizer ---",
             "Summarizing task result for context bridge",
-            metadata={"function name": "__subAGENT_context_synthesizer"},
+            metadata={"function_name": "__subAGENT_context_synthesizer"},
         )
         tasks = state.tasks
         current_task_id = state.current_task_id
@@ -1140,11 +1173,12 @@ class AgentGraphCore:
             if summary:
                 current_task.execution_context.analysis = summary
                 ContextRegistry.get().get_logger().log_info(
-                    "Context Synthesizer",
+                    "AGENT • CONTEXT_SYNTHESIZER",
                     f"Generated analysis for Task {current_task_id}: '{summary}'",
                     metadata={
-                        "function name": "__subAGENT_context_synthesizer",
-                        "task_id": current_task_id,
+                        "function_name": "__subAGENT_context_synthesizer",
+                        "task_id": int(current_task_id),
+                        "total_tasks": len(tasks),
                         "summary": summary,
                     },
                 )
@@ -1168,11 +1202,12 @@ class AgentGraphCore:
             else:
                 skip_summary = current_task.execution_context.analysis
             ContextRegistry.get().get_logger().log_info(
-                "Context Synthesizer - Skip Handler",
+                "AGENT • CONTEXT_SYNTHESIZER_SKIP",
                 f"Generated analysis for SKIPPED Task {current_task_id}: '{skip_summary}'",
                 metadata={
-                    "function name": "__subAGENT_context_synthesizer",
-                    "task_id": current_task_id,
+                    "function_name": "__subAGENT_context_synthesizer",
+                    "task_id": int(current_task_id),
+                    "total_tasks": len(tasks),
                 },
             )
 
@@ -1184,7 +1219,7 @@ class AgentGraphCore:
         ContextRegistry.get().get_logger().log_info(
             "--- NODE: Goal Validator ---",
             "Validating task goal achievement",
-            metadata={"function name": "__subAGENT_goal_validator"},
+            metadata={"function_name": "__subAGENT_goal_validator"},
         )
         tasks = state.tasks
         current_task_id = state.current_task_id
@@ -1193,10 +1228,11 @@ class AgentGraphCore:
         # 🔥 SKIP BYPASS: Skip goal validation for skipped tasks entirely.
         if current_task and current_task.status == "skip":
             ContextRegistry.get().get_logger().log_info(
-                "Goal Validator - Skip Bypass",
+                "AGENT • GOAL_VALIDATOR_SKIP",
                 f"Task {current_task_id} is SKIPPED, bypassing goal validation",
                 metadata={
-                    "task_id": current_task_id,
+                    "task_id": int(current_task_id),
+                    "total_tasks": len(tasks),
                     "skip_reason": (
                         current_task.execution_context.result
                         if current_task.execution_context
@@ -1248,11 +1284,12 @@ class AgentGraphCore:
                     "goal_achieved", False
                 )
                 ContextRegistry.get().get_logger().log_info(
-                    "Goal Validator",
+                    "AGENT • GOAL_VALIDATOR",
                     f"Validation for Task {current_task_id}: Goal Achieved = {validation_result.get('goal_achieved')}, Reasoning: {validation_result.get('reasoning')}",
                     metadata={
-                        "function name": "__subAGENT_goal_validator",
-                        "task_id": current_task_id,
+                        "function_name": "__subAGENT_goal_validator",
+                        "task_id": int(current_task_id),
+                        "total_tasks": len(tasks),
                         "validation_result": validation_result,
                     },
                 )
@@ -1310,11 +1347,12 @@ class AgentGraphCore:
                         pass
             else:
                 ContextRegistry.get().get_logger().log_warning(
-                    "Goal Validator",
+                    "AGENT • GOAL_VALIDATOR",
                     f"Invalid response from validation LLM for Task {current_task_id}. Defaulting to goal not achieved.",
                     metadata={
-                        "function name": "__subAGENT_goal_validator",
-                        "task_id": current_task_id,
+                        "function_name": "__subAGENT_goal_validator",
+                        "task_id": int(current_task_id),
+                        "total_tasks": len(tasks),
                         "llm_response": response.content,
                     },
                 )
@@ -1451,7 +1489,7 @@ class AgentGraphCore:
         ContextRegistry.get().get_logger().log_info(
             "--- NODE: Error Fallback ---",
             "Handling task failure with tiered recovery strategies",
-            metadata={"function name": "__subAGENT_error_fallback"},
+            metadata={"function_name": "__subAGENT_error_fallback"},
         )
         current_task_id = state.current_task_id
         updated_tasks = state.tasks
@@ -1764,11 +1802,12 @@ class AgentGraphCore:
 
         except Exception as e:
             ContextRegistry.get().get_logger().log_error(
-                "Error Fallback",
+                "AGENT • ERROR_FALLBACK",
                 f"Error during LLM recovery processing: {e}",
                 metadata={
-                    "function name": "__subAGENT_error_fallback",
-                    "task_id": current_task_id,
+                    "function_name": "__subAGENT_error_fallback",
+                    "task_id": int(current_task_id),
+                    "total_tasks": len(updated_tasks),
                     "exception": str(e),
                 },
             )
@@ -1797,7 +1836,7 @@ class AgentGraphCore:
         ContextRegistry.get().get_logger().log_info(
             "--- NODE: Task Planner ---",
             "Managing task progression and parent-child relationships",
-            metadata={"function name": "__subAGENT_task_planner"},
+            metadata={"function_name": "__subAGENT_task_planner"},
         )
 
         tasks = state.tasks
@@ -1871,11 +1910,12 @@ class AgentGraphCore:
             next_task.required_context.pre_execution_context = accumulated_context
 
             ContextRegistry.get().get_logger().log_info(
-                "Context Bridge",
+                "AGENT • CONTEXT_BRIDGE",
                 f"Injected context from {len(completed_tasks)} completed tasks into Task {next_task_id}",
                 metadata={
-                    "function name": "__subAGENT_task_planner",
-                    "next_task_id": next_task_id,
+                    "function_name": "__subAGENT_task_planner",
+                    "task_id": int(next_task_id),
+                    "total_tasks": len(tasks),
                     "completed_tasks_count": len(completed_tasks),
                 },
             )
@@ -1893,7 +1933,7 @@ class AgentGraphCore:
         ContextRegistry.get().get_logger().log_info(
             "--- NODE: Finalizer ---",
             "Generating final response consolidating all task results",
-            metadata={"function name": "__subAGENT_finalizer"},
+            metadata={"function_name": "__subAGENT_finalizer"},
         )
 
         tasks = state.tasks
@@ -1905,10 +1945,12 @@ class AgentGraphCore:
 
         # Debug system_logging with skip statistics
         ContextRegistry.get().get_logger().log_info(
-            "Finalizer - Task Summary",
+            "AGENT • FINALIZER_SUMMARY",
             f"Workflow completed: {len(completed_tasks)} completed, {len(skipped_tasks)} skipped, {len(failed_tasks)} failed",
             metadata={
-                "function name": "__subAGENT_finalizer",
+                "function_name": "__subAGENT_finalizer",
+                "task_id": len(tasks),
+                "total_tasks": len(tasks),
                 "completed_count": len(completed_tasks),
                 "skipped_count": len(skipped_tasks),
                 "failed_count": len(failed_tasks),
@@ -2065,10 +2107,10 @@ class AgentGraphCore:
             else:
                 workflow_status = "COMPLETED"  # Full success - all tasks completed
             ContextRegistry.get().get_logger().log_info(
-                "Finalizer",
+                "AGENT • FINALIZER",
                 "LLM produced parsable JSON. Returning parsed object as final_response.",
                 metadata={
-                    "function name": "__subAGENT_finalizer",
+                    "function_name": "__subAGENT_finalizer",
                     "parsed_preview": str(parsed)[:200],
                     "workflow_status": workflow_status,
                 },
@@ -2136,10 +2178,10 @@ class AgentGraphCore:
                 else:
                     workflow_status = "COMPLETED"  # Full success
                 ContextRegistry.get().get_logger().log_info(
-                    "Finalizer",
+                    "AGENT • FINALIZER",
                     "Repaired final response successfully and returning as final_response.",
                     metadata={
-                        "function name": "__subAGENT_finalizer",
+                        "function_name": "__subAGENT_finalizer",
                         "response_preview": str(repaired)[:200],
                         "workflow_status": workflow_status,
                     },
@@ -2152,9 +2194,9 @@ class AgentGraphCore:
                 }
         except Exception as e:
             ContextRegistry.get().get_logger().log_warning(
-                "Finalizer",
+                "AGENT • FINALIZER",
                 f"JSON repair attempt failed: {e}",
-                metadata={"function name": "__subAGENT_finalizer", "exception": str(e)},
+                metadata={"function_name": "__subAGENT_finalizer", "exception": str(e)},
             )
 
         # As a last resort, build a fallback wrapped schema so the caller can reliably extract a message.
@@ -2170,10 +2212,10 @@ class AgentGraphCore:
             final_text = str(raw)
 
         ContextRegistry.get().get_logger().log_info(
-            "Finalizer",
+            "AGENT • FINALIZER",
             f"Final Response (fallback text): {final_text}",
             metadata={
-                "function name": "__subAGENT_finalizer",
+                "function_name": "__subAGENT_finalizer",
                 "response_preview_length": len(final_text),
             },
         )
@@ -2203,10 +2245,10 @@ class AgentGraphCore:
             }
 
         ContextRegistry.get().get_logger().log_info(
-            "Finalizer",
+            "AGENT • FINALIZER",
             "Returning wrapped fallback final response as structured JSON schema",
             metadata={
-                "function name": "__subAGENT_finalizer",
+                "function_name": "__subAGENT_finalizer",
                 "response_preview": str(final_response_obj)[0:200],
             },
         )
@@ -2233,7 +2275,7 @@ class AgentGraphCore:
         ContextRegistry.get().get_logger().log_info(
             "--- ROUTER: After Execution ---",
             "Routing after task execution based on task status",
-            metadata={"function name": "__router_after_execution"},
+            metadata={"function_name": "__router_after_execution"},
         )
         current_task_id = state.current_task_id
         tasks = state.tasks
@@ -2244,11 +2286,12 @@ class AgentGraphCore:
             # This creates the crucial "retry loop".
             # print_log_message(f"Task {current_task_id} failed. Routing to classifier for retry/fallback.", "Router")
             ContextRegistry.get().get_logger().log_info(
-                "Router",
+                "AGENT • ROUTER",
                 f"Task {current_task_id} failed. Routing to classifier for retry/fallback.",
                 metadata={
-                    "function name": "__router_after_execution",
-                    "task_id": current_task_id,
+                    "function_name": "__router_after_execution",
+                    "task_id": int(current_task_id),
+                    "total_tasks": len(tasks),
                     "task_status": current_task.status,
                 },
             )
@@ -2260,18 +2303,26 @@ class AgentGraphCore:
             # If no more pending tasks, it's time to finalize the workflow.
             # print_log_message("All tasks completed. Routing to finalizer.", "Router")
             ContextRegistry.get().get_logger().log_info(
-                "Router",
+                "AGENT • ROUTER",
                 "All tasks completed. Routing to finalizer.",
-                metadata={"function name": "__router_after_execution"},
+                metadata={
+                    "function_name": "__router_after_execution",
+                    "task_id": len(tasks),
+                    "total_tasks": len(tasks),
+                },
             )
             return "subAGENT_finalizer"
 
         # If there are more pending tasks, route to the planner to select the next one.
         # print_log_message("Task completed. Routing to task planner for next task.", "Router")
         ContextRegistry.get().get_logger().log_info(
-            "Router",
+            "AGENT • ROUTER",
             "Task completed. Routing to task planner for next task.",
-            metadata={"function name": "__router_after_execution"},
+            metadata={
+                "function_name": "__router_after_execution",
+                "task_id": int(current_task_id),
+                "total_tasks": len(tasks),
+            },
         )
         return "subAGENT_task_planner"
 
@@ -2284,7 +2335,7 @@ class AgentGraphCore:
         ContextRegistry.get().get_logger().log_info(
             "--- ROUTER: Classifier ---",
             "Routing based on classifier decision",
-            metadata={"function name": "__router_classifier"},
+            metadata={"function_name": "__router_classifier"},
         )
         if state.persona == "AGENT_PERFORM_ERROR_FALLBACK":
             return "subAGENT_error_fallback"
@@ -2299,7 +2350,7 @@ class AgentGraphCore:
         ContextRegistry.get().get_logger().log_info(
             "--- ROUTER: Task Planner ---",
             "Routing based on task planner decision",
-            metadata={"function name": "__router_task_planner"},
+            metadata={"function_name": "__router_task_planner"},
         )
         # Check if all tasks are in terminal states (completed, failed, OR skip)
         tasks = state.tasks
@@ -2338,7 +2389,6 @@ class AgentGraphCore:
         The conditional routing enables sophisticated decision-making while maintaining
         clean separation of concerns and full observability throughout execution.
         """
-        from langgraph.graph import StateGraph
 
         graph_builder = StateGraph(state_schema=WorkflowStateModel)
 

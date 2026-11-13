@@ -28,6 +28,7 @@ so implementations and callers can rely on static analysis and quick navigation.
 """
 
 from abc import ABC, abstractmethod
+
 from .protocol import SlashCommand
 
 

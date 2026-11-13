@@ -13,7 +13,6 @@ import subprocess
 import sys
 import uuid
 from pathlib import Path
-from typing import List
 
 # Ensure project root is on sys.path for correct module resolution in the subprocess
 if __package__ is None:
@@ -54,7 +53,7 @@ class BrowserHandler:
     # would mask the bug (subprocess.wait(timeout=0) silently times out).
     time_out: int
     enabled: bool
-    running_processes: List[subprocess.Popen] = []
+    running_processes: list[subprocess.Popen] = []
 
     # Flag to switch between legacy subprocess and new Runner-based execution
 
@@ -185,7 +184,7 @@ class BrowserHandler:
             self.running_processes.append(self.process)
 
             ContextRegistry.get().get_logger().log_info(
-                "BROWSER SUBPROCESS",
+                "TOOL • BROWSER_SUBPROCESS",
                 f"Started browser subprocess with PID: {self.process_id}",
                 metadata={
                     "pid": self.process_id,
@@ -282,7 +281,7 @@ class BrowserHandler:
                     process.wait()
 
             ContextRegistry.get().get_logger().log_info(
-                "BROWSER TOOL CLEAN UP",
+                "TOOL • BROWSER_CLEANUP",
                 f"BrowserHandler: Cleaned up process with PID {process.pid}",
                 metadata={
                     "process_id": process.pid,
@@ -365,6 +364,6 @@ if __name__ == "__main__":
         query=test_query, head_less_mode=False, log=True, keep_alive=True
     )
 
-    print(f"\n--- Standalone Execution Result ---")
+    print("\n--- Standalone Execution Result ---")
     print(final_response)
     print("------------------------------------")

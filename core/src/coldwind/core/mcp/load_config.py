@@ -1,10 +1,9 @@
 import json
 import pathlib
-from typing import List, Optional, Union
 
 from coldwind.core.mcp.mcp_register_structure import (
-    ServerConfig,
     Command,
+    ServerConfig,
 )  # Import Command from correct location
 
 
@@ -32,7 +31,7 @@ def load_mcp_configs():
 
 
 class McpConfigFile:
-    __config_path: Union[str | pathlib.Path]
+    __config_path: str | pathlib.Path
 
     @property
     def config_path(self) -> str:
@@ -45,8 +44,9 @@ class McpConfigFile:
     @classmethod
     def __load(cls):
         """Load the MCP configuration from the specified file."""
-        from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
         from pathlib import Path
+
+        from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
 
         if not hasattr(cls, "__config_path") or cls.__config_path is None:
             # MIGRATED: settings.MCP_CONFIG.get('MCP_CONFIG_PATH') →
@@ -71,7 +71,7 @@ class McpConfigFile:
 
     # File: load_config.py
     @classmethod
-    def retrieve_config(cls) -> Optional[List[ServerConfig]]:
+    def retrieve_config(cls) -> list[ServerConfig] | None:
         """Parse .mcp.md.json into ServerConfig list"""
         from coldwind.core.tools.lggraph_tools.wrappers.mcp_wrapper.uni_mcp_wrappers import (
             UniversalMCPWrapper,

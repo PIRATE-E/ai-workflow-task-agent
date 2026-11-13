@@ -27,13 +27,14 @@ except Exception:  # neo4j not installed
     _neo4j_available = False
 
 # MIGRATED: direct langchain import for HumanMessage (was settings.HumanMessage).
-from langchain_core.messages import HumanMessage
+import pathlib
 
 from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
+
 # MIGRATED: neo4j_driver is now registered as a dynamic CoreRunTimeObjects service.
 from coldwind.core.runtime.runtime_obj_enum import CoreRunTimeObjects
 from coldwind.core.utils.open_ai_integration import OpenAIIntegration
-import pathlib
+from langchain_core.messages import HumanMessage
 
 # Corrected path: structured_triple_prompt lives under prompts, not utils
 try:
@@ -130,7 +131,7 @@ async def prompt_gemini_for_triples_cli(chunk: Document) -> dict[str, Any]:
             raise RuntimeError(
                 f"Gemini command failed with return code {process.returncode}: {stderr}"
             )
-    except asyncio.TimeoutError:
+    except TimeoutError:
         process.kill()
         stdout, stderr = await process.communicate()
         raise FileNotFoundError(

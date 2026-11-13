@@ -7,6 +7,6 @@ dashboard transport
 # WHAT: Import SocketManager and DesktopDashboardManager from .dashboard_transport.
 # WHY: Decouples desktop dashboard package from legacy core/utils/socket_manager.py,
 # preserving the Layering Invariant (Desktop defines desktop-specific dashboard transports).
-from .dashboard_transport import SocketManager, DesktopDashboardManager
+from .dashboard_transport import DesktopDashboardManager, SocketManager
 
-__all__ = ["SocketManager", "DesktopDashboardManager"]
+__all__ = ["DesktopDashboardManager", "SocketManager"]

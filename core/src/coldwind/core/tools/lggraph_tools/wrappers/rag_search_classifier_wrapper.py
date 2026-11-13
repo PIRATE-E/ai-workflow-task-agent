@@ -1,7 +1,5 @@
 from langchain_core.messages import AIMessage
 
-from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
-
 
 class RagSearchClassifierWrapper:
     """
@@ -14,10 +12,12 @@ class RagSearchClassifierWrapper:
         Initialize the RagSearchClassifierWrapper with a search query.
         :param query: The search query for the RAG Search Classifier Tool.
         """
+        from coldwind.core.tools.lggraph_tools.tool_response_manager import (
+            ToolResponseManager,
+        )
         from coldwind.core.tools.lggraph_tools.tools.rag_search_classifier_tool import (
             rag_search_classifier_tool,
         )
-        from coldwind.core.tools.lggraph_tools.tool_response_manager import ToolResponseManager
 
         self.query = query
 
@@ -47,6 +47,7 @@ class RagSearchClassifierWrapper:
             # WHAT: Route exception through ContextRegistry error handler.
             # WHY: Preserves Layering Invariant by eliminating direct desktop import.
             import traceback
+
             from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
 
             error_details = traceback.format_exc()
@@ -60,6 +61,6 @@ class RagSearchClassifierWrapper:
                 pass
 
             ai_message = AIMessage(
-                content=f"[ERROR] An error occurred while executing the RAG search: {str(e)} full traceback: {error_details}"
+                content=f"[ERROR] An error occurred while executing the RAG search: {e!s} full traceback: {error_details}"
             )
             ToolResponseManager().set_response([ai_message])

@@ -62,4 +62,4 @@ def run_shell_command(command: str, creation_flag=False) -> str:
             return f"CalledProcessError: Command failed with return code {e.returncode}"
     except Exception as e:
         # ✅ Catch any other subprocess errors
-        return f"Subprocess Error: {str(e)}"
+        return f"Subprocess Error: {e!s}"

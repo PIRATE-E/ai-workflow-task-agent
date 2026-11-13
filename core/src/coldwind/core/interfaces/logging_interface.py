@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Any, Optional
+from typing import Any
 
 
 class DebugLoggerInterface(ABC):
@@ -12,26 +12,21 @@ class DebugLoggerInterface(ABC):
     """
 
     @abstractmethod
-    def log_debug(self, heading: str, body: str, metadata: Optional[dict[str, Any]] = None) -> None:
+    def log_debug(self, heading: str, body: str, metadata: dict[str, Any] | None = None) -> None:
         """Log low-level debugging information."""
-        pass
 
     @abstractmethod
-    def log_info(self, heading: str, body: str, metadata: Optional[dict[str, Any]] = None) -> None:
+    def log_info(self, heading: str, body: str, metadata: dict[str, Any] | None = None) -> None:
         """Log general informational messages."""
-        pass
 
     @abstractmethod
-    def log_warning(self, heading: str, body: str, metadata: Optional[dict[str, Any]] = None) -> None:
+    def log_warning(self, heading: str, body: str, metadata: dict[str, Any] | None = None) -> None:
         """Log warnings that don't stop execution but require attention."""
-        pass
 
     @abstractmethod
-    def log_error(self, heading: str, body: str, metadata: Optional[dict[str, Any]] = None) -> None:
+    def log_error(self, heading: str, body: str, metadata: dict[str, Any] | None = None) -> None:
         """Log recoverable errors."""
-        pass
 
     @abstractmethod
-    def log_critical(self, heading: str, body: str, metadata: Optional[dict[str, Any]] = None) -> None:
+    def log_critical(self, heading: str, body: str, metadata: dict[str, Any] | None = None) -> None:
         """Log severe, potentially unrecoverable errors."""
-        pass

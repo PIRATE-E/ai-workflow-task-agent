@@ -8,7 +8,7 @@ the implementation and services defined into different modules
 we are orchestrating them here ...
 """
 
-from typing import Any, Optional, Self, override
+from typing import Any, Self, override
 
 from coldwind.core.config.coreSettings import CoreSettinngs
 from coldwind.core.interfaces.exception_interface import ExceptionHandlerInterface
@@ -18,16 +18,16 @@ from coldwind.core.interfaces.ui_interface import (
     CommandParserInterface,
     MessageDisplayInterface,
 )
-from coldwind.desktop.config.DesktopConfig import DesktopConfig
-from coldwind.desktop.slash_commands.executionar import ExecutionAr
-from coldwind.desktop.slash_commands.parser import ParseCommand
-from coldwind.desktop.ui.chatInputHandler import InputHandler
 from coldwind.core.system_logging.debug_protocol import (
     debug_critical,
     debug_error,
     debug_info,
     debug_warning,
 )
+from coldwind.desktop.config.DesktopConfig import DesktopConfig
+from coldwind.desktop.slash_commands.executionar import ExecutionAr
+from coldwind.desktop.slash_commands.parser import ParseCommand
+from coldwind.desktop.ui.chatInputHandler import InputHandler
 from coldwind.desktop.ui.diagnostics.rich_traceback_manager import RichTracebackManager
 from coldwind.desktop.ui.print_banner import print_banner
 from coldwind.desktop.ui.print_message_style import print_message
@@ -42,31 +42,31 @@ class DesktopDebugLogger(DebugLoggerInterface):
 
     @override
     def log_debug(
-        self, heading: str, body: str, metadata: Optional[dict[str, Any]] = None
+        self, heading: str, body: str, metadata: dict[str, Any] | None = None
     ) -> None:
         debug_info(heading, body, metadata)
 
     @override
     def log_info(
-        self, heading: str, body: str, metadata: Optional[dict[str, Any]] = None
+        self, heading: str, body: str, metadata: dict[str, Any] | None = None
     ) -> None:
         debug_info(heading, body, metadata)
 
     @override
     def log_warning(
-        self, heading: str, body: str, metadata: Optional[dict[str, Any]] = None
+        self, heading: str, body: str, metadata: dict[str, Any] | None = None
     ) -> None:
         debug_warning(heading, body, metadata)
 
     @override
     def log_error(
-        self, heading: str, body: str, metadata: Optional[dict[str, Any]] = None
+        self, heading: str, body: str, metadata: dict[str, Any] | None = None
     ) -> None:
         debug_error(heading, body, metadata)
 
     @override
     def log_critical(
-        self, heading: str, body: str, metadata: Optional[dict[str, Any]] = None
+        self, heading: str, body: str, metadata: dict[str, Any] | None = None
     ) -> None:
         debug_critical(heading, body, metadata)
 
@@ -81,7 +81,7 @@ class DesktopExceptionHandler(ExceptionHandlerInterface):
         self,
         error: Exception,
         context: str = "",
-        extra_context: Optional[dict[str, Any]] = None,
+        extra_context: dict[str, Any] | None = None,
     ) -> None:
         # ---------------------------------------------------------------------
         # WHAT CHANGED & WHY:
@@ -102,7 +102,7 @@ class DesktopMessageDisplay(MessageDisplayInterface):
     """
 
     def display_message(
-        self, role: str, content: str, metadata: Optional[dict[str, Any]] = None
+        self, role: str, content: str, metadata: dict[str, Any] | None = None
     ) -> None:
         # The existing print_message expects role as sender ('user', 'ai', 'tool')
         print_message(content, sender=role)
@@ -140,8 +140,6 @@ class DesktopCommandParser(CommandParserInterface):
         from coldwind.desktop.slash_commands.commands.clear import (
             register_clear_command,
         )
-        from coldwind.desktop.slash_commands.commands.help import register_help_command
-        from coldwind.desktop.slash_commands.commands.exit import register_exit_command
         from coldwind.desktop.slash_commands.commands.core_slashs.agent import (
             register_agent_command,
         )
@@ -151,6 +149,8 @@ class DesktopCommandParser(CommandParserInterface):
         from coldwind.desktop.slash_commands.commands.core_slashs.use_tool import (
             register_slash_command_use_tool,
         )
+        from coldwind.desktop.slash_commands.commands.exit import register_exit_command
+        from coldwind.desktop.slash_commands.commands.help import register_help_command
 
         for reg_fn in (
             register_clear_command,

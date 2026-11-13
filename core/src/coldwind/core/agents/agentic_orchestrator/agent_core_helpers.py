@@ -13,18 +13,20 @@ WHY:
 """
 import json
 import re
+
 from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
+
 from ...tools.lggraph_tools.tool_assign import ToolAssign
+from ...tools.lggraph_tools.tool_response_manager import ToolResponseManager
 from ...utils.argument_schema_util import get_tool_argument_schema
 from ...utils.model_manager import ModelManager
 from .hierarchical_agent_prompts import (
     HierarchicalAgentPrompt,
 )
-from ...tools.lggraph_tools.tool_response_manager import ToolResponseManager
 from .pydantic_models import (
-    TASK,
-    REQUIRED_CONTEXT,
     FAILURE_CONTEXT_STRATEGY,
+    REQUIRED_CONTEXT,
+    TASK,
     WorkflowStateModel,
 )
 
@@ -52,11 +54,11 @@ class AgentCoreHelpers:
                 return json.loads(schema_str)
             return {}
         except Exception as e:
-            # print_log_message(f"Failed to get schema for {tool_name}: {e}", "Tool Schema")
+            # print_log_message(f"Failed to get schema for {tool_name}: {e}", "AGENT • TOOL_SCHEMA")
             ContextRegistry.get().get_logger().log_error(
-                "Tool Schema",
+                "AGENT • TOOL_SCHEMA",
                 f"Failed to get schema for {tool_name}: {e}",
-                metadata={"function name": "__get_tool_schema", "tool_name": tool_name},
+                metadata={"function_name": "__get_tool_schema", "tool_name": tool_name},
             )
             return {}
 
@@ -68,7 +70,7 @@ class AgentCoreHelpers:
         Executes the virtual 'perform_synthesis' tool by calling an LLM.
         """
         ContextRegistry.get().get_logger().log_error(
-            "Internal Synthesis",
+            "AGENT • INTERNAL_SYNTHESIS",
             f"Performing synthesis for task: {current_task.description}",
             metadata={
                 "function_name": "_perform_internal_synthesis",
@@ -114,7 +116,7 @@ class AgentCoreHelpers:
         except Exception as e:
             error_msg = f"Internal synthesis LLM call failed: {e}"
             ContextRegistry.get().get_logger().log_error(
-                "Internal Synthesis", error_msg, metadata={"exception": str(e)}
+                "AGENT • INTERNAL_SYNTHESIS", error_msg, metadata={"exception": str(e)}
             )
             return False, error_msg
 
@@ -158,9 +160,9 @@ class AgentCoreHelpers:
             return "\n\n".join(tool_context)
 
         except Exception as e:
-            # print_log_message(f"Failed to get detailed tool context: {e}", "Tool Context")
+            # print_log_message(f"Failed to get detailed tool context: {e}", "AGENT • TOOL_CONTEXT")
             ContextRegistry.get().get_logger().log_warning(
-                "Tool Context",
+                "AGENT • TOOL_CONTEXT",
                 f"Failed to get detailed tool context: {e}",
                 metadata={
                     "function_name": "get_detailed_tool_context",
@@ -238,10 +240,10 @@ class AgentCoreHelpers:
         except Exception as e:
             # Use module-level ContextRegistry.get().get_logger().debug_warning (fallback defined earlier) instead of re-importing
             ContextRegistry.get().get_logger().log_warning(
-                "Tool Recommender",
+                "AGENT • TOOL_RECOMMENDER",
                 f"Tool recommendation failed: {e}",
                 metadata={
-                    "function name": "recommend_tools_for_task",
+                    "function_name": "recommend_tools_for_task",
                     "task_description": task_description,
                     "max_tools": max_tools,
                 },
@@ -402,7 +404,7 @@ class AgentCoreHelpers:
             """Use LLM to intelligently repair the parameters of a failed task."""
             if not task.failure_context or not task.failure_context.failed_parameters:
                 ContextRegistry.get().get_logger().log_warning(
-                    "Parameter Repair",
+                    "AGENT • PARAMETER_REPAIR",
                     f"Task {task.task_id} has no failure context or failed parameters. Cannot attempt repair.",
                     metadata={
                         "function_name": "attempt_parameter_repair",
@@ -418,7 +420,7 @@ class AgentCoreHelpers:
             failed_params = task.failure_context.failed_parameters
 
             ContextRegistry.get().get_logger().log_info(
-                "Parameter Repair",
+                "AGENT • PARAMETER_REPAIR",
                 f"Attempting parameter repair for task {task.task_id} with {fail_count} failures",
                 metadata={
                     "function_name": "attempt_parameter_repair",
@@ -461,7 +463,7 @@ class AgentCoreHelpers:
                 # Do not accept identical parameters that already failed
                 if repaired_params == failed_params:
                     ContextRegistry.get().get_logger().log_warning(
-                        "Parameter Repair",
+                        "AGENT • PARAMETER_REPAIR",
                         f"LLM returned identical parameters that already failed for task {task.task_id}",
                         metadata={
                             "function_name": "attempt_parameter_repair",
@@ -478,7 +480,7 @@ class AgentCoreHelpers:
 
                 if is_valid:
                     ContextRegistry.get().get_logger().log_info(
-                        "Parameter Repair",
+                        "AGENT • PARAMETER_REPAIR",
                         f"Successfully repaired parameters for task {task.task_id}",
                         metadata={
                             "function_name": "attempt_parameter_repair",
@@ -489,7 +491,7 @@ class AgentCoreHelpers:
                     return True, repaired_params
 
                 ContextRegistry.get().get_logger().log_warning(
-                    "Parameter Repair",
+                    "AGENT • PARAMETER_REPAIR",
                     f"LLM-suggested parameters failed validation: {error_msg}",
                     metadata={
                         "function_name": "attempt_parameter_repair",
@@ -501,7 +503,7 @@ class AgentCoreHelpers:
 
             except Exception as e:
                 ContextRegistry.get().get_logger().log_error(
-                    "Parameter Repair",
+                    "AGENT • PARAMETER_REPAIR",
                     f"Failed to repair parameters with LLM: {e}",
                     metadata={
                         "function_name": "attempt_parameter_repair",
@@ -569,7 +571,7 @@ class AgentCoreHelpers:
                         )
                     return tasks if tasks else None
                 ContextRegistry.get().get_logger().log_warning(
-                    "Task Conversion",
+                    "AGENT • TASK_CONVERSION",
                     "LLM response is not a list of tasks.",
                     metadata={
                         "function_name": "convert_decision_task",
@@ -579,7 +581,7 @@ class AgentCoreHelpers:
                 return None
             except Exception as e:
                 ContextRegistry.get().get_logger().log_error(
-                    "Task Conversion",
+                    "AGENT • TASK_CONVERSION",
                     f"Failed to convert decision to tasks with LLM: {e}",
                     metadata={
                         "function_name": "convert_decision_task",
@@ -593,7 +595,7 @@ class AgentCoreHelpers:
             """Use LLM to intelligently find a safer, alternative tool to accomplish the task's goal."""
             if not task.failure_context or not task.failure_context.error_message:
                 ContextRegistry.get().get_logger().log_warning(
-                    "Alternative Tool",
+                    "AGENT • ALTERNATIVE_TOOL",
                     f"Task {task.task_id} has no failure context or error message. Cannot find alternative tool.",
                     metadata={
                         "function_name": "find_alternative_tool",
@@ -607,7 +609,7 @@ class AgentCoreHelpers:
             fail_count = task.failure_context.fail_count
 
             ContextRegistry.get().get_logger().log_info(
-                "Alternative Tool",
+                "AGENT • ALTERNATIVE_TOOL",
                 f"Finding alternative tool for task {task.task_id} with {fail_count} failures",
                 metadata={
                     "function_name": "find_alternative_tool",
@@ -651,10 +653,10 @@ class AgentCoreHelpers:
 
                 if alternative_tool and alternative_tool in valid_tool_names:
                     ContextRegistry.get().get_logger().log_info(
-                        "Alternative Tool",
+                        "AGENT • ALTERNATIVE_TOOL",
                         f"Selected alternative tool '{alternative_tool}' for task {task.task_id}",
                         metadata={
-                            "function name": "find_alternative_tool",
+                            "function_name": "find_alternative_tool",
                             "task_id": task.task_id,
                             "alternative_tool": alternative_tool,
                             "reasoning": alternative_result.get(
@@ -665,10 +667,10 @@ class AgentCoreHelpers:
                     return alternative_tool
 
                 ContextRegistry.get().get_logger().log_warning(
-                    "Alternative Tool",
+                    "AGENT • ALTERNATIVE_TOOL",
                     f"LLM-suggested tool '{alternative_tool}' not valid or identical to current tool",
                     metadata={
-                        "function name": "find_alternative_tool",
+                        "function_name": "find_alternative_tool",
                         "task_id": task.task_id,
                         "suggested_tool": alternative_tool,
                     },
@@ -677,10 +679,10 @@ class AgentCoreHelpers:
 
             except Exception as e:
                 ContextRegistry.get().get_logger().log_error(
-                    "Alternative Tool",
+                    "AGENT • ALTERNATIVE_TOOL",
                     f"Failed to find alternative tool with LLM: {e}",
                     metadata={
-                        "function name": "find_alternative_tool",
+                        "function_name": "find_alternative_tool",
                         "task_id": task.task_id,
                         "exception": str(e),
                     },
@@ -708,10 +710,10 @@ class AgentCoreHelpers:
             """Decide the best recovery strategy and return a dictionary strictly validated against FAILURE_CONTEXT_STRATEGY."""
             if not task.failure_context:
                 ContextRegistry.get().get_logger().log_warning(
-                    "Strategy Decision",
+                    "AGENT • STRATEGY_DECISION",
                     f"Task {getattr(task, 'task_id', 'N/A')} has no failure context. Defaulting to SKIP.",
                     metadata={
-                        "function name": "decide_recovery_strategy",
+                        "function_name": "decide_recovery_strategy",
                         "task_id": getattr(task, "task_id", "N/A"),
                     },
                 )
@@ -734,10 +736,10 @@ class AgentCoreHelpers:
             # Producer-level retry ceiling: if retries or strategy attempts are exhausted, return validated SKIP
             if fail_count > max_allowed_retries or len(prior_history) >= max_allowed_retries:
                 ContextRegistry.get().get_logger().log_info(
-                    "Strategy Decision",
+                    "AGENT • STRATEGY_DECISION",
                     f"Task {task.task_id} reached retry ceiling (fail_count={fail_count}, prior_attempts={len(prior_history)}). Selecting SKIP.",
                     metadata={
-                        "function name": "decide_recovery_strategy",
+                        "function_name": "decide_recovery_strategy",
                         "task_id": task.task_id,
                         "fail_count": fail_count,
                         "prior_attempts": len(prior_history),
@@ -756,10 +758,10 @@ class AgentCoreHelpers:
                 ).model_dump()
 
             ContextRegistry.get().get_logger().log_info(
-                "Strategy Decision",
+                "AGENT • STRATEGY_DECISION",
                 f"Deciding recovery strategy for task {getattr(task, 'task_id', 'N/A')} with {fail_count} failures",
                 metadata={
-                    "function name": "decide_recovery_strategy",
+                    "function_name": "decide_recovery_strategy",
                     "task_id": getattr(task, "task_id", "N/A"),
                     "error_type": error_type,
                     "fail_count": fail_count,
@@ -880,10 +882,10 @@ class AgentCoreHelpers:
                     and validated_strategy.recovery_strategy in attempted_strategies
                 ):
                     ContextRegistry.get().get_logger().log_warning(
-                        "Strategy Decision",
+                        "AGENT • STRATEGY_DECISION",
                         f"LLM repeated previously attempted strategy '{validated_strategy.recovery_strategy}'. Delegating to history-aware fallback.",
                         metadata={
-                            "function name": "decide_recovery_strategy",
+                            "function_name": "decide_recovery_strategy",
                             "task_id": task.task_id,
                             "repeated_strategy": validated_strategy.recovery_strategy,
                             "attempted_strategies": list(attempted_strategies),
@@ -895,10 +897,10 @@ class AgentCoreHelpers:
 
                 validated_dict = validated_strategy.model_dump()
                 ContextRegistry.get().get_logger().log_info(
-                    "Strategy Decision",
+                    "AGENT • STRATEGY_DECISION",
                     f"Selected strategy '{validated_strategy.recovery_strategy}' for task {task.task_id}",
                     metadata={
-                        "function name": "decide_recovery_strategy",
+                        "function_name": "decide_recovery_strategy",
                         "task_id": task.task_id,
                         "recovery_strategy": validated_strategy.recovery_strategy,
                         "confidence_level": validated_strategy.confidence_level,
@@ -910,10 +912,10 @@ class AgentCoreHelpers:
 
             except Exception as e:
                 ContextRegistry.get().get_logger().log_warning(
-                    "Strategy Decision",
+                    "AGENT • STRATEGY_DECISION",
                     f"LLM strategy selection failed or returned invalid contract ({e}); using history-aware rule fallback.",
                     metadata={
-                        "function name": "decide_recovery_strategy",
+                        "function_name": "decide_recovery_strategy",
                         "task_id": getattr(task, "task_id", "N/A"),
                         "exception": str(e),
                     },
@@ -1043,9 +1045,7 @@ class AgentCoreHelpers:
                     if expected_python_types is None:
                         continue
                     # Special-cases for number/integer
-                    if expected_type == "number" and isinstance(value, (int, float)):
-                        pass
-                    elif (
+                    if expected_type == "number" and isinstance(value, (int, float)) or (
                         expected_type == "integer"
                         and isinstance(value, int)
                         and not isinstance(value, bool)
@@ -1071,10 +1071,10 @@ class AgentCoreHelpers:
             """Execute tool and return (success, result)."""
 
             ContextRegistry.get().get_logger().log_info(
-                "Tool Executor",
+                "AGENT • TOOL_EXECUTOR",
                 f"Executing tool: '{tool_name}' with parameters: {parameters}",
                 metadata={
-                    "function name": "__tool_executor",
+                    "function_name": "__tool_executor",
                     "tool_name": tool_name,
                     "parameters": parameters,
                 },
@@ -1181,10 +1181,10 @@ class AgentCoreHelpers:
 
                 if is_logical_success:
                     ContextRegistry.get().get_logger().log_info(
-                        "Tool Executor",
+                        "AGENT • TOOL_EXECUTOR",
                         f"Tool '{tool_name}' executed successfully.",
                         metadata={
-                            "function name": "__tool_executor",
+                            "function_name": "__tool_executor",
                             "tool_name": tool_name,
                             "response_content": (
                                 last_response.content[:200] + "..."
@@ -1196,10 +1196,10 @@ class AgentCoreHelpers:
                     return (True, last_response.content)
                 else:
                     ContextRegistry.get().get_logger().log_warning(
-                        "Tool Executor",
+                        "AGENT • TOOL_EXECUTOR",
                         f"Tool '{tool_name}' executed but detected logical failure.",
                         metadata={
-                            "function name": "__tool_executor",
+                            "function_name": "__tool_executor",
                             "tool_name": tool_name,
                             "response_content": (
                                 last_response.content[:200] + "..."
@@ -1212,10 +1212,10 @@ class AgentCoreHelpers:
                     return (False, logical_failure_message)
             except Exception as e:
                 ContextRegistry.get().get_logger().log_error(
-                    "Tool Executor",
-                    f"Exception during tool execution: {str(e)}",
+                    "AGENT • TOOL_EXECUTOR",
+                    f"Exception during tool execution: {e!s}",
                     metadata={
-                        "function name": "__tool_executor",
+                        "function_name": "__tool_executor",
                         "tool_name": tool_name,
                         "exception": str(e),
                     },
@@ -1261,10 +1261,10 @@ class AgentCoreHelpers:
                 # but it will prevent the main workflow from hanging.
                 executor.shutdown(wait=False)
                 ContextRegistry.get().get_logger().log_error(
-                    "Tool Executor",
+                    "AGENT • TOOL_EXECUTOR",
                     f"Tool '{tool_name}' execution timed out after {timeout} seconds.",
                     metadata={
-                        "function name": "exeCuteTool",
+                        "function_name": "exeCuteTool",
                         "tool_name": tool_name,
                         "timeout": timeout,
                     },
@@ -1274,10 +1274,10 @@ class AgentCoreHelpers:
                 # Handle other exceptions during execution.
                 executor.shutdown(wait=True)
                 ContextRegistry.get().get_logger().log_error(
-                    "Tool Executor",
-                    f"Exception during tool execution: {str(e)}",
+                    "AGENT • TOOL_EXECUTOR",
+                    f"Exception during tool execution: {e!s}",
                     metadata={
-                        "function name": "exeCuteTool",
+                        "function_name": "exeCuteTool",
                         "tool_name": tool_name,
                         "exception": str(e),
                     },
@@ -1293,10 +1293,10 @@ class AgentCoreHelpers:
         ) -> dict:
             """Analyze if task is atomic or needs decomposition using tool schema awareness."""
             ContextRegistry.get().get_logger().log_info(
-                "Complexity Analyzer",
+                "AGENT • COMPLEXITY_ANALYZER",
                 f"Analyzing complexity for Task {task.task_id}: '{task.description}'",
                 metadata={
-                    "function name": "__analyze_task_complexity",
+                    "function_name": "__analyze_task_complexity",
                     "task_id": task.task_id,
                     "task_description": task.description,
                     "tool_name": task.tool_name,
@@ -1347,10 +1347,10 @@ class AgentCoreHelpers:
                 }
 
             ContextRegistry.get().get_logger().log_info(
-                "Complexity Analyzer",
+                "AGENT • COMPLEXITY_ANALYZER",
                 f"Complexity Analysis Result: {analysis_result}",
                 metadata={
-                    "function name": "__analyze_task_complexity",
+                    "function_name": "__analyze_task_complexity",
                     "task_id": task.task_id,
                     "analysis_result": analysis_result,
                 },

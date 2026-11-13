@@ -11,8 +11,8 @@ for custom log entry structure with metadata support.
 
 
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Union
 from enum import Enum
+from typing import Any
 
 
 class LogLevel (Enum):
@@ -38,7 +38,7 @@ class LogEntry:
     LOG_LEVEL: LogLevel
     TIME_STAMP: str
     MESSAGE: str # main message body
-    METADATA: Optional[Dict[str, Any]] = None
+    METADATA: dict[str, Any] | None = None
 
     """
     LogLevel - DEBUG, INFO, WARNING, ERROR, CRITICAL

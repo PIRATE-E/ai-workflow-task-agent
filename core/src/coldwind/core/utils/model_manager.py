@@ -2,31 +2,31 @@ import json
 import os
 import subprocess
 import time
-from typing import ClassVar, Optional, Any, Iterator, Union
-
-# MIGRATED: AIMessage added to direct langchain import (was settings.AIMessage).
-from langchain_core.language_models import LanguageModelInput
-from langchain_core.messages import (
-    BaseMessageChunk,
-    BaseMessage,
-    AIMessageChunk,
-    AIMessage,
-)
-from langchain_core.runnables import RunnableConfig
-from langchain_ollama import ChatOllama
-
-from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
-from coldwind.core.utils.open_ai_integration import OpenAIIntegration
+from collections.abc import Iterator
+from typing import Any, ClassVar, Optional
 
 # WHAT: Route exception handling through core exception_interface contract.
 # WHY: Eliminates legacy _CoreExceptionHandlerAdapter and fake RichTracebackManager aliases.
 from coldwind.core.interfaces.exception_interface import rich_exception_handler
+from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
+from coldwind.core.utils.open_ai_integration import OpenAIIntegration
+
+# MIGRATED: AIMessage added to direct langchain import (was settings.AIMessage).
+from langchain_core.language_models import LanguageModelInput
+from langchain_core.messages import (
+    AIMessage,
+    AIMessageChunk,
+    BaseMessage,
+    BaseMessageChunk,
+)
+from langchain_core.runnables import RunnableConfig
+from langchain_ollama import ChatOllama
 
 
 def _handle_exception(
     error: Exception,
     context: str = "",
-    extra_context: Optional[dict[str, Any]] = None,
+    extra_context: dict[str, Any] | None = None,
 ) -> None:
     """Helper to route exceptions to active runtime error handler safely."""
     try:
@@ -46,8 +46,8 @@ class ModelManager(ChatOllama):
     """
 
     instance: ClassVar[Optional["ModelManager"]] = None
-    current_model: ClassVar[Optional[str]] = None
-    _openai_integration: ClassVar[Optional[OpenAIIntegration]] = None
+    current_model: ClassVar[str | None] = None
+    _openai_integration: ClassVar[OpenAIIntegration | None] = None
     _is_openai_mode: ClassVar[bool] = False
 
     # 🐞 BORN EMPTY (fixes import-time ContextRegistry.get() crash — see
@@ -87,7 +87,7 @@ class ModelManager(ChatOllama):
         Ensures only one instance of ModelManager exists (Singleton pattern).
         """
         if cls.instance is None:
-            cls.instance = super(ModelManager, cls).__new__(cls)
+            cls.instance = super().__new__(cls)
         return cls.instance
 
     @rich_exception_handler("ModelManager Initialization")
@@ -189,7 +189,7 @@ class ModelManager(ChatOllama):
             raise
 
     @property
-    def openai_chat(self) -> Optional[OpenAIIntegration]:
+    def openai_chat(self) -> OpenAIIntegration | None:
         """Property to access the OpenAI integration."""
         return ModelManager._openai_integration
 
@@ -335,9 +335,9 @@ class ModelManager(ChatOllama):
     def invoke(
         self,
         input: LanguageModelInput,
-        config: Optional[RunnableConfig] = None,
+        config: RunnableConfig | None = None,
         *,
-        stop: Optional[list[str]] = None,
+        stop: list[str] | None = None,
         **kwargs: Any,
     ) -> BaseMessage | Any:
         """
@@ -385,9 +385,9 @@ class ModelManager(ChatOllama):
     def stream(
         self,
         input: LanguageModelInput,
-        config: Optional[RunnableConfig] = None,
+        config: RunnableConfig | None = None,
         *,
-        stop: Optional[list[str]] = None,
+        stop: list[str] | None = None,
         **kwargs: Any,
     ) -> Iterator[BaseMessageChunk]:
         """
@@ -409,7 +409,7 @@ class ModelManager(ChatOllama):
             # If using OpenAIIntegration, delegate to it
             open_ai_response = ModelManager._openai_integration.generate_text(
                 prompt=(
-                    getattr(input[0], "content")
+                    input[0].content
                     if isinstance(input, list) and not isinstance(input[0], dict)
                     else input.content
                 ),
@@ -446,8 +446,8 @@ class ModelManager(ChatOllama):
 
     @classmethod
     def convert_to_json(
-        cls, response: Union[str, dict, list, BaseMessage]
-    ) -> Union[dict, list]:
+        cls, response: str | dict | list | BaseMessage
+    ) -> dict | list:
         """
         🔧 ENHANCED v4.0: JSON extraction with COMPLETELY ISOLATED system_logging (no recursion possible)
 

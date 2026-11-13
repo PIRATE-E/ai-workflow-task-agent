@@ -6,9 +6,10 @@ handlers are responsible for processing log entries and directing them to approp
 
 import os
 from abc import ABC, abstractmethod
-from pathlib import Path
-from typing import Dict, TextIO
 from datetime import datetime
+from pathlib import Path
+from typing import TextIO
+
 from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
 from coldwind.core.system_logging.debug_protocol import LogEntry
 
@@ -57,7 +58,7 @@ class Handler(ABC):
 
 class TextHandler(Handler):
     name = "TextHandler"
-    writers: Dict[str, TextIO] = {}
+    writers: dict[str, TextIO] = {}
 
     # file rotation settings - fetched from active runtime context at access time
     _accessed_rotation_size_limit = False
@@ -143,7 +144,6 @@ class TextHandler(Handler):
             os.fsync(writer.fileno())
             writer.close()
         TextHandler.writers.clear()
-        pass
 
     def _text_file_rotation(self, file_path: Path):
         """

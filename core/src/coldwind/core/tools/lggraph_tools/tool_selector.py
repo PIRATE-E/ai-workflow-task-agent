@@ -13,8 +13,8 @@ WHY:
   calls were obsolete artifacts from the pre-workspace codebase that bypassed the logging pipeline.
 """
 
-from typing import Any
 import inspect
+from typing import Any
 
 from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
 from coldwind.core.runtime.runtime_obj_enum import CoreRunTimeObjects
@@ -51,7 +51,7 @@ def execute_selected_tool(
             parameters = ModelManager.convert_to_json(parameters)
         except Exception as err:
             logger.log_error(
-                heading="TOOL_SELECTOR - PARSE_ERROR",
+                heading="TOOL • PARSE_ERROR",
                 body=f"Failed to parse string parameters into JSON dictionary: {err}",
                 metadata={"raw_parameters": parameters, "error": str(err)},
             )
@@ -64,7 +64,7 @@ def execute_selected_tool(
                 # 4. Validate that parameters is a dictionary; recover if malformed
                 if not isinstance(parameters, dict):
                     logger.log_warning(
-                        heading="TOOL_SELECTOR - INVALID_PARAMETERS",
+                        heading="TOOL • INVALID_PARAMETERS",
                         body=f"Expected parameters as dict, got {type(parameters).__name__}; creating empty dict fallback.",
                         metadata={
                             "tool_name": tool.name,
@@ -78,7 +78,7 @@ def execute_selected_tool(
                 parameters["tool_name"] = tool.name
 
                 logger.log_info(
-                    heading="TOOL_SELECTOR - TOOL_EXECUTION",
+                    heading="TOOL • EXECUTION",
                     body=f"Executing tool '{tool.name}' with validated parameters.",
                     metadata={
                         "tool_name": tool.name,
@@ -103,7 +103,7 @@ def execute_selected_tool(
 
             except Exception as e:
                 logger.log_error(
-                    heading="TOOL_SELECTOR - EXECUTION_ERROR",
+                    heading="TOOL • EXECUTION_ERROR",
                     body=f"Error executing tool '{tool.name}': {e}",
                     metadata={
                         "tool_name": tool.name,
@@ -120,7 +120,7 @@ def execute_selected_tool(
 
     # 8. Handle unknown or unregistered tool name
     logger.log_warning(
-        heading="TOOL_SELECTOR - TOOL_NOT_FOUND",
+        heading="TOOL • NOT_FOUND",
         body=f"Tool '{selection.tool_name}' was selected but not found in registered tool list.",
         metadata={"tool_name": selection.tool_name},
     )

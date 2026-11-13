@@ -151,7 +151,7 @@ class HierarchicalAgentPrompt:
         - Use sparingly. Most sub-tasks should rely on summarized context.
         '''
 
-        human_prompt = f'''
+        human_prompt = '''
          Based on the instructions in the system prompt, generate the required JSON array of tasks.
          
          🚨 RESPOND WITH ONLY THE JSON ARRAY - NO OTHER TEXT.
@@ -329,7 +329,7 @@ class HierarchicalAgentPrompt:
             # Specific instruction for Collector tasks using perform_synthesis
         collector_instruction = ""
         if tool_name == "perform_synthesis" and "Collector" in task_description:
-            collector_instruction = f'''
+            collector_instruction = '''
              --- COLLECTOR TASK INSTRUCTION ---
              This is a "Collector" task. Your goal is to synthesize the raw results from previous tasks into a single, comprehensive output.
              You MUST review the `FULL RAW RESULTS OF PREVIOUS TASKS` section. For each relevant task (e.g., `google_search`, `read_text_file`), extract the *full, raw text content* of its `result` field.

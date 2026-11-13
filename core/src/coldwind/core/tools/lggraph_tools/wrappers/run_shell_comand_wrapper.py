@@ -1,9 +1,10 @@
 # MIGRATED: direct langchain import for AIMessage (response-construction wrapper).
 # Runtime context access (when needed) via ContextRegistry.get().get_settings().
-from langchain_core.messages import AIMessage
-
 from coldwind.core.tools.lggraph_tools.tool_response_manager import ToolResponseManager
-from coldwind.core.tools.lggraph_tools.tools.run_shell_command_tool import run_shell_command
+from coldwind.core.tools.lggraph_tools.tools.run_shell_command_tool import (
+    run_shell_command,
+)
+from langchain_core.messages import AIMessage
 
 
 class ShellCommandWrapper:

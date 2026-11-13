@@ -1,10 +1,20 @@
-from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
-from coldwind.core.agents.agentic_orchestrator.agent_core_helpers import AgentCoreHelpers
 import uuid
-from coldwind.core.agents.agentic_orchestrator.pydantic_models import TASK, REQUIRED_CONTEXT, EXECUTION_CONTEXT, FAILURE_CONTEXT, subAgent_CONTEXT
-from coldwind.core.agents.agentic_orchestrator.hierarchical_agent_prompts import HierarchicalAgentPrompt
-from coldwind.core.utils.model_manager import ModelManager
 
+from coldwind.core.agents.agentic_orchestrator.agent_core_helpers import (
+    AgentCoreHelpers,
+)
+from coldwind.core.agents.agentic_orchestrator.hierarchical_agent_prompts import (
+    HierarchicalAgentPrompt,
+)
+from coldwind.core.agents.agentic_orchestrator.pydantic_models import (
+    EXECUTION_CONTEXT,
+    FAILURE_CONTEXT,
+    REQUIRED_CONTEXT,
+    TASK,
+    subAgent_CONTEXT,
+)
+from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
+from coldwind.core.utils.model_manager import ModelManager
 from coldwind.core.utils.timestamp_util import get_formatted_timestamp
 
 
@@ -22,7 +32,7 @@ class Spawn_subAgent:
             "--- SPAWNER: Analyzing Task for sub-agent spawning ---",
             f"Task ID: {parent_task.task_id}, Reason: {reason}",
             metadata={
-                "function name": "analyze_spawn_requirement",
+                "function_name": "analyze_spawn_requirement",
                 "task_id": parent_task.task_id,
                 "reason": reason,
             },
@@ -56,10 +66,10 @@ class Spawn_subAgent:
             or "requires_decomposition" not in analysis_result
         ):
             ContextRegistry.get().get_logger().log_warning(
-                "SubAgent Spawner",
+                "AGENT • SPAWNER_RUN",
                 "LLM failed to provide a valid spawn analysis. Defaulting to NO spawn.",
                 metadata={
-                    "function name": "analyze_spawn_requirement",
+                    "function_name": "analyze_spawn_requirement",
                     "task_id": parent_task.task_id,
                     "reason": reason,
                 },
@@ -70,10 +80,10 @@ class Spawn_subAgent:
             }
 
         ContextRegistry.get().get_logger().log_info(
-            "SubAgent Spawner",
+            "AGENT • SPAWNER_RUN",
             f"Spawn Analysis Result: {analysis_result.get('reasoning')}",
             metadata={
-                "function name": "analyze_spawn_requirement",
+                "function_name": "analyze_spawn_requirement",
                 "task_id": parent_task.task_id,
                 "reason": reason,
                 "should_spawn": analysis_result.get("requires_decomposition"),
@@ -101,7 +111,7 @@ class Spawn_subAgent:
             "--- SPAWNER: Decomposing Task into smaller tasks ---",
             f"Task ID: {parent_task.task_id}",
             metadata={
-                "function name": "decompose_task_for_subAgent",
+                "function_name": "decompose_task_for_subAgent",
                 "task_id": parent_task.task_id,
                 "description": parent_task.description,
                 "tool_name": parent_task.tool_name,
@@ -133,10 +143,10 @@ class Spawn_subAgent:
         except Exception as e:
             # This is a critical internal error, not just a planning choice.
             ContextRegistry.get().get_logger().log_error(
-                "SubAgent Spawner",
+                "AGENT • SPAWNER_RUN",
                 f"CRITICAL: Failed to generate sub-task prompt due to an internal error: {e}",
                 metadata={
-                    "function name": "decompose_task_for_subAgent",
+                    "function_name": "decompose_task_for_subAgent",
                     "task_id": parent_task.task_id,
                     "exception_type": type(e).__name__,
                     "exception": str(e),
@@ -194,10 +204,10 @@ class Spawn_subAgent:
 
         if not isinstance(decomposed_tasks_data, list):
             ContextRegistry.get().get_logger().log_warning(
-                "SubAgent Spawner",
+                "AGENT • SPAWNER_RUN",
                 "LLM failed to return a valid list for decomposition.",
                 metadata={
-                    "function name": "decompose_task_for_subAgent",
+                    "function_name": "decompose_task_for_subAgent",
                     "task_id": parent_task.task_id,
                 },
             )
@@ -211,10 +221,10 @@ class Spawn_subAgent:
                 # FIX: Now recommended_tools is consistently list[str] for both depth cases
                 if item["tool_name"] not in recommended_tools:
                     ContextRegistry.get().get_logger().log_warning(
-                        "SubAgent Spawner",
+                        "AGENT • SPAWNER_RUN",
                         f"Tool '{item['tool_name']}' not in recommended set. Skipping.",
                         metadata={
-                            "function name": "decompose_task_for_subAgent",
+                            "function_name": "decompose_task_for_subAgent",
                             "task_id": parent_task.task_id,
                             "tool_name": item["tool_name"],
                         },
@@ -254,10 +264,10 @@ class Spawn_subAgent:
                 )
 
         ContextRegistry.get().get_logger().log_info(
-            "SubAgent Spawner",
+            "AGENT • SPAWNER_RUN",
             f"Decomposed into {len(sub_tasks)} validated sub-tasks.",
             metadata={
-                "function name": "decompose_task_for_subAgent",
+                "function_name": "decompose_task_for_subAgent",
                 "task_id": parent_task.task_id,
                 "subtasks_created": len(sub_tasks),
             },
@@ -273,7 +283,7 @@ class Spawn_subAgent:
             "--- SPAWNER: Injecting sub-tasks into the workflow ---",
             f"Parent Task ID: {parent_task.task_id}, Sub-tasks to inject: {len(subtasks)}",
             metadata={
-                "function name": "inject_subAgent_into_workflow",
+                "function_name": "inject_subAgent_into_workflow",
                 "parent_task_id": parent_task.task_id,
                 "subtasks_to_inject": len(subtasks),
             },
@@ -308,7 +318,7 @@ class Spawn_subAgent:
                         ),
                     )
                 ContextRegistry.get().get_logger().log_info(
-                    "SubAgent Spawner",
+                    "AGENT • SPAWNER_RUN",
                     f"Inherited failed_parameters from parent {parent_task.task_id} to subtask {subtask.task_id}",
                     metadata={
                         "parent_failed_params": parent_task.failure_context.failed_parameters,
@@ -321,10 +331,10 @@ class Spawn_subAgent:
             current_task_index = current_tasks.index(parent_task)
         except ValueError:
             ContextRegistry.get().get_logger().log_warning(
-                "SubAgent Spawner",
+                "AGENT • SPAWNER_RUN",
                 f"Could not find parent task {parent_task.task_id} in state.",
                 metadata={
-                    "function name": "inject_subAgent_into_workflow",
+                    "function_name": "inject_subAgent_into_workflow",
                     "parent_task_id": parent_task.task_id,
                 },
             )
@@ -347,10 +357,10 @@ class Spawn_subAgent:
 
             if new_signature in completed_task_signatures:
                 ContextRegistry.get().get_logger().log_warning(
-                    "SubAgent Spawner",
+                    "AGENT • SPAWNER_RUN",
                     f"Skipping redundant sub-task {new_sub_task.task_id} ('{new_sub_task.description}') as it's semantically equivalent to a completed task.",
                     metadata={
-                        "function name": "inject_subAgent_into_workflow",
+                        "function_name": "inject_subAgent_into_workflow",
                         "redundant_task_id": new_sub_task.task_id,
                         "redundant_task_description": new_sub_task.description,
                     },
@@ -409,10 +419,10 @@ class Spawn_subAgent:
                 strategy_history=[],
             )
             ContextRegistry.get().get_logger().log_info(
-                "SubAgent Spawner",
+                "AGENT • SPAWNER_RUN",
                 f"Injected synthetic failure_context into parent task {parent_task.task_id}",
                 metadata={
-                    "function name": "spawn_subAgent_recursive",
+                    "function_name": "spawn_subAgent_recursive",
                     "parent_task_id": parent_task.task_id,
                     "injected_failed_parameters": synthetic_failed_params,
                 },
@@ -421,10 +431,10 @@ class Spawn_subAgent:
         spawn_analysis = cls.analyze_spawn_requirement(parent_task, spawn_reason, state)
         if not spawn_analysis.get("should_spawn"):
             ContextRegistry.get().get_logger().log_info(
-                "SubAgent Spawner",
+                "AGENT • SPAWNER_RUN",
                 f"Analysis decided not to spawn a sub-agent for task {parent_task.task_id}.",
                 metadata={
-                    "function name": "spawn_subAgent_recursive",
+                    "function_name": "spawn_subAgent_recursive",
                     "task_id": parent_task.task_id,
                 },
             )
@@ -434,10 +444,10 @@ class Spawn_subAgent:
         )
         if not subtasks:
             ContextRegistry.get().get_logger().log_warning(
-                "SubAgent Spawner",
+                "AGENT • SPAWNER_RUN",
                 f"Decomposition failed for task {parent_task.task_id}.",
                 metadata={
-                    "function name": "spawn_subAgent_recursive",
+                    "function_name": "spawn_subAgent_recursive",
                     "task_id": parent_task.task_id,
                 },
             )

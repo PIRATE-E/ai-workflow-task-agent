@@ -6,16 +6,13 @@ into typed LogEntry objects, and renders formatted Rich panels in the
 dashboard window.
 """
 
-import json
-from typing import Any, Dict, Optional, Union
 
+from coldwind.core.system_logging.debug_protocol import LogCategory, LogEntry, LogLevel
 from rich.box import ROUNDED
 from rich.console import Console, Group
 from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
-
-from coldwind.core.system_logging.debug_protocol import LogCategory, LogEntry, LogLevel
 
 # Shared console configured for terminal output with safe box characters
 console = Console(force_terminal=True, safe_box=True)
@@ -31,7 +28,7 @@ class Printer:
     # WHY: Provides visual distinction between DEBUG, INFO, WARNING, ERROR, and
     #      CRITICAL messages so developers can scan logs quickly in the dashboard.
     # =========================================================================
-    LEVEL_STYLES: Dict[LogLevel, tuple[str, str, str]] = {
+    LEVEL_STYLES: dict[LogLevel, tuple[str, str, str]] = {
         LogLevel.DEBUG: ("🔍 DEBUG", "dim cyan", "dim cyan"),
         LogLevel.INFO: ("ℹ️  INFO", "bold cyan", "cyan"),
         LogLevel.WARNING: ("⚠️  WARNING", "bold yellow", "yellow"),
@@ -39,7 +36,7 @@ class Printer:
         LogLevel.CRITICAL: ("💥 CRITICAL", "bold bright_white on red", "bright_red"),
     }
 
-    CATEGORY_LABELS: Dict[LogCategory, str] = {
+    CATEGORY_LABELS: dict[LogCategory, str] = {
         LogCategory.API_CALL: "🌐 API_CALL",
         LogCategory.TOOL_EXECUTION: "⚙️ TOOL_EXECUTION",
         LogCategory.AGENT_WORKFLOW: "🤖 AGENT_WORKFLOW",
@@ -49,7 +46,7 @@ class Printer:
     }
 
     @classmethod
-    def process_log(cls, raw_line: Union[str, bytes]) -> None:
+    def process_log(cls, raw_line: str | bytes) -> None:
         """
         Parse raw JSON line into a LogEntry and render it to the Rich console.
 

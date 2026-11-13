@@ -3,11 +3,12 @@ this only contains the orchestration logic for the browser tool to run as subpro
 """
 
 from __future__ import annotations
+
 import asyncio
 from queue import Queue
 
 from .config import BrowserRequiredConfig
-from .Handler import HandlerEnums, HandlerExceptionRaises, Handler
+from .Handler import Handler, HandlerEnums, HandlerExceptionRaises
 
 # IMPORTANT: Import events_drivers to register driver classes with the metaclass
 # Without this import, Handler.enum_driver_map will have None for all events
@@ -24,7 +25,7 @@ class Runner:
 
     def __new__(cls, *args, **kwargs):
         if cls.instance is None:
-            cls.instance = super(Runner, cls).__new__(cls)
+            cls.instance = super().__new__(cls)
         return cls.instance
 
     def __init__(self, config: BrowserRequiredConfig):

@@ -1,12 +1,11 @@
-import inspect
 from dataclasses import dataclass
 from typing import Any
 
+from coldwind.core.interfaces.ui_interface import print_message
+from coldwind.core.prompts.system_prompt_tool_selector import get_tool_selector_prompt
 from coldwind.core.runtime.CoreContextRegistry import ContextRegistry
 from coldwind.core.runtime.runtime_obj_enum import CoreRunTimeObjects
-from coldwind.core.prompts.system_prompt_tool_selector import get_tool_selector_prompt
 from coldwind.core.tools.lggraph_tools.tool_assign import ToolAssign
-from coldwind.core.interfaces.ui_interface import print_message
 from coldwind.core.utils.argument_schema_util import get_tool_argument_schema
 from coldwind.core.utils.model_manager import ModelManager
 
@@ -48,7 +47,7 @@ def tool_selection_agent(state) -> dict:
 
     if not tools:
         logger.log_error(
-            heading="TOOL_SELECTOR - NO_TOOLS",
+            heading="TOOL • NO_TOOLS",
             body="No tools available for selection.",
         )
         tools_context = "No tools available."
@@ -82,7 +81,7 @@ def tool_selection_agent(state) -> dict:
         # WHY: Core is headless. Platform handler owns terminal status displays.
         # ---------------------------------------------------------------------
         ContextRegistry.get().get_logger().log_info(
-            heading="STATUS",
+            heading="TOOL • SELECTION",
             body="Selecting appropriate tool...",
             metadata={"node": "tool_selector"},
         )
@@ -111,7 +110,7 @@ def tool_selection_agent(state) -> dict:
         print("Parameters:", selection.parameters)
     except Exception as e:
         logger.log_error(
-            heading="TOOL_SELECTOR - LLM_ERROR",
+            heading="TOOL • LLM_ERROR",
             body=f"Exception during tool selection: {e}",
             metadata={"error": str(e)},
         )
@@ -126,7 +125,7 @@ def tool_selection_agent(state) -> dict:
             parameters = ModelManager.convert_to_json(parameters)
         except Exception as e:
             logger.log_error(
-                heading="TOOL_SELECTOR - PARAM_PARSE_ERROR",
+                heading="TOOL • PARAM_PARSE_ERROR",
                 body=f"Could not parse parameters: {e}",
                 metadata={"raw_parameters": parameters, "error": str(e)},
             )

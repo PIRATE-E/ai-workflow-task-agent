@@ -1,6 +1,5 @@
 # it gonna carried out the classes that will be used to get the information of the tools and used by the agent
-from pydantic import Field, BaseModel
-
+from pydantic import BaseModel, Field
 
 # --- register tools (structured classes)  -----------
 
