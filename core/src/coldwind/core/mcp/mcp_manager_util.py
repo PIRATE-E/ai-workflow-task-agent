@@ -105,7 +105,7 @@ class Utils(MCP_Manager):
             )
         except TimeoutError:
             ContextRegistry.get().get_logger().log_error(
-                "MCP * START ERROR",
+                "MCP • START_ERROR",
                 f"Server '{name}' failed to start within {time} seconds.",
             )
             return False

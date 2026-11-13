@@ -65,7 +65,9 @@ class AgentStatusUpdater:
     }
 
     @classmethod
-    def update_status(cls, category: str, task_id: int | None = None, extra_info: str = ""):
+    def update_status(
+        cls, category: str, task_id: int | None = None, extra_info: str = ""
+    ):
         """Update user status with funny quotes and request count info."""
         try:
             import random
@@ -81,37 +83,38 @@ class AgentStatusUpdater:
             if extra_info:
                 base_message += f" {extra_info}"
 
-            # Get current request count from OpenAI integration
+            # Get current request counts from OpenAI integration
             from coldwind.core.utils.open_ai_integration import OpenAIIntegration
 
-            current_requests = OpenAIIntegration.requests_count
-
+            current_requests = OpenAIIntegration.total_requests
+            rpm_requests = OpenAIIntegration.requests_count
             # Format final message with request count
             final_message = f"{base_message} @ API calls: {current_requests}"
 
             # -----------------------------------------------------------------
             # WHAT CHANGED & WHY:
-            # Replaced legacy eval_listener.emit_on_variable_change with standard
-            # logger.log_info(heading="STATUS", body=final_message).
-            # WHY: Headless core emits status milestones through system_logging
-            # pipeline so registered platform handlers (DesktopStatusHandler,
-            # GUI sinks) receive and present them directly without in-memory event buses.
+            # Replaced legacy heading="STATUS" with heading="AGENT • STATUS".
+            # Standardized metadata keys: 'rpm_count' and 'total_requests'.
+            # WHY: Allows Router to classify entry as AGENT_WORKFLOW instead of OTHER,
+            # and aligns with the universal platform telemetry contract.
             # -----------------------------------------------------------------
             ContextRegistry.get().get_logger().log_info(
-                heading="STATUS",
+                heading="AGENT • STATUS",
                 body=final_message,
                 metadata={
                     "category": category,
                     "task_id": task_id,
                     "extra_info": extra_info,
-                    "api_calls": current_requests,
+                    "rpm_count": rpm_requests,
+                    "total_requests": current_requests,
                 },
             )
 
         except Exception as e:
             # Fail silently - status updates shouldn't break the workflow
+            # Standardized heading to AGENT • STATUS_UPDATE for Router and telemetry compliance
             ContextRegistry.get().get_logger().log_warning(
-                heading="Status Updater",
+                heading="AGENT • STATUS_UPDATE",
                 body=f"Failed to update status: {e}",
                 metadata={
                     "category": category,

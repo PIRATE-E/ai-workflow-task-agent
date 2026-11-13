@@ -52,7 +52,8 @@ def normalize_utf8_text(text: str) -> str:
         
         return text
     except Exception as e:
-        ContextRegistry.get().get_logger().log_info("UTF8_NORMALIZATION", f"Failed to normalize text: {e}", metadata={
+        # Standardized heading to AGENT • UTF8_NORMALIZE for Router and telemetry compliance
+        ContextRegistry.get().get_logger().log_info("AGENT • UTF8_NORMALIZE", f"Failed to normalize text: {e}", metadata={
             "original_length": len(text),
             "error_type": type(e).__name__
         })
@@ -288,7 +289,7 @@ def agent_node(state):
 
         # Log both the user-facing text and the raw normalized final_response for debugging
         ContextRegistry.get().get_logger().log_info("AGENT_MODE • FINAL_RESPONSE_DELIVER", "Delivering final response to user", metadata={
-            "function name": "agent_node",
+            "function_name": "agent_node",
             "display_preview": (display_text or "")[:400],
             "raw_preview": (str(final_response) or "")[:400],
         })

@@ -184,7 +184,7 @@ class BrowserHandler:
             self.running_processes.append(self.process)
 
             ContextRegistry.get().get_logger().log_info(
-                "BROWSER SUBPROCESS",
+                "TOOL • BROWSER_SUBPROCESS",
                 f"Started browser subprocess with PID: {self.process_id}",
                 metadata={
                     "pid": self.process_id,
@@ -281,7 +281,7 @@ class BrowserHandler:
                     process.wait()
 
             ContextRegistry.get().get_logger().log_info(
-                "BROWSER TOOL CLEAN UP",
+                "TOOL • BROWSER_CLEANUP",
                 f"BrowserHandler: Cleaned up process with PID {process.pid}",
                 metadata={
                     "process_id": process.pid,
